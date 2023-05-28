@@ -8,6 +8,7 @@ psycopg2 = "*"
 pandas = "*"
 sqlalchemy = "*"
 oracledb = "*"
+polars = "*"
 
 [dev-packages]
 pyspark = "*"
