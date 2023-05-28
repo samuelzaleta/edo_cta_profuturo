@@ -1,4 +1,8 @@
-from common import MemoryLogger, get_postgres_pool, get_mit_pool, truncate_table, extract_terms, extract_dataset
+#!/usr/bin/python3
+from profuturo.common import MemoryLogger, truncate_table
+from profuturo.database import get_postgres_pool, get_mit_pool
+from profuturo.extraction import extract_terms, extract_dataset
+
 
 app_logger = MemoryLogger()
 postgres_pool = get_postgres_pool()

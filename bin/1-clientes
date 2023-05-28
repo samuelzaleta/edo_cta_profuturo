@@ -1,4 +1,7 @@
-from common import MemoryLogger, HtmlReporter, get_postgres_pool, get_mit_pool, get_buc_pool, truncate_table, extract_terms, extract_dataset, extract_indicator, notify
+#!/usr/bin/python3
+from profuturo.common import MemoryLogger, HtmlReporter, truncate_table, notify
+from profuturo.database import get_postgres_pool, get_mit_pool, get_buc_pool
+from profuturo.extraction import extract_terms, extract_dataset, extract_indicator
 from sqlalchemy import text, Engine
 
 

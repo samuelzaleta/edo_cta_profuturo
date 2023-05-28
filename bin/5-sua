@@ -1,11 +1,13 @@
-from common import MemoryLogger, HtmlReporter, get_postgres_pool, get_mit_pool, get_buc_pool, truncate_table, extract_terms, extract_dataset, notify
+#!/usr/bin/python3
+from profuturo.common import MemoryLogger, HtmlReporter, truncate_table, notify
+from profuturo.database import get_postgres_pool, get_mit_pool
+from profuturo.extraction import extract_terms, extract_dataset
 
 
 app_logger = MemoryLogger()
 html_reporter = HtmlReporter()
 postgres_pool = get_postgres_pool()
 mit_pool = get_mit_pool()
-buc_pool = get_buc_pool()
 
 with postgres_pool.begin() as postgres:
     terms = extract_terms(postgres)
