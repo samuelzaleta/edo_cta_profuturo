@@ -40,9 +40,6 @@ def get_mit_pool():
         "oracle+oracledb://",
         creator=get_mit_conn,
     )
-    with mit_pool.connect() as conn:
-        conn.execute(text("SELECT 'OK' FROM dual"))
-        print("MIT connection OK")
 
     return mit_pool
 
@@ -52,9 +49,6 @@ def get_buc_pool():
         "oracle+oracledb://",
         creator=get_buc_conn,
     )
-    with buc_pool.connect() as conn:
-        conn.execute(text("SELECT 'OK' FROM dual"))
-        print("BUC connection OK")
 
     return buc_pool
 
@@ -64,8 +58,5 @@ def get_postgres_pool():
         "postgresql+psycopg2://",
         creator=get_postgres_conn,
     )
-    with postgres_pool.connect() as conn:
-        conn.execute(text("SELECT 'OK'"))
-        print("Postgres connection OK")
 
     return postgres_pool

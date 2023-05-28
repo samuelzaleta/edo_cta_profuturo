@@ -76,11 +76,10 @@ def extract_dataset(
     destination: Connection,
     query: str,
     table: str,
-    term: int,
     phase: int,
+    term: int = None,
     params: Dict[str, Any] = None,
     limit: int = None,
-    with_term: bool = True,
 ):
     if params is None:
         params = {}
@@ -95,7 +94,7 @@ def extract_dataset(
     try:
         df_pd = pd.read_sql_query(text(query), origin, params=params)
 
-        if with_term:
+        if term:
             df_pd = df_pd.assign(fcn_id_periodo=term)
 
         df_pd.to_sql(
@@ -109,16 +108,16 @@ def extract_dataset(
     except Exception as e:
         notify(
             destination,
-            term,
             f"Error al ingestar {table}",
             f"Hubo un error al ingestar {table}",
-            f"Mensaje de error: {e}"
+            f"Mensaje de error: {e}",
+            term,
         )
         raise e
 
     end = datetime.now()
 
-    write_binnacle(destination, phase, start, end, term=term)
+    write_binnacle(destination, phase, start, end, term)
 
     print(f"Done extracting {table}!")
     print(df_pd.info())

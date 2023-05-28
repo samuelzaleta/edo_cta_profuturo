@@ -156,7 +156,7 @@ def write_binnacle(conn: Connection, phase: int, start: datetime, end: datetime,
     })
 
 
-def notify(conn: Connection, term: int, title: str, message: str = None, details: str = None, control: bool = False):
+def notify(conn: Connection, title: str, message: str = None, details: str = None, term: int = None, control: bool = False):
     conn.execute(text("""
     INSERT INTO ttgespro_notificacion (
         FTC_TITULO, FTC_DETALLE_TEXTO, FTC_DETALLE_BLOB, 

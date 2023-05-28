@@ -32,7 +32,7 @@ with postgres_pool.begin() as postgres:
                    FTD_FEH_LIQUIDACION
             FROM TTAFOGRAL_MOV_AVOL
             WHERE FTD_FEH_LIQUIDACION BETWEEN :start AND :end
-            """, "tthechos_movimientos", term_id, phase=3, params={"start": start_month, "end": end_month}, limit=100)
+            """, "tthechos_movimientos", phase=3, term=term_id, params={"start": start_month, "end": end_month}, limit=100)
             extract_dataset(mit, postgres, """
             SELECT FTN_NUM_CTA_INVDUAL AS fcn_cuenta,
                    FCN_ID_TIPO_MOV,
@@ -45,7 +45,7 @@ with postgres_pool.begin() as postgres:
                    FTD_FEH_LIQUIDACION
             FROM TTAFOGRAL_MOV_BONO
             WHERE FTD_FEH_LIQUIDACION BETWEEN :start AND :end
-            """, "tthechos_movimientos", term_id, phase=3, params={"start": start_month, "end": end_month}, limit=100)
+            """, "tthechos_movimientos", phase=3, term=term_id, params={"start": start_month, "end": end_month}, limit=100)
             extract_dataset(mit, postgres, """
             SELECT FTN_NUM_CTA_INVDUAL AS fcn_cuenta,
                    FCN_ID_TIPO_MOV,
@@ -58,7 +58,7 @@ with postgres_pool.begin() as postgres:
                    FTD_FEH_LIQUIDACION
             FROM TTAFOGRAL_MOV_COMP
             WHERE FTD_FEH_LIQUIDACION BETWEEN :start AND :end
-            """, "tthechos_movimientos", term_id, phase=3, params={"start": start_month, "end": end_month}, limit=100)
+            """, "tthechos_movimientos", phase=3, term=term_id, params={"start": start_month, "end": end_month}, limit=100)
             extract_dataset(mit, postgres, """
             SELECT FTN_NUM_CTA_INVDUAL AS fcn_cuenta,
                    FCN_ID_TIPO_MOV,
@@ -71,7 +71,7 @@ with postgres_pool.begin() as postgres:
                    FTD_FEH_LIQUIDACION
             FROM TTAFOGRAL_MOV_GOB
             WHERE FTD_FEH_LIQUIDACION BETWEEN :start AND :end
-            """, "tthechos_movimientos", term_id, phase=3, params={"start": start_month, "end": end_month}, limit=100)
+            """, "tthechos_movimientos", phase=3, term=term_id, params={"start": start_month, "end": end_month}, limit=100)
             extract_dataset(mit, postgres, """
             SELECT FTN_NUM_CTA_INVDUAL AS fcn_cuenta,
                    FCN_ID_TIPO_MOV,
@@ -84,7 +84,7 @@ with postgres_pool.begin() as postgres:
                    FTD_FEH_LIQUIDACION
             FROM TTAFOGRAL_MOV_RCV
             WHERE FTD_FEH_LIQUIDACION BETWEEN :start AND :end
-            """, "tthechos_movimientos", term_id, phase=3, params={"start": start_month, "end": end_month}, limit=100)
+            """, "tthechos_movimientos", phase=3, term=term_id, params={"start": start_month, "end": end_month}, limit=100)
             extract_dataset(mit, postgres, """
             SELECT FTN_NUM_CTA_INVDUAL AS fcn_cuenta,
                    FCN_ID_TIPO_MOV,
@@ -97,7 +97,7 @@ with postgres_pool.begin() as postgres:
                    FTD_FEH_LIQUIDACION
             FROM TTAFOGRAL_MOV_SAR
             WHERE FTD_FEH_LIQUIDACION BETWEEN :start AND :end
-            """, "tthechos_movimientos", term_id, phase=3, params={"start": start_month, "end": end_month}, limit=100)
+            """, "tthechos_movimientos", phase=3, term=term_id, params={"start": start_month, "end": end_month}, limit=100)
             extract_dataset(mit, postgres, """
             SELECT FTN_NUM_CTA_INVDUAL AS fcn_cuenta,
                    FCN_ID_TIPO_MOV,
@@ -110,7 +110,7 @@ with postgres_pool.begin() as postgres:
                    FTD_FEH_LIQUIDACION
             FROM TTAFOGRAL_MOV_VIV
             WHERE FTD_FEH_LIQUIDACION BETWEEN :start AND :end
-            """, "tthechos_movimientos", term_id, phase=3, params={"start": start_month, "end": end_month}, limit=100)
+            """, "tthechos_movimientos", phase=3, term=term_id, params={"start": start_month, "end": end_month}, limit=100)
 
             # Cifras de control
             report = html_reporter.generate(
@@ -151,9 +151,9 @@ with postgres_pool.begin() as postgres:
 
             notify(
                 postgres,
-                term_id,
                 "Cifras de control Comisiones generadas",
                 "Se han generado las cifras de control para comisiones exitosamente",
                 report,
+                term=term_id,
                 control=True,
             )

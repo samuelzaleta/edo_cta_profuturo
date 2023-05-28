@@ -62,8 +62,8 @@ with postgres_pool.begin() as postgres:
             """
 
             truncate_table(postgres, "thhechos_saldo_historico", term_id)
-            extract_dataset(mit, postgres, query, "thhechos_saldo_historico", term_id, phase=2, params={"date": start_month, "type": "I"})
-            extract_dataset(mit, postgres, query, "thhechos_saldo_historico", term_id, phase=2, params={"date": end_month, "type": "F"})
+            extract_dataset(mit, postgres, query, "thhechos_saldo_historico", phase=2, term=term_id, params={"date": start_month, "type": "I"})
+            extract_dataset(mit, postgres, query, "thhechos_saldo_historico", phase=2, term=term_id, params={"date": end_month, "type": "F"})
 
             # Cifras de control
             report = html_reporter.generate(
@@ -107,9 +107,9 @@ with postgres_pool.begin() as postgres:
 
             notify(
                 postgres,
-                term_id,
                 "Cifras de control Saldos generadas",
                 "Se han generado las cifras de control para saldos exitosamente",
                 report,
+                term=term_id,
                 control=True,
             )
