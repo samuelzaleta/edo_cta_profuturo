@@ -1,18 +1,19 @@
 #!/usr/bin/python3
-from profuturo.common import MemoryLogger, HtmlReporter, truncate_table, notify
-from profuturo.database import get_postgres_pool, get_mit_pool, get_buc_pool
+from profuturo.common import truncate_table, notify, register_time
+from profuturo.database import get_postgres_pool, get_mit_pool, get_buc_pool, use_pools
 from profuturo.extraction import extract_dataset, extract_indicator
+from profuturo.reporters import HtmlReporter
 from sqlalchemy import text, Engine
 
 
-app_logger = MemoryLogger()
 html_reporter = HtmlReporter()
 postgres_pool = get_postgres_pool()
 mit_pool = get_mit_pool()
 buc_pool = get_buc_pool()
+phase = 1
 
-with postgres_pool.begin() as postgres:
-    with buc_pool.begin() as buc:
+with use_pools(phase, postgres_pool, buc_pool) as (postgres, buc):
+    with register_time(postgres, phase):
         # Extracción
         truncate_table(postgres, 'tcdatmae_clientes')
         extract_dataset(buc, postgres, """
@@ -45,7 +46,7 @@ with postgres_pool.begin() as postgres:
           AND D.IDTIPODOM = 818 -- Tipo de domicilio Particular
           AND D.IDSTATUSDOM = 761 -- ACTIVO
           AND D.PREFERENTE = 1 --Domicilio preferente
-        """, "tcdatmae_clientes", phase=1, limit=100_000)
+        """, "tcdatmae_clientes", phase, limit=100_000)
 
         # Indicadores
         indicators = postgres.execute(text("""
@@ -54,7 +55,7 @@ with postgres_pool.begin() as postgres:
         WHERE ftc_bandera_estatus = 'V'
         """))
 
-        for i, indicator in enumerate(indicators.fetchall()):
+        for index, indicator in enumerate(indicators.fetchall()):
             print(f"Extracting {indicator[1]}...")
 
             indicators_queries = postgres.execute(text("""
@@ -73,7 +74,7 @@ with postgres_pool.begin() as postgres:
                     pool = postgres_pool
 
                 with pool.connect() as conn:
-                    extract_indicator(conn, postgres, indicator_query[0], index=i, phase=1)
+                    extract_indicator(conn, postgres, indicator_query[0], index, phase)
 
         # Generación de cifras de control
         report = html_reporter.generate(postgres, """

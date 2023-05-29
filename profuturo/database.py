@@ -1,7 +1,25 @@
-from sqlalchemy import text
+from sqlalchemy.engine import Engine
+from sqlalchemy.exc import OperationalError
+from contextlib import ExitStack
+from .exceptions import ProfuturoException
+import contextlib
 import sqlalchemy
 import oracledb
 import psycopg2
+
+
+@contextlib.contextmanager
+def use_pools(phase: int, *pools: Engine):
+    with ExitStack() as stack:
+        conns = []
+
+        for pool in pools:
+            try:
+                conns.append(stack.enter_context(pool.begin()))
+            except OperationalError as e:
+                raise ProfuturoException("DATABASE_CONNECTION_ERROR", phase) from e
+
+        yield conns
 
 
 def get_mit_conn() -> oracledb.Connection:
@@ -34,7 +52,7 @@ def get_postgres_conn():
 
 
 def get_mit_pool():
-    oracledb.init_oracle_client()
+    #oracledb.init_oracle_client()
 
     mit_pool = sqlalchemy.create_engine(
         "oracle+oracledb://",

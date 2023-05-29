@@ -1,22 +1,21 @@
 #!/usr/bin/python3
-from profuturo.common import MemoryLogger, truncate_table
-from profuturo.database import get_postgres_pool, get_mit_pool
+from profuturo.common import truncate_table, register_time
+from profuturo.database import get_postgres_pool, get_mit_pool, use_pools
 from profuturo.extraction import extract_dataset
 
-
-app_logger = MemoryLogger()
 postgres_pool = get_postgres_pool()
 mit_pool = get_mit_pool()
+phase = 0
 
-with postgres_pool.begin() as postgres:
-    with mit_pool.begin() as mit:
+with use_pools(phase, postgres_pool, mit_pool) as (postgres, mit):
+    with register_time(postgres, phase):
         truncate_table(postgres, 'tcdatmae_tipos_subcuenta')
         extract_dataset(mit, postgres, """
         SELECT DISTINCT sct.FCN_ID_TIPO_SUBCTA AS ftn_id_tipo_subcta, 
                sct.FCN_ID_REGIMEN, sct.FCN_ID_CAT_SUBCTA, cat.FCC_VALOR
         FROM TCCRXGRAL_TIPO_SUBCTA sct
         INNER JOIN THCRXGRAL_CAT_CATALOGO cat ON sct.FCN_ID_CAT_SUBCTA = cat.FCN_ID_CAT_CATALOGO
-        """, "tcdatmae_tipos_subcuenta", phase=0)
+        """, "tcdatmae_tipos_subcuenta", phase)
 
         truncate_table(postgres, 'catalogo_siefores')
         extract_dataset(mit, postgres, """
@@ -33,4 +32,4 @@ with postgres_pool.begin() as postgres:
                FCB_VIGENCIA
         FROM dataset
         WHERE ROW_NUM = 1
-        """, "catalogo_siefores", phase=0)
+        """, "catalogo_siefores", phase)

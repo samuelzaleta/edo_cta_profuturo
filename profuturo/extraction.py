@@ -1,33 +1,38 @@
-from sqlalchemy.engine import Connection
-from sqlalchemy import text
+from sqlalchemy import text, Connection
 from typing import Dict, List, Any
-from datetime import datetime, date
-from .common import write_binnacle, notify
+from datetime import date
+from .exceptions import ProfuturoException
 from ._helpers import group_by, chunk
 import calendar
 import pandas as pd
 
 
-def extract_terms(conn: Connection) -> List[Dict[str, Any]]:
-    cursor = conn.execute(text("""
-    SELECT ftn_id_periodo, ftc_periodo
-    FROM tcgespro_periodos
-    """))
-    terms = []
+def extract_terms(conn: Connection, phase: int) -> List[Dict[str, Any]]:
+    try:
+        cursor = conn.execute(text("""
+        SELECT ftn_id_periodo, ftc_periodo
+        FROM tcgespro_periodos
+        """))
+        terms = []
 
-    for row in cursor.fetchall():
-        term = row[1].split('-')
-        year = int(term[0])
-        month = int(term[1])
+        if cursor.rowcount == 0:
+            raise ValueError("The terms table should have at least one term", phase)
 
-        month_range = calendar.monthrange(year, month)
-        start_month = date(year, month, 1)
-        end_month = date(year, month, month_range[1])
+        for row in cursor.fetchall():
+            term = row[1].split('-')
+            year = int(term[0])
+            month = int(term[1])
 
-        terms.append({"id": row[0], "start_month": start_month, "end_month": end_month})
-        print(f"Extracting period: from {start_month} to {end_month}")
+            month_range = calendar.monthrange(year, month)
+            start_month = date(year, month, 1)
+            end_month = date(year, month, month_range[1])
 
-    return terms
+            terms.append({"id": row[0], "start_month": start_month, "end_month": end_month})
+            print(f"Extracting period: from {start_month} to {end_month}")
+
+        return terms
+    except Exception as e:
+        raise ProfuturoException("TERMS_ERROR", phase) from e
 
 
 def extract_indicator(
@@ -47,8 +52,6 @@ def extract_indicator(
 
     print("Extracting fixed indicator...")
 
-    start = datetime.now()
-
     cursor = origin.execute(text(query), params)
     for value, accounts in group_by(cursor.fetchall(), lambda row: row[1], lambda row: row[0]).items():
         for i, batch in enumerate(chunk(accounts, 1_000)):
@@ -63,10 +66,6 @@ def extract_indicator(
             })
 
             print(f"Updating records {i * 1_000} throught {(i + 1) * 1_000}")
-
-    end = datetime.now()
-
-    write_binnacle(destination, phase, start, end)
 
     print("Done extracting fixed indicator!")
 
@@ -89,8 +88,6 @@ def extract_dataset(
 
     print(f"Extracting {table}...")
 
-    start = datetime.now()
-
     try:
         df_pd = pd.read_sql_query(text(query), origin, params=params)
 
@@ -106,18 +103,7 @@ def extract_dataset(
             chunksize=1_000,
         )
     except Exception as e:
-        notify(
-            destination,
-            f"Error al ingestar {table}",
-            f"Hubo un error al ingestar {table}",
-            f"Mensaje de error: {e}",
-            term,
-        )
-        raise e
-
-    end = datetime.now()
-
-    write_binnacle(destination, phase, start, end, term)
+        raise ProfuturoException("UNKNOWN_ERROR", phase, term) from e
 
     print(f"Done extracting {table}!")
     print(df_pd.info())

@@ -1,18 +1,19 @@
 #!/usr/bin/python3
-from profuturo.common import MemoryLogger, HtmlReporter, truncate_table, notify
-from profuturo.database import get_postgres_pool, get_mit_pool
+from profuturo.common import truncate_table, notify, register_time
+from profuturo.database import get_postgres_pool, get_mit_pool, use_pools
 from profuturo.extraction import extract_terms, extract_dataset
+from profuturo.reporters import HtmlReporter
 
 
-app_logger = MemoryLogger()
 html_reporter = HtmlReporter()
 postgres_pool = get_postgres_pool()
 mit_pool = get_mit_pool()
+phase = 1
 
-with postgres_pool.begin() as postgres:
-    terms = extract_terms(postgres)
+with use_pools(phase, postgres_pool, mit_pool) as (postgres, mit):
+    with register_time(postgres, phase):
+        terms = extract_terms(postgres, phase)
 
-    with mit_pool.begin() as mit:
         for term in terms:
             term_id = term["id"]
             start_month = term["start_month"]
@@ -62,8 +63,8 @@ with postgres_pool.begin() as postgres:
             """
 
             truncate_table(postgres, "thhechos_saldo_historico", term_id)
-            extract_dataset(mit, postgres, query, "thhechos_saldo_historico", phase=2, term=term_id, params={"date": start_month, "type": "I"})
-            extract_dataset(mit, postgres, query, "thhechos_saldo_historico", phase=2, term=term_id, params={"date": end_month, "type": "F"})
+            extract_dataset(mit, postgres, query, "thhechos_saldo_historico", phase, term=term_id, params={"date": start_month, "type": "I"})
+            extract_dataset(mit, postgres, query, "thhechos_saldo_historico", phase, term=term_id, params={"date": end_month, "type": "F"})
 
             # Cifras de control
             report = html_reporter.generate(
