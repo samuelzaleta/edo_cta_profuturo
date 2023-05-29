@@ -52,7 +52,7 @@ def get_postgres_conn():
 
 
 def get_mit_pool():
-    #oracledb.init_oracle_client()
+    oracledb.init_oracle_client()
 
     mit_pool = sqlalchemy.create_engine(
         "oracle+oracledb://",

@@ -50,24 +50,20 @@ def extract_indicator(
         query = f"SELECT * FROM ({query}) WHERE ROWNUM <= :limit"
         params["limit"] = limit
 
-    print("Extracting fixed indicator...")
-
     cursor = origin.execute(text(query), params)
     for value, accounts in group_by(cursor.fetchall(), lambda row: row[1], lambda row: row[0]).items():
         for i, batch in enumerate(chunk(accounts, 1_000)):
             destination.execute(text("""
             UPDATE tcdatmae_clientes
-            SET FTA_INDICADORES[:index] = :value
+            SET FTO_INDICADORES = jsonb_set(FTO_INDICADORES, :field, :value)
             WHERE FTN_CUENTA IN :accounts
             """), {
                 "accounts": tuple(batch),
-                "index": index,
-                "value": value,
+                "field": f"{{{index}}}",
+                "value": f'"{value}"',
             })
 
             print(f"Updating records {i * 1_000} throught {(i + 1) * 1_000}")
-
-    print("Done extracting fixed indicator!")
 
 
 def extract_dataset(

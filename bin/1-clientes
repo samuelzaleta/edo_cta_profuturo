@@ -17,17 +17,17 @@ with use_pools(phase, postgres_pool, buc_pool) as (postgres, buc):
         # Extracción
         truncate_table(postgres, 'tcdatmae_clientes')
         extract_dataset(buc, postgres, """
-        SELECT C.NUMERO AS CUENTA,
-               (PF.NOMBRE || ' ' || PF.APELLIDOPATERNO || ' ' ||PF.APELIDOMATERNO) AS NOMBRE,
-               DI.CALLE,
-               DI.NUMEROEXTERIOR AS NUMERO,
-               ASE.NOMBRE AS COLONIA,
-               CD.NOMBRE AS DELEGACION,
-               CP.CODIGOPOSTAL,
-               E.NOMBRE AS ENTIDAD_FEDERATIVA,
-               NSS.VALOR_IDENTIFICADOR AS NSS,
-               CURP.VALOR_IDENTIFICADOR AS CURP,
-               RFC.VALOR_IDENTIFICADOR AS RFC
+        SELECT C.NUMERO AS FTn_CUENTA,
+               (PF.NOMBRE || ' ' || PF.APELLIDOPATERNO || ' ' ||PF.APELIDOMATERNO) AS FTC_NOMBRE,
+               DI.CALLE AS FTC_CALLE,
+               DI.NUMEROEXTERIOR AS FTC_NUMERO,
+               ASE.NOMBRE AS FTC_COLONIA,
+               CD.NOMBRE AS FTC_DELEGACION,
+               CP.CODIGOPOSTAL AS FTN_CODIGOPOSTAL,
+               E.NOMBRE AS FTC_ENTIDAD_FEDERATIVA,
+               NSS.VALOR_IDENTIFICADOR AS FTC_NSS,
+               CURP.VALOR_IDENTIFICADOR AS FTC_CURP,
+               RFC.VALOR_IDENTIFICADOR AS FTC_RFC
         FROM CONTRATO C
             INNER JOIN PERSONA_CONT_ROL PCR ON C.IDCONTRATO = PCR.IDCONTRATO
             INNER JOIN PERSONA_FISICA PF ON PCR.IDPERSONA = PF.IDPERSONA
@@ -76,30 +76,28 @@ with use_pools(phase, postgres_pool, buc_pool) as (postgres, buc):
                 with pool.connect() as conn:
                     extract_indicator(conn, postgres, indicator_query[0], index, phase)
 
+            print(f"Done extracting {indicator[1]}!")
+
         # Generación de cifras de control
         report = html_reporter.generate(postgres, """
-        SELECT ftc_generacion,
-               ftc_vigencia,
+        SELECT fto_indicadores->>'34' AS generacion,
+               fto_indicadores->>'21' AS vigencia,
                CASE
-                   WHEN ftc_origen = 'Asignado' THEN 'Asignado'
-                   WHEN ftb_pension = true AND ftb_bono = true THEN 'Pensionado con Bono'
-                   WHEN ftb_pension = true THEN 'Pensionado'
-                   WHEN ftc_origen = 'Afiliado' AND ftb_bono = true THEN 'Afiliado con Bono'
-                   WHEN ftc_origen = 'Afiliado' THEN 'Afiliado'
+                   WHEN fto_indicadores->>'3' = 'Asignado' THEN 'Asignado'
+                   WHEN fto_indicadores->>'4' = 'Pensionado' THEN 'Pensionado'
+                   WHEN fto_indicadores->>'3' = 'Afiliado' THEN 'Afiliado'
                END AS tipo_formato,
-               ftc_tipo_cliente,
+               fto_indicadores->>'31' AS tipo_cliente,
                COUNT(*)
         FROM tcdatmae_clientes
-        GROUP BY ftc_generacion,
-                 ftc_vigencia,
+        GROUP BY fto_indicadores->>'34',
+                 fto_indicadores->>'21',
                  CASE
-                     WHEN ftc_origen = 'Asignado' THEN 'Asignado'
-                     WHEN ftb_pension = true AND ftb_bono = true THEN 'Pensionado con Bono'
-                     WHEN ftb_pension = true THEN 'Pensionado'
-                     WHEN ftc_origen = 'Afiliado' AND ftb_bono = true THEN 'Afiliado con Bono'
-                     WHEN ftc_origen = 'Afiliado' THEN 'Afiliado'
+                     WHEN fto_indicadores->>'3' = 'Asignado' THEN 'Asignado'
+                     WHEN fto_indicadores->>'4' = 'Pensionado' THEN 'Pensionado'
+                     WHEN fto_indicadores->>'3' = 'Afiliado' THEN 'Afiliado'
                  END,
-                 ftc_tipo_cliente
+                 fto_indicadores->>'31'
         """, ["Tipo Generación", "Vigencia", "Tipo Formato", "Indicador Afiliación"], ["Clientes"])
 
         notify(

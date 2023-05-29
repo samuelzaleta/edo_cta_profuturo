@@ -31,32 +31,28 @@ with use_pools(phase, postgres_pool, mit_pool) as (postgres, mit):
 
             # Cifras de control
             report = html_reporter.generate(postgres, """
-            SELECT ftc_generacion,
-                   ftc_vigencia,
+            SELECT fto_indicadores->>'34' AS generacion,
+                   fto_indicadores->>'21' AS vigencia,
                    CASE
-                       WHEN ftc_origen = 'Asignado' THEN 'Asignado'
-                       WHEN ftb_pension = true AND ftb_bono = true THEN 'Pensionado con Bono'
-                       WHEN ftb_pension = true THEN 'Pensionado'
-                       WHEN ftc_origen = 'Afiliado' AND ftb_bono = true THEN 'Afiliado con Bono'
-                       WHEN ftc_origen = 'Afiliado' THEN 'Afiliado'
+                       WHEN fto_indicadores->>'3' = 'Asignado' THEN 'Asignado'
+                       WHEN fto_indicadores->>'4' = 'Pensionado' THEN 'Pensionado'
+                       WHEN fto_indicadores->>'3' = 'Afiliado' THEN 'Afiliado'
                    END AS tipo_formato,
-                   ftc_tipo_cliente,
+                   fto_indicadores->>'33' AS tipo_cliente,
                    s.fcc_valor AS siefore,
                    COUNT(*) AS clientes,
                    SUM(ftf_monto_pesos) AS comisiones
             FROM tthechos_comisiones mc
                 LEFT JOIN catalogo_siefores s ON mc.fcn_id_siefore = s.fcn_id_cat_catalogo
                 INNER JOIN tcdatmae_clientes c ON mc.fcn_cuenta = c.ftn_cuenta
-            GROUP BY ftc_generacion,
-                     ftc_vigencia,
+            GROUP BY fto_indicadores->>'34',
+                     fto_indicadores->>'21',
                      CASE
-                         WHEN ftc_origen = 'Asignado' THEN 'Asignado'
-                         WHEN ftb_pension = true AND ftb_bono = true THEN 'Pensionado con Bono'
-                         WHEN ftb_pension = true THEN 'Pensionado'
-                         WHEN ftc_origen = 'Afiliado' AND ftb_bono = true THEN 'Afiliado con Bono'
-                         WHEN ftc_origen = 'Afiliado' THEN 'Afiliado'
+                         WHEN fto_indicadores->>'3' = 'Asignado' THEN 'Asignado'
+                         WHEN fto_indicadores->>'4' = 'Pensionado' THEN 'Pensionado'
+                         WHEN fto_indicadores->>'3' = 'Afiliado' THEN 'Afiliado'
                      END,
-                     ftc_tipo_cliente,
+                     fto_indicadores->>'33',
                      s.fcc_valor
             """, ["Tipo Generación", "Vigencia", "Tipo Formato", "Indicador Afiliación", "SIEFORE"], ["Registros", "Comisiones"])
 
