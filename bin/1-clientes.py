@@ -1,4 +1,3 @@
-#!/usr/bin/python3
 from profuturo.common import truncate_table, notify, register_time
 from profuturo.database import get_postgres_pool, get_mit_pool, get_buc_pool, use_pools
 from profuturo.extraction import extract_dataset, extract_indicator
@@ -74,7 +73,7 @@ with use_pools(phase, postgres_pool, buc_pool) as (postgres, buc):
                     pool = postgres_pool
 
                 with pool.connect() as conn:
-                    extract_indicator(conn, postgres, indicator_query[0], index, phase)
+                    extract_indicator(conn, postgres, indicator_query[0], index, phase, limit=100_000)
 
             print(f"Done extracting {indicator[1]}!")
 

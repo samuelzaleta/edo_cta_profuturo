@@ -1,4 +1,3 @@
-#!/usr/bin/python3
 from profuturo.common import truncate_table, notify, register_time
 from profuturo.database import get_postgres_pool, get_mit_pool, use_pools
 from profuturo.extraction import extract_terms, extract_dataset
