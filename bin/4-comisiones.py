@@ -1,5 +1,5 @@
-from profuturo.common import truncate_table, notify, register_time
-from profuturo.database import get_postgres_pool, get_mit_pool, use_pools
+from profuturo.common import truncate_table, notify, register_time, define_extraction
+from profuturo.database import get_postgres_pool, get_mit_pool
 from profuturo.extraction import extract_terms, extract_dataset
 from profuturo.reporters import HtmlReporter
 from datetime import date
@@ -9,17 +9,17 @@ postgres_pool = get_postgres_pool()
 mit_pool = get_mit_pool()
 phase = 4
 
-with use_pools(phase, postgres_pool, mit_pool) as (postgres, mit):
-    with register_time(postgres, phase):
-        terms = extract_terms(postgres, phase)
+with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
+    terms = extract_terms(postgres, phase)
 
-        for term in terms:
-            term_id = term["id"]
-            start_month = term["start_month"]
-            end_month = term["end_month"]
+    for term in terms:
+        term_id = term["id"]
+        start_month = term["start_month"]
+        end_month = term["end_month"]
 
+        with register_time(postgres, phase, term=term_id):
             # Extracción
-            truncate_table(postgres, 'tthechos_comisiones', term_id)
+            truncate_table(postgres, 'tthechos_comisiones', term=term_id)
             extract_dataset(mit, postgres, """
             SELECT FTN_NUM_CTA_INVDUAL AS FCN_CUENTA, FTN_ID_MOV AS FCN_ID_MOV, 
                    FTC_FOLIO, FCN_ID_SIEFORE, FTF_MONTO_ACCIONES, FTD_FEH_LIQUIDACION, 

@@ -1,5 +1,5 @@
-from profuturo.common import truncate_table, notify, register_time
-from profuturo.database import get_postgres_pool, get_mit_pool, get_buc_pool, use_pools
+from profuturo.common import truncate_table, notify, register_time, define_extraction
+from profuturo.database import get_postgres_pool, get_mit_pool, get_buc_pool
 from profuturo.extraction import extract_dataset, extract_indicator
 from profuturo.reporters import HtmlReporter
 from sqlalchemy import text, Engine
@@ -11,7 +11,7 @@ mit_pool = get_mit_pool()
 buc_pool = get_buc_pool()
 phase = 1
 
-with use_pools(phase, postgres_pool, buc_pool) as (postgres, buc):
+with define_extraction(phase, postgres_pool, buc_pool) as (postgres, buc):
     with register_time(postgres, phase):
         # Extracción
         truncate_table(postgres, 'tcdatmae_clientes')
