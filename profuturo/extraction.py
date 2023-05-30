@@ -55,7 +55,7 @@ def extract_indicator(
         for i, batch in enumerate(chunk(accounts, 1_000)):
             destination.execute(text("""
             UPDATE tcdatmae_clientes
-            SET FTO_INDICADORES = jsonb_set(FTO_INDICADORES, :field, :value)
+            SET FTO_INDICADORES = jsonb_set(CASE WHEN FTO_INDICADORES IS NULL THEN '{}' ELSE FTO_INDICADORES END, :field, :value)
             WHERE FTN_CUENTA IN :accounts
             """), {
                 "accounts": tuple(batch),
