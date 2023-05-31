@@ -9,6 +9,7 @@ pandas = "*"
 sqlalchemy = "*"
 oracledb = "*"
 polars = "*"
+profuturo = {editable = true, path = "."}
 
 [dev-packages]
 pyspark = "*"
