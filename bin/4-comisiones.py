@@ -7,7 +7,7 @@ from datetime import date
 html_reporter = HtmlReporter()
 postgres_pool = get_postgres_pool()
 mit_pool = get_mit_pool()
-phase = 4
+phase = 2
 
 with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
     terms = extract_terms(postgres, phase)
@@ -26,7 +26,7 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
                    FTF_MONTO_PESOS
             FROM TTAFOGRAL_MOV_CMS
             WHERE FTD_FEH_LIQUIDACION BETWEEN :start AND :end
-            """, "tthechos_comisiones", phase, term=term_id, params={"start": date(2022, 9, 1), "end": date(2022, 9, 30)})
+            """, "TTHECHOS_COMISION", term=term_id, params={"start": date(2022, 9, 1), "end": date(2022, 9, 30)})
 
             # Cifras de control
             report = html_reporter.generate(postgres, """

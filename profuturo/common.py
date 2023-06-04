@@ -8,7 +8,7 @@ import contextlib
 
 @contextlib.contextmanager
 def define_extraction(phase: int, main_pool: Engine, *pools: Engine):
-    with notify_exceptions(main_pool):
+    with notify_exceptions(main_pool, phase):
         with use_pools(phase, main_pool, *pools) as pools:
             yield pools
 
@@ -23,65 +23,75 @@ def register_time(conn: Connection, phase: int, term: int = None):
 
 
 def write_binnacle(conn: Connection, phase: int, start: datetime, end: datetime, term: int = None) -> None:
-    cursor = conn.execute(text("""
-    SELECT ftc_verde, ftc_amarillo
-    FROM tcgespro_fases
-    WHERE ftn_id_fase = :phase
-    """), {'phase': phase})
+    try:
+        cursor = conn.execute(text("""
+        SELECT "FTC_VERDE", "FTC_AMARILLO"
+        FROM "TCGESPRO_FASE"
+        WHERE "FTN_ID_FASE" = :phase
+        """), {'phase': phase})
 
-    if cursor.rowcount != 1:
-        print(f'Phase {phase} not found')
-        return
+        if cursor.rowcount != 1:
+            print(f'Phase {phase} not found')
+            return
 
-    delta = end - start
-    service_level = cursor.fetchone()
-    green_time = time.fromisoformat(service_level[0])
-    yellow_time = time.fromisoformat(service_level[1])
+        delta = end - start
+        service_level = cursor.fetchone()
+        green_time = time.fromisoformat(service_level[0])
+        yellow_time = time.fromisoformat(service_level[1])
 
-    flag: str
-    if delta <= timedelta(hours=green_time.hour, minutes=green_time.minute):
-        flag = "Verde"
-    elif delta <= timedelta(hours=yellow_time.hour, minutes=yellow_time.minute):
-        flag = "Amarillo"
-    else:
-        flag = "Rojo"
+        flag: str
+        if delta <= timedelta(hours=green_time.hour, minutes=green_time.minute):
+            flag = "Verde"
+        elif delta <= timedelta(hours=yellow_time.hour, minutes=yellow_time.minute):
+            flag = "Amarillo"
+        else:
+            flag = "Rojo"
 
-    conn.execute(text("""
-    INSERT INTO ttgespro_bitacora_estado_cuenta (fecha_hora_inicio, fecha_hora_final, bandera_nivel_servicio, id_formato_estado_cuenta, id_periodo, id_fase) 
-    VALUES (:start, :end, :flag, :format, :term, :phase)
-    """), {
-        "start": start,
-        "end": end,
-        "flag": flag,
-        "format": 0,
-        "term": term,
-        "phase": phase,
-    })
+        conn.execute(text("""
+        INSERT INTO "TTGESPRO_BITACORA_ESTADO_CUENTA" (
+            "FTD_FECHA_HORA_INICIO", "FTD_FECHA_HORA_FIN", "FTC_BANDERA_NIVEL_SERVICIO", 
+            "FCN_ID_PERIODO", "FCN_ID_FASE"
+        ) 
+        VALUES (:start, :end, :flag, :term, :phase)
+        """), {
+            "start": start,
+            "end": end,
+            "flag": flag,
+            "term": term,
+            "phase": phase,
+        })
+    except Exception as e:
+        raise ProfuturoException("BINNACLE_ERROR", phase, term) from e
 
 
 @contextlib.contextmanager
-def notify_exceptions(pool: Engine):
+def notify_exceptions(pool: Engine, phase: int):
     try:
         yield
     except ProfuturoException as e:
         with pool.begin() as conn:
             notify(
                 conn,
-                f"Error al ingestar la etapa {e.phase}",
+                f"Error al ingestar la etapa {phase}",
                 e.msg,
                 str(e),
                 e.term,
             )
 
         raise e
+    except Exception as e:
+        with pool.begin() as conn:
+            notify(conn, f"Error desconocido al ingestar la etapa {phase}", details=str(e))
+
+        raise e
 
 
 def notify(conn: Connection, title: str, message: str = None, details: str = None, term: int = None, control: bool = False):
     conn.execute(text("""
-    INSERT INTO ttgespro_notificacion (
-        FTC_TITULO, FTC_DETALLE_TEXTO, FTC_DETALLE_BLOB, 
-        FTB_CIFRAS_CONTROL, FCN_ID_PERIODO, FCN_ID_USUARIO
-    ) 
+    INSERT INTO "TTGESPRO_NOTIFICACION" (
+        "FTC_TITULO", "FTC_DETALLE_TEXTO", "FTC_DETALLE_BLOB", 
+        "FTB_CIFRAS_CONTROL", "FCN_ID_PERIODO", "FCN_ID_USUARIO"
+    )
     VALUES (:title, :message, :details, :control, :term, 0)
     """), {
         "title": title,
@@ -93,7 +103,10 @@ def notify(conn: Connection, title: str, message: str = None, details: str = Non
 
 
 def truncate_table(conn: Connection, table: str, term: int = None) -> None:
-    if term:
-        conn.execute(text(f"DELETE FROM {table} WHERE FCN_ID_PERIODO = :term"), {"term": term})
-    else:
-        conn.execute(text(f"TRUNCATE {table}"))
+    try:
+        if term:
+            conn.execute(text(f'DELETE FROM "{table}" WHERE "FCN_ID_PERIODO" = :term'), {"term": term})
+        else:
+            conn.execute(text(f'TRUNCATE "{table}"'))
+    except Exception as e:
+        raise ProfuturoException.from_exception(e, term) from e

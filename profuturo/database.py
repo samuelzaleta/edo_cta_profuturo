@@ -46,8 +46,8 @@ def get_postgres_conn():
         host="34.72.193.129",
         user="alexo",
         password="Alexo123",
-        database="postgres",
-        options="-c search_path=maestros,gestor,hechos",
+        database="PROFUTURO",
+        options='-c search_path="MAESTROS","GESTOR","HECHOS"',
     )
 
 

@@ -7,7 +7,7 @@ from profuturo.reporters import HtmlReporter
 html_reporter = HtmlReporter()
 postgres_pool = get_postgres_pool()
 mit_pool = get_mit_pool()
-phase = 1
+phase = 3
 
 with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
     terms = extract_terms(postgres, phase)
@@ -61,9 +61,9 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
                      SH.FTD_FEH_LIQUIDACION
             """
 
-            truncate_table(postgres, "thhechos_saldo_historico", term_id)
-            extract_dataset(mit, postgres, query, "thhechos_saldo_historico", phase, term=term_id, params={"date": start_month, "type": "I"})
-            extract_dataset(mit, postgres, query, "thhechos_saldo_historico", phase, term=term_id, params={"date": end_month, "type": "F"})
+            truncate_table(postgres, "THHECHOS_SALDO_HISTORICO", term=term_id)
+            extract_dataset(mit, postgres, query, "THHECHOS_SALDO_HISTORICO", term=term_id, params={"date": start_month, "type": "I"})
+            extract_dataset(mit, postgres, query, "THHECHOS_SALDO_HISTORICO", term=term_id, params={"date": end_month, "type": "F"})
 
             # Cifras de control
             report = html_reporter.generate(

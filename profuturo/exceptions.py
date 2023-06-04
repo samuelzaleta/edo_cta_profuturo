@@ -1,3 +1,5 @@
+from psycopg2.errors import UndefinedTable
+from sqlalchemy.exc import ProgrammingError
 from typing import Optional
 
 
@@ -24,12 +26,20 @@ class ProfuturoException(Exception):
 
     code: str
     msg: str
-    phase: int
     term: Optional[int]
 
-    def __init__(self, code: str, phase: int, term: Optional[int] = None, *args: object):
+    def __init__(self, code: str, term: Optional[int] = None, *args: object):
         super().__init__(args)
         self.code = code
         self.msg = self.MAPPING[code]
-        self.phase = phase
         self.term = term
+
+    @classmethod
+    def from_exception(cls, e: Exception, term: Optional[int] = None):
+        message = "UNKNOWN_ERROR"
+
+        if isinstance(e, ProgrammingError):
+            if isinstance(e.orig, UndefinedTable):
+                message = "TABLE_MISSED"
+
+        return cls(message, term)

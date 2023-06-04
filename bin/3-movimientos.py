@@ -19,7 +19,7 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
 
         with register_time(postgres, phase, term=term_id):
             # Extracción
-            truncate_table(postgres, 'tthechos_movimientos', term=term_id)
+            truncate_table(postgres, 'TTHECHOS_MOVIMIENTO', term=term_id)
             extract_dataset(mit, postgres, """
             SELECT FTN_NUM_CTA_INVDUAL AS fcn_cuenta,
                    FCN_ID_TIPO_MOV,
@@ -32,7 +32,7 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
                    FTD_FEH_LIQUIDACION
             FROM TTAFOGRAL_MOV_AVOL
             WHERE FTD_FEH_LIQUIDACION BETWEEN :start AND :end
-            """, "tthechos_movimientos", phase, term=term_id, params={"start": start_month, "end": end_month}, limit=100)
+            """, "TTHECHOS_MOVIMIENTO", term=term_id, params={"start": start_month, "end": end_month}, limit=100)
             extract_dataset(mit, postgres, """
             SELECT FTN_NUM_CTA_INVDUAL AS fcn_cuenta,
                    FCN_ID_TIPO_MOV,
@@ -45,7 +45,7 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
                    FTD_FEH_LIQUIDACION
             FROM TTAFOGRAL_MOV_BONO
             WHERE FTD_FEH_LIQUIDACION BETWEEN :start AND :end
-            """, "tthechos_movimientos", phase, term=term_id, params={"start": start_month, "end": end_month}, limit=100)
+            """, "TTHECHOS_MOVIMIENTO", term=term_id, params={"start": start_month, "end": end_month}, limit=100)
             extract_dataset(mit, postgres, """
             SELECT FTN_NUM_CTA_INVDUAL AS fcn_cuenta,
                    FCN_ID_TIPO_MOV,
@@ -58,7 +58,7 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
                    FTD_FEH_LIQUIDACION
             FROM TTAFOGRAL_MOV_COMP
             WHERE FTD_FEH_LIQUIDACION BETWEEN :start AND :end
-            """, "tthechos_movimientos", phase, term=term_id, params={"start": start_month, "end": end_month}, limit=100)
+            """, "TTHECHOS_MOVIMIENTO", term=term_id, params={"start": start_month, "end": end_month}, limit=100)
             extract_dataset(mit, postgres, """
             SELECT FTN_NUM_CTA_INVDUAL AS fcn_cuenta,
                    FCN_ID_TIPO_MOV,
@@ -71,7 +71,7 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
                    FTD_FEH_LIQUIDACION
             FROM TTAFOGRAL_MOV_GOB
             WHERE FTD_FEH_LIQUIDACION BETWEEN :start AND :end
-            """, "tthechos_movimientos", phase, term=term_id, params={"start": start_month, "end": end_month}, limit=100)
+            """, "TTHECHOS_MOVIMIENTO", term=term_id, params={"start": start_month, "end": end_month}, limit=100)
             extract_dataset(mit, postgres, """
             SELECT FTN_NUM_CTA_INVDUAL AS fcn_cuenta,
                    FCN_ID_TIPO_MOV,
@@ -84,7 +84,7 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
                    FTD_FEH_LIQUIDACION
             FROM TTAFOGRAL_MOV_RCV
             WHERE FTD_FEH_LIQUIDACION BETWEEN :start AND :end
-            """, "tthechos_movimientos", phase, term=term_id, params={"start": start_month, "end": end_month}, limit=100)
+            """, "TTHECHOS_MOVIMIENTO", term=term_id, params={"start": start_month, "end": end_month}, limit=100)
             extract_dataset(mit, postgres, """
             SELECT FTN_NUM_CTA_INVDUAL AS fcn_cuenta,
                    FCN_ID_TIPO_MOV,
@@ -97,7 +97,7 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
                    FTD_FEH_LIQUIDACION
             FROM TTAFOGRAL_MOV_SAR
             WHERE FTD_FEH_LIQUIDACION BETWEEN :start AND :end
-            """, "tthechos_movimientos", phase, term=term_id, params={"start": start_month, "end": end_month}, limit=100)
+            """, "TTHECHOS_MOVIMIENTO", term=term_id, params={"start": start_month, "end": end_month}, limit=100)
             extract_dataset(mit, postgres, """
             SELECT FTN_NUM_CTA_INVDUAL AS fcn_cuenta,
                    FCN_ID_TIPO_MOV,
@@ -110,7 +110,7 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
                    FTD_FEH_LIQUIDACION
             FROM TTAFOGRAL_MOV_VIV
             WHERE FTD_FEH_LIQUIDACION BETWEEN :start AND :end
-            """, "tthechos_movimientos", phase, term=term_id, params={"start": start_month, "end": end_month}, limit=100)
+            """, "TTHECHOS_MOVIMIENTO", term=term_id, params={"start": start_month, "end": end_month}, limit=100)
 
             # Cifras de control
             report = html_reporter.generate(

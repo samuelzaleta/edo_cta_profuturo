@@ -9,12 +9,12 @@ html_reporter = HtmlReporter()
 postgres_pool = get_postgres_pool()
 mit_pool = get_mit_pool()
 buc_pool = get_buc_pool()
-phase = 1
+phase = 6
 
 with define_extraction(phase, postgres_pool, buc_pool) as (postgres, buc):
     with register_time(postgres, phase):
         # Extracción
-        truncate_table(postgres, 'tcdatmae_clientes')
+        truncate_table(postgres, 'TCDATMAE_CLIENTE')
         extract_dataset(buc, postgres, """
         SELECT C.NUMERO AS FTn_CUENTA,
                (PF.NOMBRE || ' ' || PF.APELLIDOPATERNO || ' ' ||PF.APELIDOMATERNO) AS FTC_NOMBRE,
@@ -45,7 +45,7 @@ with define_extraction(phase, postgres_pool, buc_pool) as (postgres, buc):
           AND D.IDTIPODOM = 818 -- Tipo de domicilio Particular
           AND D.IDSTATUSDOM = 761 -- ACTIVO
           AND D.PREFERENTE = 1 --Domicilio preferente
-        """, "tcdatmae_clientes", phase, limit=100_000)
+        """, "TCDATMAE_CLIENTE", limit=100_000)
 
         # Indicadores
         indicators = postgres.execute(text("""
@@ -73,7 +73,7 @@ with define_extraction(phase, postgres_pool, buc_pool) as (postgres, buc):
                     pool = postgres_pool
 
                 with pool.connect() as conn:
-                    extract_indicator(conn, postgres, indicator_query[0], index, phase, limit=100_000)
+                    extract_indicator(conn, postgres, indicator_query[0], index, limit=100_000)
 
             print(f"Done extracting {indicator[1]}!")
 
@@ -88,7 +88,7 @@ with define_extraction(phase, postgres_pool, buc_pool) as (postgres, buc):
                END AS tipo_formato,
                fto_indicadores->>'31' AS tipo_cliente,
                COUNT(*)
-        FROM tcdatmae_clientes
+        FROM TCDATMAE_CLIENTE
         GROUP BY fto_indicadores->>'34',
                  fto_indicadores->>'21',
                  CASE
