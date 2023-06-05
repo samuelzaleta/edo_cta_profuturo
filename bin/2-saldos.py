@@ -69,33 +69,33 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
             report = html_reporter.generate(
                 postgres,
                 """
-                SELECT fto_indicadores->>'34' AS generacion,
-                       fto_indicadores->>'21' AS vigencia,
+                SELECT "FTO_INDICADORES"->>'34' AS generacion,
+                       "FTO_INDICADORES"->>'21' AS vigencia,
                        CASE
-                           WHEN fto_indicadores->>'3' = 'Asignado' THEN 'Asignado'
-                           WHEN fto_indicadores->>'4' = 'Pensionado' THEN 'Pensionado'
-                           WHEN fto_indicadores->>'3' = 'Afiliado' THEN 'Afiliado'
+                           WHEN "FTO_INDICADORES"->>'3' = 'Asignado' THEN 'Asignado'
+                           WHEN "FTO_INDICADORES"->>'4' = 'Pensionado' THEN 'Pensionado'
+                           WHEN "FTO_INDICADORES"->>'3' = 'Afiliado' THEN 'Afiliado'
                        END AS tipo_formato,
-                       fto_indicadores->>'33' AS tipo_cliente,
-                       ts.fcc_valor AS subcuenta,
-                       s.fcc_valor AS siefore,
+                       "FTO_INDICADORES"->>'33' AS tipo_cliente,
+                       ts."FCC_VALOR" AS subcuenta,
+                       s."FTC_DESCRIPCION" AS siefore,
                        COUNT(*) AS clientes,
-                       SUM(CASE sh.ftc_tipo_saldo WHEN 'I' THEN sh.ftf_saldo_dia ELSE 0 END) AS saldo_inicial,
-                       SUM(CASE sh.ftc_tipo_saldo WHEN 'F' THEN sh.ftf_saldo_dia ELSE 0 END) AS saldo_final
-                FROM thhechos_saldo_historico sh
-                    INNER JOIN tcdatmae_tipos_subcuenta ts ON sh.fcn_id_tipo_subcta = ts.ftn_id_tipo_subcta
-                    INNER JOIN catalogo_siefores s ON sh.fcn_id_siefore = s.fcn_id_cat_catalogo
-                    INNER JOIN tcdatmae_clientes c ON sh.fcn_cuenta = c.ftn_cuenta
-                GROUP BY fto_indicadores->>'34',
-                         fto_indicadores->>'21',
+                       SUM(CASE sh."FTC_TIPO_SALDO" WHEN 'I' THEN sh."FTF_SALDO_DIA" ELSE 0 END) AS saldo_inicial,
+                       SUM(CASE sh."FTC_TIPO_SALDO" WHEN 'F' THEN sh."FTF_SALDO_DIA" ELSE 0 END) AS saldo_final
+                FROM "THHECHOS_SALDO_HISTORICO" sh
+                    INNER JOIN "TCDATMAE_TIPO_SUBCUENTA" ts ON sh."FCN_ID_TIPO_SUBCTA" = ts."FTN_ID_TIPO_SUBCTA"
+                    INNER JOIN "TCDATMAE_SIEFORE" s ON sh."FCN_ID_SIEFORE" = s."FTN_ID_SIEFORE"
+                    INNER JOIN "TCDATMAE_CLIENTE" c ON sh."FCN_CUENTA" = c."FTN_CUENTA"
+                GROUP BY "FTO_INDICADORES"->>'34',
+                         "FTO_INDICADORES"->>'21',
                          CASE
-                             WHEN fto_indicadores->>'3' = 'Asignado' THEN 'Asignado'
-                             WHEN fto_indicadores->>'4' = 'Pensionado' THEN 'Pensionado'
-                             WHEN fto_indicadores->>'3' = 'Afiliado' THEN 'Afiliado'
+                             WHEN "FTO_INDICADORES"->>'3' = 'Asignado' THEN 'Asignado'
+                             WHEN "FTO_INDICADORES"->>'4' = 'Pensionado' THEN 'Pensionado'
+                             WHEN "FTO_INDICADORES"->>'3' = 'Afiliado' THEN 'Afiliado'
                          END,
-                         fto_indicadores->>'33',
-                         ts.fcc_valor,
-                         s.fcc_valor
+                         "FTO_INDICADORES"->>'33',
+                         ts."FCC_VALOR",
+                         s."FTC_DESCRIPCION"
                 """,
                 ["Tipo Generación", "Vigencia", "Tipo Formato", "Indicador Afiliación", "Sub Cuenta", "SIEFORE"],
                 ["Clientes", "Saldo inicial", "Saldo final"],

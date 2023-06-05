@@ -21,93 +21,100 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
             # Extracción
             truncate_table(postgres, 'TTHECHOS_MOVIMIENTO', term=term_id)
             extract_dataset(mit, postgres, """
-            SELECT FTN_NUM_CTA_INVDUAL AS fcn_cuenta,
-                   FCN_ID_TIPO_MOV,
-                   FCN_ID_CONCEPTO_MOV,
+            SELECT FTN_NUM_CTA_INVDUAL AS FCN_CUENTA,
+                   FCN_ID_TIPO_MOV AS FCN_ID_TIPO_MOVIMIENTO,
+                   FCN_ID_CONCEPTO_MOV AS FCN_ID_CONCEPTO_MOVIMIENTO,
                    FCN_ID_TIPO_SUBCTA,
                    FCN_ID_SIEFORE,
                    FTC_FOLIO,
                    FTF_MONTO_ACCIONES,
                    FTF_MONTO_PESOS,
-                   FTD_FEH_LIQUIDACION
+                   FTD_FEH_LIQUIDACION,
+                   'M' AS FTC_BD_ORIGEN
             FROM TTAFOGRAL_MOV_AVOL
             WHERE FTD_FEH_LIQUIDACION BETWEEN :start AND :end
             """, "TTHECHOS_MOVIMIENTO", term=term_id, params={"start": start_month, "end": end_month}, limit=100)
             extract_dataset(mit, postgres, """
-            SELECT FTN_NUM_CTA_INVDUAL AS fcn_cuenta,
-                   FCN_ID_TIPO_MOV,
-                   FCN_ID_CONCEPTO_MOV,
+            SELECT FTN_NUM_CTA_INVDUAL AS FCN_CUENTA,
+                   FCN_ID_TIPO_MOV AS FCN_ID_TIPO_MOVIMIENTO,
+                   FCN_ID_CONCEPTO_MOV AS FCN_ID_CONCEPTO_MOVIMIENTO,
                    FCN_ID_TIPO_SUBCTA,
                    FCN_ID_SIEFORE,
                    FTC_FOLIO,
                    FTF_MONTO_ACCIONES,
                    FTF_MONTO_PESOS,
-                   FTD_FEH_LIQUIDACION
+                   FTD_FEH_LIQUIDACION,
+                   'M' AS FTC_BD_ORIGEN
             FROM TTAFOGRAL_MOV_BONO
             WHERE FTD_FEH_LIQUIDACION BETWEEN :start AND :end
             """, "TTHECHOS_MOVIMIENTO", term=term_id, params={"start": start_month, "end": end_month}, limit=100)
             extract_dataset(mit, postgres, """
-            SELECT FTN_NUM_CTA_INVDUAL AS fcn_cuenta,
-                   FCN_ID_TIPO_MOV,
-                   FCN_ID_CONCEPTO_MOV,
+            SELECT FTN_NUM_CTA_INVDUAL AS FCN_CUENTA,
+                   FCN_ID_TIPO_MOV AS FCN_ID_TIPO_MOVIMIENTO,
+                   FCN_ID_CONCEPTO_MOV AS FCN_ID_CONCEPTO_MOVIMIENTO,
                    FCN_ID_TIPO_SUBCTA,
                    FCN_ID_SIEFORE,
                    FTC_FOLIO,
                    FTF_MONTO_ACCIONES,
                    FTF_MONTO_PESOS,
-                   FTD_FEH_LIQUIDACION
+                   FTD_FEH_LIQUIDACION,
+                   'M' AS FTC_BD_ORIGEN
             FROM TTAFOGRAL_MOV_COMP
             WHERE FTD_FEH_LIQUIDACION BETWEEN :start AND :end
             """, "TTHECHOS_MOVIMIENTO", term=term_id, params={"start": start_month, "end": end_month}, limit=100)
             extract_dataset(mit, postgres, """
-            SELECT FTN_NUM_CTA_INVDUAL AS fcn_cuenta,
-                   FCN_ID_TIPO_MOV,
-                   FCN_ID_CONCEPTO_MOV,
+            SELECT FTN_NUM_CTA_INVDUAL AS FCN_CUENTA,
+                   FCN_ID_TIPO_MOV AS FCN_ID_TIPO_MOVIMIENTO,
+                   FCN_ID_CONCEPTO_MOV AS FCN_ID_CONCEPTO_MOVIMIENTO,
                    FCN_ID_TIPO_SUBCTA,
                    FCN_ID_SIEFORE,
                    FTC_FOLIO,
                    FTF_MONTO_ACCIONES,
                    FTF_MONTO_PESOS,
-                   FTD_FEH_LIQUIDACION
+                   FTD_FEH_LIQUIDACION,
+                   'M' AS FTC_BD_ORIGEN
             FROM TTAFOGRAL_MOV_GOB
             WHERE FTD_FEH_LIQUIDACION BETWEEN :start AND :end
             """, "TTHECHOS_MOVIMIENTO", term=term_id, params={"start": start_month, "end": end_month}, limit=100)
             extract_dataset(mit, postgres, """
-            SELECT FTN_NUM_CTA_INVDUAL AS fcn_cuenta,
-                   FCN_ID_TIPO_MOV,
-                   FCN_ID_CONCEPTO_MOV,
+            SELECT FTN_NUM_CTA_INVDUAL AS FCN_CUENTA,
+                   FCN_ID_TIPO_MOV AS FCN_ID_TIPO_MOVIMIENTO,
+                   FCN_ID_CONCEPTO_MOV AS FCN_ID_CONCEPTO_MOVIMIENTO,
                    FCN_ID_TIPO_SUBCTA,
                    FCN_ID_SIEFORE,
                    FTC_FOLIO,
                    FTF_MONTO_ACCIONES,
                    FTF_MONTO_PESOS,
-                   FTD_FEH_LIQUIDACION
+                   FTD_FEH_LIQUIDACION,
+                   'M' AS FTC_BD_ORIGEN
             FROM TTAFOGRAL_MOV_RCV
             WHERE FTD_FEH_LIQUIDACION BETWEEN :start AND :end
             """, "TTHECHOS_MOVIMIENTO", term=term_id, params={"start": start_month, "end": end_month}, limit=100)
             extract_dataset(mit, postgres, """
-            SELECT FTN_NUM_CTA_INVDUAL AS fcn_cuenta,
-                   FCN_ID_TIPO_MOV,
-                   FCN_ID_CONCEPTO_MOV,
+            SELECT FTN_NUM_CTA_INVDUAL AS FCN_CUENTA,
+                   FCN_ID_TIPO_MOV AS FCN_ID_TIPO_MOVIMIENTO,
+                   FCN_ID_CONCEPTO_MOV AS FCN_ID_CONCEPTO_MOVIMIENTO,
                    FCN_ID_TIPO_SUBCTA,
                    FCN_ID_SIEFORE,
                    FTC_FOLIO,
                    FTF_MONTO_ACCIONES,
                    FTF_MONTO_PESOS,
-                   FTD_FEH_LIQUIDACION
+                   FTD_FEH_LIQUIDACION,
+                   'M' AS FTC_BD_ORIGEN
             FROM TTAFOGRAL_MOV_SAR
             WHERE FTD_FEH_LIQUIDACION BETWEEN :start AND :end
             """, "TTHECHOS_MOVIMIENTO", term=term_id, params={"start": start_month, "end": end_month}, limit=100)
             extract_dataset(mit, postgres, """
-            SELECT FTN_NUM_CTA_INVDUAL AS fcn_cuenta,
-                   FCN_ID_TIPO_MOV,
-                   FCN_ID_CONCEPTO_MOV,
+            SELECT FTN_NUM_CTA_INVDUAL AS FCN_CUENTA,
+                   FCN_ID_TIPO_MOV AS FCN_ID_TIPO_MOVIMIENTO,
+                   FCN_ID_CONCEPTO_MOV AS FCN_ID_CONCEPTO_MOVIMIENTO,
                    FCN_ID_TIPO_SUBCTA,
                    FCN_ID_SIEFORE,
                    FTC_FOLIO,
                    FTF_MONTO_ACCIONES,
                    FTF_MONTO_PESOS,
-                   FTD_FEH_LIQUIDACION
+                   FTD_FEH_LIQUIDACION,
+                   'M' AS FTC_BD_ORIGEN
             FROM TTAFOGRAL_MOV_VIV
             WHERE FTD_FEH_LIQUIDACION BETWEEN :start AND :end
             """, "TTHECHOS_MOVIMIENTO", term=term_id, params={"start": start_month, "end": end_month}, limit=100)
@@ -116,30 +123,30 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
             report = html_reporter.generate(
                 postgres,
                 """
-                SELECT fto_indicadores->>'34' AS generacion,
-                       fto_indicadores->>'21' AS vigencia,
+                SELECT "FTO_INDICADORES"->>'34' AS generacion,
+                       "FTO_INDICADORES"->>'21' AS vigencia,
                        CASE
-                           WHEN fto_indicadores->>'3' = 'Asignado' THEN 'Asignado'
-                           WHEN fto_indicadores->>'4' = 'Pensionado' THEN 'Pensionado'
-                           WHEN fto_indicadores->>'3' = 'Afiliado' THEN 'Afiliado'
+                           WHEN "FTO_INDICADORES"->>'3' = 'Asignado' THEN 'Asignado'
+                           WHEN "FTO_INDICADORES"->>'4' = 'Pensionado' THEN 'Pensionado'
+                           WHEN "FTO_INDICADORES"->>'3' = 'Afiliado' THEN 'Afiliado'
                        END AS tipo_formato,
-                       fto_indicadores->>'33' AS tipo_cliente,
-                       mc.ftc_descripcion,
-                       COUNT(DISTINCT c.ftn_cuenta) AS clientes,
-                       SUM(m.ftf_monto_pesos) AS importe
-                FROM tthechos_movimientos m
-                    INNER JOIN ttgespro_mov_profuturo_consar pc ON m.fcn_id_concepto_mov = pc.fcc_id_movimiento_profuturo
-                    INNER JOIN tcdatmae_movimientos_consar mc on pc.fcn_id_movimiento_consar = mc.ftn_id_movimiento_consar
-                    INNER JOIN tcdatmae_clientes c on m.fcn_cuenta = c.ftn_cuenta
-                GROUP BY fto_indicadores->>'34',
-                         fto_indicadores->>'21',
+                       "FTO_INDICADORES"->>'33' AS tipo_cliente,
+                       mc."FTC_DESCRIPCION",
+                       COUNT(DISTINCT c."FTN_CUENTA") AS clientes,
+                       SUM(m."FTF_MONTO_PESOS") AS importe
+                FROM "TTHECHOS_MOVIMIENTO" m
+                    INNER JOIN "TTGESPRO_MOV_PROFUTURO_CONSAR" pc ON m."FCN_ID_TIPO_MOVIMIENTO" = pc."FCN_ID_MOVIMIENTO_PROFUTURO"
+                    INNER JOIN "TCDATMAE_MOVIMIENTO_CONSAR" mc on pc."FCN_ID_MOVIMIENTO_CONSAR" = mc."FTN_ID_MOVIMIENTO_CONSAR"
+                    INNER JOIN "TCDATMAE_CLIENTE" c on m."FCN_CUENTA" = c."FTN_CUENTA"
+                GROUP BY "FTO_INDICADORES"->>'34',
+                         "FTO_INDICADORES"->>'21',
                          CASE
-                             WHEN fto_indicadores->>'3' = 'Asignado' THEN 'Asignado'
-                             WHEN fto_indicadores->>'4' = 'Pensionado' THEN 'Pensionado'
-                             WHEN fto_indicadores->>'3' = 'Afiliado' THEN 'Afiliado'
+                             WHEN "FTO_INDICADORES"->>'3' = 'Asignado' THEN 'Asignado'
+                             WHEN "FTO_INDICADORES"->>'4' = 'Pensionado' THEN 'Pensionado'
+                             WHEN "FTO_INDICADORES"->>'3' = 'Afiliado' THEN 'Afiliado'
                          END,
-                         fto_indicadores->>'33',
-                         mc.ftc_descripcion
+                         "FTO_INDICADORES"->>'33',
+                         mc."FTC_DESCRIPCION"
                 """,
                 ["Tipo Generación", "Vigencia", "Tipo Formato", "Indicador Afiliación", "SIEFORE"],
                 ["Registros", "Comisiones"],

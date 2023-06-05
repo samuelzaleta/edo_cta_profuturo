@@ -19,10 +19,14 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
 
         with register_time(postgres, phase, term=term_id):
             # Extracción
-            truncate_table(postgres, 'tthechos_comisiones', term=term_id)
+            truncate_table(postgres, 'TTHECHOS_COMISION', term=term_id)
             extract_dataset(mit, postgres, """
-            SELECT FTN_NUM_CTA_INVDUAL AS FCN_CUENTA, FTN_ID_MOV AS FCN_ID_MOV, 
-                   FTC_FOLIO, FCN_ID_SIEFORE, FTF_MONTO_ACCIONES, FTD_FEH_LIQUIDACION, 
+            SELECT FTN_NUM_CTA_INVDUAL AS FCN_CUENTA,
+                   FTN_ID_MOV AS FCN_ID_MOVIMIENTO,
+                   FCN_ID_SIEFORE,
+                   FTC_FOLIO,
+                   FTF_MONTO_ACCIONES,
+                   FTD_FEH_LIQUIDACION,
                    FTF_MONTO_PESOS
             FROM TTAFOGRAL_MOV_CMS
             WHERE FTD_FEH_LIQUIDACION BETWEEN :start AND :end
@@ -30,29 +34,29 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
 
             # Cifras de control
             report = html_reporter.generate(postgres, """
-            SELECT fto_indicadores->>'34' AS generacion,
-                   fto_indicadores->>'21' AS vigencia,
+            SELECT "FTO_INDICADORES"->>'34' AS generacion,
+                   "FTO_INDICADORES"->>'21' AS vigencia,
                    CASE
-                       WHEN fto_indicadores->>'3' = 'Asignado' THEN 'Asignado'
-                       WHEN fto_indicadores->>'4' = 'Pensionado' THEN 'Pensionado'
-                       WHEN fto_indicadores->>'3' = 'Afiliado' THEN 'Afiliado'
+                       WHEN "FTO_INDICADORES"->>'3' = 'Asignado' THEN 'Asignado'
+                       WHEN "FTO_INDICADORES"->>'4' = 'Pensionado' THEN 'Pensionado'
+                       WHEN "FTO_INDICADORES"->>'3' = 'Afiliado' THEN 'Afiliado'
                    END AS tipo_formato,
-                   fto_indicadores->>'33' AS tipo_cliente,
-                   s.fcc_valor AS siefore,
+                   "FTO_INDICADORES"->>'33' AS tipo_cliente,
+                   s."FTC_DESCRIPCION" AS siefore,
                    COUNT(*) AS clientes,
-                   SUM(ftf_monto_pesos) AS comisiones
-            FROM tthechos_comisiones mc
-                LEFT JOIN catalogo_siefores s ON mc.fcn_id_siefore = s.fcn_id_cat_catalogo
-                INNER JOIN tcdatmae_clientes c ON mc.fcn_cuenta = c.ftn_cuenta
-            GROUP BY fto_indicadores->>'34',
-                     fto_indicadores->>'21',
+                   SUM("FTF_MONTO_PESOS") AS comisiones
+            FROM "TTHECHOS_COMISION" mc
+                LEFT JOIN "TCDATMAE_SIEFORE" s ON mc."FCN_ID_SIEFORE" = s."FTN_ID_SIEFORE"
+                INNER JOIN "TCDATMAE_CLIENTE" c ON mc."FCN_CUENTA" = c."FTN_CUENTA"
+            GROUP BY "FTO_INDICADORES"->>'34',
+                     "FTO_INDICADORES"->>'21',
                      CASE
-                         WHEN fto_indicadores->>'3' = 'Asignado' THEN 'Asignado'
-                         WHEN fto_indicadores->>'4' = 'Pensionado' THEN 'Pensionado'
-                         WHEN fto_indicadores->>'3' = 'Afiliado' THEN 'Afiliado'
+                         WHEN "FTO_INDICADORES"->>'3' = 'Asignado' THEN 'Asignado'
+                         WHEN "FTO_INDICADORES"->>'4' = 'Pensionado' THEN 'Pensionado'
+                         WHEN "FTO_INDICADORES"->>'3' = 'Afiliado' THEN 'Afiliado'
                      END,
-                     fto_indicadores->>'33',
-                     s.fcc_valor
+                     "FTO_INDICADORES"->>'33',
+                     s."FTC_DESCRIPCION"
             """, ["Tipo Generación", "Vigencia", "Tipo Formato", "Indicador Afiliación", "SIEFORE"], ["Registros", "Comisiones"])
 
             notify(

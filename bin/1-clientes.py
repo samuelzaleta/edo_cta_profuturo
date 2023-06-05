@@ -1,6 +1,6 @@
 from profuturo.common import truncate_table, notify, register_time, define_extraction
 from profuturo.database import get_postgres_pool, get_mit_pool, get_buc_pool
-from profuturo.extraction import extract_dataset, extract_indicator
+from profuturo.extraction import extract_indicator, upsert_dataset
 from profuturo.reporters import HtmlReporter
 from sqlalchemy import text, Engine
 
@@ -14,19 +14,18 @@ phase = 6
 with define_extraction(phase, postgres_pool, buc_pool) as (postgres, buc):
     with register_time(postgres, phase):
         # Extracción
-        truncate_table(postgres, 'TCDATMAE_CLIENTE')
-        extract_dataset(buc, postgres, """
-        SELECT C.NUMERO AS FTn_CUENTA,
-               (PF.NOMBRE || ' ' || PF.APELLIDOPATERNO || ' ' ||PF.APELIDOMATERNO) AS FTC_NOMBRE,
-               DI.CALLE AS FTC_CALLE,
-               DI.NUMEROEXTERIOR AS FTC_NUMERO,
-               ASE.NOMBRE AS FTC_COLONIA,
-               CD.NOMBRE AS FTC_DELEGACION,
-               CP.CODIGOPOSTAL AS FTN_CODIGOPOSTAL,
-               E.NOMBRE AS FTC_ENTIDAD_FEDERATIVA,
-               NSS.VALOR_IDENTIFICADOR AS FTC_NSS,
-               CURP.VALOR_IDENTIFICADOR AS FTC_CURP,
-               RFC.VALOR_IDENTIFICADOR AS FTC_RFC
+        upsert_dataset(buc, postgres, """
+        SELECT C.NUMERO AS id,
+               (PF.NOMBRE || ' ' || PF.APELLIDOPATERNO || ' ' ||PF.APELIDOMATERNO) AS name,
+               DI.CALLE AS street,
+               DI.NUMEROEXTERIOR AS street_number,
+               ASE.NOMBRE AS colony,
+               CD.NOMBRE AS municipality,
+               CP.CODIGOPOSTAL AS zip,
+               E.NOMBRE AS state,
+               NSS.VALOR_IDENTIFICADOR AS nss,
+               CURP.VALOR_IDENTIFICADOR AS curp,
+               RFC.VALOR_IDENTIFICADOR AS rfc
         FROM CONTRATO C
             INNER JOIN PERSONA_CONT_ROL PCR ON C.IDCONTRATO = PCR.IDCONTRATO
             INNER JOIN PERSONA_FISICA PF ON PCR.IDPERSONA = PF.IDPERSONA
@@ -44,23 +43,38 @@ with define_extraction(phase, postgres_pool, buc_pool) as (postgres, buc):
           AND C.IDLINEANEGOCIO = 763 -- Linea de negocio
           AND D.IDTIPODOM = 818 -- Tipo de domicilio Particular
           AND D.IDSTATUSDOM = 761 -- ACTIVO
-          AND D.PREFERENTE = 1 --Domicilio preferente
+          AND D.PREFERENTE = 1 -- Domicilio preferente
+        """, """
+        INSERT INTO "TCDATMAE_CLIENTE"(
+            "FTN_CUENTA", "FTC_NOMBRE", "FTC_CALLE", "FTC_NUMERO", 
+            "FTC_COLONIA", "FTC_DELEGACION", "FTN_CODIGO_POSTAL", 
+            "FTC_ENTIDAD_FEDERATIVA", "FTC_NSS", "FTC_CURP", "FTC_RFC"
+        )
+        VALUES (
+            :id, :name, :street, :street_number,
+            :colony, :municipality,:zip,
+            :state, :nss, :curp, :rfc
+        )
+        ON CONFLICT ("FTN_CUENTA") DO UPDATE 
+        SET "FTC_NOMBRE" = :name, "FTC_CALLE" = :street, "FTC_NUMERO" = :street_number,
+            "FTC_COLONIA" = :colony, "FTC_DELEGACION" = :municipality, "FTN_CODIGO_POSTAL" = :zip,
+            "FTC_ENTIDAD_FEDERATIVA" = :state, "FTC_NSS" = :nss, "FTC_CURP" = :curp, "FTC_RFC" = :rfc
         """, "TCDATMAE_CLIENTE", limit=100_000)
 
         # Indicadores
         indicators = postgres.execute(text("""
-        SELECT ftn_id_indicador, ftc_descripcion 
-        FROM tcgespro_indicadores
-        WHERE ftc_bandera_estatus = 'V'
+        SELECT "FTN_ID_INDICADOR", "FTC_DESCRIPCION" 
+        FROM "TCGESPRO_INDICADOR"
+        WHERE "FTC_BANDERA_ESTATUS" = 'V'
         """))
 
         for index, indicator in enumerate(indicators.fetchall()):
             print(f"Extracting {indicator[1]}...")
 
             indicators_queries = postgres.execute(text("""
-            SELECT ftc_consulta_sql, ftc_bd_origen
-            FROM tcgespro_indicador_consulta
-            WHERE ftn_id_indicador = :indicator
+            SELECT "FTC_CONSULTA_SQL", "FTC_BD_ORIGEN"
+            FROM "TCGESPRO_INDICADOR_CONSULTA"
+            WHERE "FCN_ID_INDICADOR" = :indicator
             """), {"indicator": indicator[0]})
 
             for indicator_query in indicators_queries.fetchall():
@@ -79,24 +93,24 @@ with define_extraction(phase, postgres_pool, buc_pool) as (postgres, buc):
 
         # Generación de cifras de control
         report = html_reporter.generate(postgres, """
-        SELECT fto_indicadores->>'34' AS generacion,
-               fto_indicadores->>'21' AS vigencia,
+        SELECT "FTO_INDICADORES"->>'34' AS generacion,
+               "FTO_INDICADORES"->>'21' AS vigencia,
                CASE
-                   WHEN fto_indicadores->>'3' = 'Asignado' THEN 'Asignado'
-                   WHEN fto_indicadores->>'4' = 'Pensionado' THEN 'Pensionado'
-                   WHEN fto_indicadores->>'3' = 'Afiliado' THEN 'Afiliado'
+                   WHEN "FTO_INDICADORES"->>'3' = 'Asignado' THEN 'Asignado'
+                   WHEN "FTO_INDICADORES"->>'4' = 'Pensionado' THEN 'Pensionado'
+                   WHEN "FTO_INDICADORES"->>'3' = 'Afiliado' THEN 'Afiliado'
                END AS tipo_formato,
-               fto_indicadores->>'31' AS tipo_cliente,
+               "FTO_INDICADORES"->>'31' AS tipo_cliente,
                COUNT(*)
-        FROM TCDATMAE_CLIENTE
-        GROUP BY fto_indicadores->>'34',
-                 fto_indicadores->>'21',
+        FROM "TCDATMAE_CLIENTE"
+        GROUP BY "FTO_INDICADORES"->>'34',
+                 "FTO_INDICADORES"->>'21',
                  CASE
-                     WHEN fto_indicadores->>'3' = 'Asignado' THEN 'Asignado'
-                     WHEN fto_indicadores->>'4' = 'Pensionado' THEN 'Pensionado'
-                     WHEN fto_indicadores->>'3' = 'Afiliado' THEN 'Afiliado'
+                     WHEN "FTO_INDICADORES"->>'3' = 'Asignado' THEN 'Asignado'
+                     WHEN "FTO_INDICADORES"->>'4' = 'Pensionado' THEN 'Pensionado'
+                     WHEN "FTO_INDICADORES"->>'3' = 'Afiliado' THEN 'Afiliado'
                  END,
-                 fto_indicadores->>'31'
+                 "FTO_INDICADORES"->>'31'
         """, ["Tipo Generación", "Vigencia", "Tipo Formato", "Indicador Afiliación"], ["Clientes"])
 
         notify(

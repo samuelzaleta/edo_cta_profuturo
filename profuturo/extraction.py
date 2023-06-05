@@ -55,7 +55,7 @@ def extract_indicator(
             for i, batch in enumerate(chunk(accounts, 1_000)):
                 destination.execute(text("""
                 UPDATE "TCDATMAE_CLIENTE"
-                SET "FTO_INDICADORES" = jsonb_set(CASE WHEN "FTO_INDICADORES" IS NULL THEN '{}' ELSE "FTO_INDICADORES" END, :field, :value)
+                SET "FTO_INDICADORES" = jsonb_set("FTO_INDICADORES", :field, :value)
                 WHERE "FTN_CUENTA" IN :accounts
                 """), {
                     "accounts": tuple(batch),
@@ -105,3 +105,32 @@ def extract_dataset(
 
     print(f"Done extracting {table}!")
     print(df_pd.info())
+
+
+def upsert_dataset(
+    origin: Connection,
+    destination: Connection,
+    select_query: str,
+    upsert_query: str,
+    table: str,
+    term: int = None,
+    params: Dict[str, Any] = None,
+    limit: int = None,
+):
+    if params is None:
+        params = {}
+    if limit is not None:
+        select_query = f"SELECT * FROM ({select_query})WHERE ROWNUM <= :limit"
+        params["limit"] = limit
+
+    print(f"Upserting {table}...")
+
+    try:
+        cursor = origin.execute(text(select_query), params)
+
+        for row in cursor.fetchall():
+            destination.execute(text(upsert_query), row._mapping)
+    except Exception as e:
+        raise ProfuturoException.from_exception(e, term) from e
+
+    print(f"Done upserting {table}!")
