@@ -1,7 +1,6 @@
 from sqlalchemy.engine import Connection
 from sqlalchemy import text, Engine
 from datetime import datetime, time, timedelta
-from typing import Optional
 from .database import use_pools
 from .exceptions import ProfuturoException
 import contextlib
@@ -17,43 +16,45 @@ def define_extraction(phase: int, main_pool: Engine, *pools: Engine):
 @contextlib.contextmanager
 def register_time(conn: Connection, phase: int, term: int = None):
     start = datetime.now()
-    write_binnacle(conn, phase, start, term=term)
     yield
     end = datetime.now()
     write_binnacle(conn, phase, start, end, term=term)
 
 
-def write_binnacle(conn: Connection, phase: int, start: datetime, end: datetime = None, term: int = None) -> None:
+def write_binnacle(conn: Connection, phase: int, start: datetime, end: datetime, term: int = None) -> None:
     try:
-        flag: Optional[str] = None
-        if end:
-            cursor = conn.execute(text("""
-            SELECT "FTC_VERDE", "FTC_AMARILLO"
-            FROM "TCGESPRO_FASE"
-            WHERE "FTN_ID_FASE" = :phase
-            """), {'phase': phase})
+        cursor = conn.execute(text("""
+        SELECT "FTC_VERDE", "FTC_AMARILLO"
+        FROM "TCGESPRO_FASE"
+        WHERE "FTN_ID_FASE" = :phase
+        """), {'phase': phase})
 
-            delta = end - start
-            service_level = cursor.fetchone()
-            green_time = time.fromisoformat(service_level[0])
-            yellow_time = time.fromisoformat(service_level[1])
+        if cursor.rowcount != 1:
+            print(f'Phase {phase} not found')
+            return
 
-            flag: str
-            if delta <= timedelta(hours=green_time.hour, minutes=green_time.minute):
-                flag = "Verde"
-            elif delta <= timedelta(hours=yellow_time.hour, minutes=yellow_time.minute):
-                flag = "Amarillo"
-            else:
-                flag = "Rojo"
+        delta = end - start
+        service_level = cursor.fetchone()
+        green_time = time.fromisoformat(service_level[0])
+        yellow_time = time.fromisoformat(service_level[1])
+
+        flag: str
+        if delta <= timedelta(hours=green_time.hour, minutes=green_time.minute):
+            flag = "Verde"
+        elif delta <= timedelta(hours=yellow_time.hour, minutes=yellow_time.minute):
+            flag = "Amarillo"
+        else:
+            flag = "Rojo"
 
         conn.execute(text("""
         INSERT INTO "TTGESPRO_BITACORA_ESTADO_CUENTA" (
-            "FTD_FECHA_HORA", "FTC_BANDERA_NIVEL_SERVICIO", 
+            "FTD_FECHA_HORA_INICIO", "FTD_FECHA_HORA_FIN", "FTC_BANDERA_NIVEL_SERVICIO", 
             "FCN_ID_PERIODO", "FCN_ID_FASE"
         ) 
-        VALUES (:date, :flag, :term, :phase)
+        VALUES (:start, :end, :flag, :term, :phase)
         """), {
-            "date": end or start,
+            "start": start,
+            "end": end,
             "flag": flag,
             "term": term,
             "phase": phase,

@@ -62,7 +62,7 @@ with define_extraction(phase, postgres_pool, buc_pool) as (postgres, buc):
         """, "TCDATMAE_CLIENTE", limit=100_000)
 
         # Indicadores
-        postgres.execute(text('UPDATE "TCDATMAE_CLIENTE" SET "FTO_INDICADORES" = NULL'))
+        postgres.execute(text('UPDATE "TCDATMAE_CLIENTE" SET "FTO_INDICADORES" = \'{}\''))
 
         indicators = postgres.execute(text("""
         SELECT "FTN_ID_INDICADOR", "FTC_DESCRIPCION" 

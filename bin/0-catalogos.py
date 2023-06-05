@@ -1,6 +1,6 @@
-from profuturo.common import truncate_table, register_time, define_extraction
+from profuturo.common import register_time, define_extraction
 from profuturo.database import get_postgres_pool, get_mit_pool
-from profuturo.extraction import extract_dataset, extract_terms, upsert_dataset
+from profuturo.extraction import upsert_dataset
 
 postgres_pool = get_postgres_pool()
 mit_pool = get_mit_pool()
