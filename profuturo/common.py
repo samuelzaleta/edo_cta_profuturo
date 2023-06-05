@@ -1,6 +1,7 @@
 from sqlalchemy.engine import Connection
 from sqlalchemy import text, Engine
 from datetime import datetime, time, timedelta
+from typing import Optional
 from .database import use_pools
 from .exceptions import ProfuturoException
 import contextlib
@@ -16,46 +17,43 @@ def define_extraction(phase: int, main_pool: Engine, *pools: Engine):
 @contextlib.contextmanager
 def register_time(conn: Connection, phase: int, term: int = None):
     start = datetime.now()
+    write_binnacle(conn, phase, start, term=term)
     yield
     end = datetime.now()
+    write_binnacle(conn, phase, start, end, term=term)
 
-    write_binnacle(conn, phase, start, end, term)
 
-
-def write_binnacle(conn: Connection, phase: int, start: datetime, end: datetime, term: int = None) -> None:
+def write_binnacle(conn: Connection, phase: int, start: datetime, end: datetime = None, term: int = None) -> None:
     try:
-        cursor = conn.execute(text("""
-        SELECT "FTC_VERDE", "FTC_AMARILLO"
-        FROM "TCGESPRO_FASE"
-        WHERE "FTN_ID_FASE" = :phase
-        """), {'phase': phase})
+        flag: Optional[str] = None
+        if end:
+            cursor = conn.execute(text("""
+            SELECT "FTC_VERDE", "FTC_AMARILLO"
+            FROM "TCGESPRO_FASE"
+            WHERE "FTN_ID_FASE" = :phase
+            """), {'phase': phase})
 
-        if cursor.rowcount != 1:
-            print(f'Phase {phase} not found')
-            return
+            delta = end - start
+            service_level = cursor.fetchone()
+            green_time = time.fromisoformat(service_level[0])
+            yellow_time = time.fromisoformat(service_level[1])
 
-        delta = end - start
-        service_level = cursor.fetchone()
-        green_time = time.fromisoformat(service_level[0])
-        yellow_time = time.fromisoformat(service_level[1])
-
-        flag: str
-        if delta <= timedelta(hours=green_time.hour, minutes=green_time.minute):
-            flag = "Verde"
-        elif delta <= timedelta(hours=yellow_time.hour, minutes=yellow_time.minute):
-            flag = "Amarillo"
-        else:
-            flag = "Rojo"
+            flag: str
+            if delta <= timedelta(hours=green_time.hour, minutes=green_time.minute):
+                flag = "Verde"
+            elif delta <= timedelta(hours=yellow_time.hour, minutes=yellow_time.minute):
+                flag = "Amarillo"
+            else:
+                flag = "Rojo"
 
         conn.execute(text("""
         INSERT INTO "TTGESPRO_BITACORA_ESTADO_CUENTA" (
-            "FTD_FECHA_HORA_INICIO", "FTD_FECHA_HORA_FIN", "FTC_BANDERA_NIVEL_SERVICIO", 
+            "FTD_FECHA_HORA", "FTC_BANDERA_NIVEL_SERVICIO", 
             "FCN_ID_PERIODO", "FCN_ID_FASE"
         ) 
-        VALUES (:start, :end, :flag, :term, :phase)
+        VALUES (:date, :flag, :term, :phase)
         """), {
-            "start": start,
-            "end": end,
+            "date": end or start,
             "flag": flag,
             "term": term,
             "phase": phase,
@@ -86,7 +84,8 @@ def notify_exceptions(pool: Engine, phase: int):
         raise e
 
 
-def notify(conn: Connection, title: str, message: str = None, details: str = None, term: int = None, control: bool = False):
+def notify(conn: Connection, title: str, message: str = None, details: str = None, term: int = None,
+           control: bool = False):
     conn.execute(text("""
     INSERT INTO "TTGESPRO_NOTIFICACION" (
         "FTC_TITULO", "FTC_DETALLE_TEXTO", "FTC_DETALLE_BLOB", 

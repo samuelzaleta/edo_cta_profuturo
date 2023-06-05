@@ -1,4 +1,4 @@
-from profuturo.common import truncate_table, notify, register_time, define_extraction
+from profuturo.common import notify, register_time, define_extraction
 from profuturo.database import get_postgres_pool, get_mit_pool, get_buc_pool
 from profuturo.extraction import extract_indicator, upsert_dataset
 from profuturo.reporters import HtmlReporter
@@ -62,6 +62,8 @@ with define_extraction(phase, postgres_pool, buc_pool) as (postgres, buc):
         """, "TCDATMAE_CLIENTE", limit=100_000)
 
         # Indicadores
+        postgres.execute(text('UPDATE "TCDATMAE_CLIENTE" SET "FTO_INDICADORES" = NULL'))
+
         indicators = postgres.execute(text("""
         SELECT "FTN_ID_INDICADOR", "FTC_DESCRIPCION" 
         FROM "TCGESPRO_INDICADOR"
