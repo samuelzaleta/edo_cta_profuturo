@@ -3,6 +3,10 @@ from sqlalchemy import text
 from typing import Dict, List
 
 
+def _format_value(value: float | int) -> str:
+    return '{:,}'.format(round(value, 2))
+
+
 class HtmlReporter:
     _conn: Connection
     _cursor: CursorResult
@@ -72,7 +76,7 @@ class HtmlReporter:
         """)
 
         for column_value, current_value in self._current_values[group].items():
-            self._append_html("<td>{:,}</td>".format(round(current_value, 2)))
+            self._append_html(f"<td>{_format_value(current_value)}</td>")
             self._current_values[group][column_value] = 0
 
         self._append_html("</tr>")
@@ -85,7 +89,7 @@ class HtmlReporter:
             self._append_html(f"<td>{row[i]}</td>")
             i = i + 1
         for _ in self._value_columns:
-            self._append_html('<td style="text-align: right;">{:,}</td>'.format(round(row[i], 2)))
+            self._append_html(f'<td style="text-align: right;">{_format_value(row[i])}</td>')
             i = i + 1
 
         self._append_html("</tr>")
@@ -97,7 +101,7 @@ class HtmlReporter:
         """)
 
         for total in self._current_totals.values():
-            self._append_html("<td>{:,}</td>".format(round(total, 2)))
+            self._append_html(f"<td>{_format_value(total)}</td>")
 
         self._append_html("""
             </tr>
