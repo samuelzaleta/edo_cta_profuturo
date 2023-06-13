@@ -2,17 +2,24 @@ from profuturo.common import notify, register_time, define_extraction
 from profuturo.database import get_postgres_pool, get_mit_pool, get_buc_pool
 from profuturo.extraction import extract_indicator, upsert_dataset
 from profuturo.reporters import HtmlReporter
+from profuturo.extraction import extract_terms
 from sqlalchemy import text, Engine
+import sys
 
 
 html_reporter = HtmlReporter()
 postgres_pool = get_postgres_pool()
 mit_pool = get_mit_pool()
 buc_pool = get_buc_pool()
-phase = 6
+phase = int(sys.argv[1])
 
 with define_extraction(phase, postgres_pool, buc_pool) as (postgres, buc):
-    with register_time(postgres, phase):
+    term = extract_terms(postgres, phase)
+    term_id = term["id"]
+    start_month = term["start_month"]
+    end_month = term["end_month"]
+
+    with register_time(postgres_pool, phase, term_id):
         # Extracción
         upsert_dataset(buc, postgres, """
         SELECT C.NUMERO AS id,
@@ -70,7 +77,7 @@ with define_extraction(phase, postgres_pool, buc_pool) as (postgres, buc):
         WHERE "FTC_BANDERA_ESTATUS" = 'V'
         """))
 
-        for index, indicator in enumerate(indicators.fetchall()):
+        for indicator in indicators.fetchall():
             print(f"Extracting {indicator[1]}...")
 
             indicators_queries = postgres.execute(text("""
@@ -89,7 +96,7 @@ with define_extraction(phase, postgres_pool, buc_pool) as (postgres, buc):
                     pool = postgres_pool
 
                 with pool.connect() as conn:
-                    extract_indicator(conn, postgres, indicator_query[0], index, limit=100_000)
+                    extract_indicator(conn, postgres, indicator_query[0], indicator[0], limit=100_000)
 
             print(f"Done extracting {indicator[1]}!")
 

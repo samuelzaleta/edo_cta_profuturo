@@ -14,24 +14,55 @@ def define_extraction(phase: int, main_pool: Engine, *pools: Engine):
 
 
 @contextlib.contextmanager
-def register_time(conn: Connection, phase: int, term: int = None):
-    start = datetime.now()
+def register_time(pool: Engine, phase: int, term: int = None):
+    with pool.begin() as conn:
+        binnacle_id = register_start(conn, phase, datetime.now(), term=term)
+
     yield
-    end = datetime.now()
-    write_binnacle(conn, phase, start, end, term=term)
+
+    with pool.begin() as conn:
+        register_end(conn, binnacle_id, datetime.now())
 
 
-def write_binnacle(conn: Connection, phase: int, start: datetime, end: datetime, term: int = None) -> None:
+def register_start(conn: Connection, phase: int, start: datetime, term: int = None) -> int:
     try:
+        cursor = conn.execute(text("""
+        INSERT INTO "TTGESPRO_BITACORA_ESTADO_CUENTA" (
+           "FTD_FECHA_HORA_INICIO", "FCN_ID_PERIODO", "FCN_ID_FASE")
+        VALUES (:start, :term, :phase)
+        RETURNING "FTN_ID_BITACORA_ESTADO_CUENTA"
+        """), {
+            "start": start,
+            "term": term,
+            "phase": phase
+        })
+        row = cursor.fetchone()
+
+        return row[0]
+    except Exception as e:
+        raise ProfuturoException("BINNACLE_ERROR", phase, term) from e
+
+
+def register_end(conn: Connection, binnacle_id: int, end: datetime) -> None:
+    try:
+        cursor = conn.execute(text("""
+        SELECT "FTD_FECHA_HORA_INICIO", "FCN_ID_FASE"
+        FROM "TTGESPRO_BITACORA_ESTADO_CUENTA"
+        WHERE "FTN_ID_BITACORA_ESTADO_CUENTA" = :id
+        """), {'id': binnacle_id})
+
+        binnacle = cursor.fetchone()
+        start = binnacle[0]
+        phase = binnacle[1]
+
         cursor = conn.execute(text("""
         SELECT "FTC_VERDE", "FTC_AMARILLO"
         FROM "TCGESPRO_FASE"
         WHERE "FTN_ID_FASE" = :phase
         """), {'phase': phase})
 
-        if cursor.rowcount != 1:
-            print(f'Phase {phase} not found')
-            return
+        if cursor.rowcount == 0:
+            raise ValueError('Phase not found', phase)
 
         delta = end - start
         service_level = cursor.fetchone()
@@ -47,20 +78,12 @@ def write_binnacle(conn: Connection, phase: int, start: datetime, end: datetime,
             flag = "Rojo"
 
         conn.execute(text("""
-        INSERT INTO "TTGESPRO_BITACORA_ESTADO_CUENTA" (
-            "FTD_FECHA_HORA_INICIO", "FTD_FECHA_HORA_FIN", "FTC_BANDERA_NIVEL_SERVICIO", 
-            "FCN_ID_PERIODO", "FCN_ID_FASE"
-        ) 
-        VALUES (:start, :end, :flag, :term, :phase)
-        """), {
-            "start": start,
-            "end": end,
-            "flag": flag,
-            "term": term,
-            "phase": phase,
-        })
+        UPDATE "TTGESPRO_BITACORA_ESTADO_CUENTA"
+        SET "FTD_FECHA_HORA_FIN" = :end, "FTC_BANDERA_NIVEL_SERVICIO" = :flag
+        WHERE "FTN_ID_BITACORA_ESTADO_CUENTA" = :id
+        """), {"id": binnacle_id, "end": end, "flag": flag})
     except Exception as e:
-        raise ProfuturoException("BINNACLE_ERROR", phase, term) from e
+        raise ProfuturoException("BINNACLE_ERROR") from e
 
 
 @contextlib.contextmanager

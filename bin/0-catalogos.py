@@ -1,13 +1,21 @@
 from profuturo.common import register_time, define_extraction
 from profuturo.database import get_postgres_pool, get_mit_pool
 from profuturo.extraction import upsert_dataset
+from profuturo.extraction import extract_terms
+import sys
+
 
 postgres_pool = get_postgres_pool()
 mit_pool = get_mit_pool()
-phase = 5
+phase = int(sys.argv[1])
 
 with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
-    with register_time(postgres, phase):
+    term = extract_terms(postgres, phase)
+    term_id = term["id"]
+    start_month = term["start_month"]
+    end_month = term["end_month"]
+
+    with register_time(postgres_pool, phase, term_id):
         upsert_dataset(mit, postgres, """
         WITH dataset AS (
             SELECT ROW_NUMBER() OVER(PARTITION BY FCN_ID_CAT_CATALOGO ORDER BY FHD_HIST_FEH_CRE DESC) AS ROW_NUM,

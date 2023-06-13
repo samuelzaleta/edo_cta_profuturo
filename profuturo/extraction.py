@@ -4,22 +4,24 @@ from datetime import date
 from .exceptions import ProfuturoException
 from ._helpers import group_by, chunk
 import calendar
+import sys
 import pandas as pd
 
 
-def extract_terms(conn: Connection, phase: int) -> List[Dict[str, Any]]:
+def extract_terms(conn: Connection, phase: int) -> Dict[str, Any]:
     try:
+        term_id = sys.argv[2]
         cursor = conn.execute(text("""
-        SELECT "FTN_ID_PERIODO", "FTC_PERIODO"
+        SELECT "FTC_PERIODO"
         FROM "TCGESPRO_PERIODO"
-        """))
+        WHERE "FTN_ID_PERIODO" = :term
+        """), {"term": term_id})
 
         if cursor.rowcount == 0:
-            raise ValueError("The terms table should have at least one term", phase)
+            raise ValueError("The term does not exist", phase)
 
-        terms = []
         for row in cursor.fetchall():
-            term = row[1].split('/')
+            term = row[0].split('/')
             month = int(term[0])
             year = int(term[1])
 
@@ -27,10 +29,10 @@ def extract_terms(conn: Connection, phase: int) -> List[Dict[str, Any]]:
             start_month = date(year, month, 1)
             end_month = date(year, month, month_range[1])
 
-            terms.append({"id": row[0], "start_month": start_month, "end_month": end_month})
             print(f"Extracting period: from {start_month} to {end_month}")
+            return {"id": term_id, "start_month": start_month, "end_month": end_month}
 
-        return terms
+        raise RuntimeError("Can not retrieve the term")
     except Exception as e:
         raise ProfuturoException("TERMS_ERROR", phase) from e
 

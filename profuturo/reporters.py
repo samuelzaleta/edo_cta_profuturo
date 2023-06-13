@@ -72,7 +72,7 @@ class HtmlReporter:
         """)
 
         for column_value, current_value in self._current_values[group].items():
-            self._append_html(f"<td>{current_value}</td>")
+            self._append_html("<td>{:,}</td>".format(round(current_value, 2)))
             self._current_values[group][column_value] = 0
 
         self._append_html("</tr>")
@@ -80,8 +80,13 @@ class HtmlReporter:
     def _append_row(self, row: Row):
         self._append_html("<tr>")
 
-        for value in row:
-            self._append_html(f"<td>{value}</td>")
+        i = 0
+        for _ in self._display_columns:
+            self._append_html(f"<td>{row[i]}</td>")
+            i = i + 1
+        for _ in self._value_columns:
+            self._append_html('<td style="text-align: right;">{:,}</td>'.format(round(row[i], 2)))
+            i = i + 1
 
         self._append_html("</tr>")
 
@@ -92,7 +97,7 @@ class HtmlReporter:
         """)
 
         for total in self._current_totals.values():
-            self._append_html(f"<td>{total}</td>")
+            self._append_html("<td>{:,}</td>".format(round(total, 2)))
 
         self._append_html("""
             </tr>
