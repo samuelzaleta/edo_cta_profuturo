@@ -10,6 +10,7 @@ sqlalchemy = "*"
 oracledb = "*"
 polars = "*"
 profuturo = {editable = true, path = "."}
+jaydebeapi = "*"
 
 [dev-packages]
 pyspark = "*"

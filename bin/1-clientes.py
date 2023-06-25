@@ -66,7 +66,7 @@ with define_extraction(phase, postgres_pool, buc_pool) as (postgres, buc):
         SET "FTC_NOMBRE" = :name, "FTC_CALLE" = :street, "FTC_NUMERO" = :street_number,
             "FTC_COLONIA" = :colony, "FTC_DELEGACION" = :municipality, "FTN_CODIGO_POSTAL" = :zip,
             "FTC_ENTIDAD_FEDERATIVA" = :state, "FTC_NSS" = :nss, "FTC_CURP" = :curp, "FTC_RFC" = :rfc
-        """, "TCDATMAE_CLIENTE", limit=100_000)
+        """, "TCDATMAE_CLIENTE", limit=7_000_000)
 
         # Indicadores
         postgres.execute(text('UPDATE "TCDATMAE_CLIENTE" SET "FTO_INDICADORES" = \'{}\''))
@@ -127,5 +127,6 @@ with define_extraction(phase, postgres_pool, buc_pool) as (postgres, buc):
             "Cifras de control Cliente generadas",
             "Se han generado las cifras de control para clientes exitosamente",
             report,
+            term=term_id,
             control=True,
         )

@@ -45,9 +45,10 @@ def get_postgres_conn():
     return psycopg2.connect(
         host="34.72.193.129",
         user="alexo",
-        password="Alexo123",
+        password="Oxela3210",
         database="PROFUTURO",
-        options='-c search_path="MAESTROS","GESTOR","HECHOS"',
+        port=5432,
+        options='-c search_path="MAESTROS","GESTOR","HECHOS","RESULTADOS"',
     )
 
 

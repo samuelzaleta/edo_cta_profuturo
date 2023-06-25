@@ -1,4 +1,4 @@
-from typing import Callable, Dict, Any
+from typing import Callable, Dict, Any, List
 
 
 def chunk(iterable: iter, size: int):
@@ -23,3 +23,12 @@ def group_by(
         result[key].append(element)
 
     return result
+
+def sub_anverso_tables() -> List[str]:
+    tables = [
+        "TTCALCUL_RENDIMIENTO",
+        "TTEDOCTA_AFILIADO",
+        "TTEDOCTA_GENERACION_AFORE"
+    ]
+    
+    return tables

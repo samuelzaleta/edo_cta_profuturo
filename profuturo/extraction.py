@@ -2,10 +2,11 @@ from sqlalchemy import text, Connection
 from typing import Dict, List, Any
 from datetime import date
 from .exceptions import ProfuturoException
-from ._helpers import group_by, chunk
+from ._helpers import group_by, chunk, sub_anverso_tables
 import calendar
 import sys
 import pandas as pd
+import datetime
 
 
 def extract_terms(conn: Connection, phase: int) -> Dict[str, Any]:
@@ -82,8 +83,12 @@ def extract_dataset(
     if params is None:
         params = {}
     if limit is not None:
-        query = f"SELECT * FROM ({query}) WHERE ROWNUM <= :limit"
-        params["limit"] = limit
+        if table in sub_anverso_tables():
+            f"SELECT Q.* FROM ({query}) AS Q LIMIT :limit"
+            params["limit"] = limit
+        else:
+            query = f"SELECT * FROM ({query}) WHERE ROWNUM <= :limit"
+            params["limit"] = limit
 
     print(f"Extracting {table}...")
 
@@ -93,6 +98,9 @@ def extract_dataset(
 
         if term:
             df_pd = df_pd.assign(FCN_ID_PERIODO=term)
+
+        if table in sub_anverso_tables():
+            df_pd = df_pd.assign(FTD_FECHAHORA_ALTA=datetime.datetime.now())
 
         df_pd.to_sql(
             table,

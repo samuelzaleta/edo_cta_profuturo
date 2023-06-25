@@ -1,10 +1,10 @@
 from sqlalchemy.engine import Connection, CursorResult, Row
 from sqlalchemy import text
-from typing import Dict, List
+from typing import Dict, List, Any
 
 
-def _format_value(value: float | int) -> str:
-    return '{:,}'.format(round(value, 2))
+def _format_value(value: float) -> str:
+    return '{:,.2f}'.format(round(value, 2))
 
 
 class HtmlReporter:
@@ -17,9 +17,19 @@ class HtmlReporter:
     _current_totals: Dict[str, float]
     _html: str
 
-    def generate(self, conn: Connection, query: str, display_columns: List[str], value_columns: List[str]) -> str:
+    def generate(
+        self,
+        conn: Connection,
+        query: str,
+        display_columns: List[str],
+        value_columns: List[str],
+        params: Dict[str, Any] = None,
+    ) -> str:
+        if not params:
+            params = {}
+
         self._conn = conn
-        self._cursor = conn.execute(text(query))
+        self._cursor = conn.execute(text(query), params)
         self._display_columns = display_columns
         self._value_columns = value_columns
         self._current_displays = {}

@@ -23,7 +23,7 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
             SELECT FTN_NUM_CTA_INVDUAL,
                    FCN_ID_TIPO_SUBCTA,
                    FCN_ID_SIEFORE,
-                   TRUNC(FTD_FEH_LIQUIDACION, 'MM') AS START_OF_MONTH
+                   MAX(TRUNC(FTD_FEH_LIQUIDACION, 'MM')) AS START_OF_MONTH
             FROM cierren.thafogral_saldo_historico_v2
             WHERE FTN_NUM_CTA_INVDUAL > 0
               AND FTD_FEH_LIQUIDACION <= :date
