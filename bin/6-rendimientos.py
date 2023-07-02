@@ -35,7 +35,7 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
                        WHEN "FTO_INDICADORES"->>'3' = 'Asignado' THEN 'Asignado'
                        WHEN "FTO_INDICADORES"->>'4' = 'Pensionado' THEN 'Pensionado'
                        WHEN "FTO_INDICADORES"->>'3' = 'Afiliado' THEN 'Afiliado'
-                   END AS tipo_formato,
+                   END AS tipo_afiliación,
                    "FTO_INDICADORES"->>'33' AS tipo_cliente,
                    ts."FCC_VALOR" AS tipo_subcuenta,
                    COUNT(DISTINCT c."FTN_CUENTA") AS clientes,

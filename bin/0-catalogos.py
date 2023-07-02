@@ -1,7 +1,7 @@
 from profuturo.common import register_time, define_extraction
 from profuturo.database import get_postgres_pool, get_mit_pool
-from profuturo.extraction import upsert_dataset
-from profuturo.extraction import extract_terms
+from profuturo.extractionPolars import upsert_dataset
+from profuturo.extractionPolars import extract_terms
 import sys
 
 
@@ -11,10 +11,12 @@ phase = int(sys.argv[1])
 
 with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
     term = extract_terms(postgres, phase)
+    print("post",postgres, phase)
+    print("term", term)	
     term_id = term["id"]
     start_month = term["start_month"]
     end_month = term["end_month"]
-
+    print("term_id",term_id)
     with register_time(postgres_pool, phase, term_id):
         upsert_dataset(mit, postgres, """
         WITH dataset AS (

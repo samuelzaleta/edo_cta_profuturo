@@ -1,4 +1,3 @@
-import jaydebeapi
 from sqlalchemy.engine import Engine
 from sqlalchemy.exc import OperationalError
 from contextlib import ExitStack
@@ -49,44 +48,34 @@ def get_postgres_conn():
         password="Oxela3210",
         database="PROFUTURO",
         port=5432,
-        options='-c search_path="MAESTROS","GESTOR","HECHOS","RESULTADOS"',
-    )
-
-
-def get_integrity_conn():
-    return jaydebeapi.connect(
-        "oracle.rdb.jdbc.rdbThin.Driver",
-        "jdbc:rdbThin://130.40.30.144:1707/mexico$base:cierren",
-        {"user": "obadillo", "password": "BADILLO2022"},
-        "C:\\Users\\Brandon Antonio\\PycharmProjects\\edo_cta_profuturo\\libs\\RDBTHIN.JAR"
+        options='-c search_path="MAESTROS","GESTOR","HECHOS"',
     )
 
 
 def get_mit_pool():
     oracledb.init_oracle_client()
 
-    return sqlalchemy.create_engine(
+    mit_pool = sqlalchemy.create_engine(
         "oracle+oracledb://",
         creator=get_mit_conn,
     )
 
+    return mit_pool
+
 
 def get_buc_pool():
-    return sqlalchemy.create_engine(
+    buc_pool = sqlalchemy.create_engine(
         "oracle+oracledb://",
         creator=get_buc_conn,
     )
 
-
-def get_integrity_pool():
-    return sqlalchemy.create_engine(
-        "rdb+jaydebeapi://",
-        creator=get_integrity_conn,
-    )
+    return buc_pool
 
 
 def get_postgres_pool():
-    return sqlalchemy.create_engine(
+    postgres_pool = sqlalchemy.create_engine(
         "postgresql+psycopg2://",
         creator=get_postgres_conn,
     )
+
+    return postgres_pool

@@ -28,6 +28,7 @@ with define_extraction(phase, postgres_pool, buc_pool) as (postgres, buc):
                DI.NUMEROEXTERIOR AS street_number,
                ASE.NOMBRE AS colony,
                CD.NOMBRE AS municipality,
+               M.NOMBRE AS delegacion,
                CP.CODIGOPOSTAL AS zip,
                E.NOMBRE AS state,
                NSS.VALOR_IDENTIFICADOR AS nss,
@@ -66,7 +67,7 @@ with define_extraction(phase, postgres_pool, buc_pool) as (postgres, buc):
         SET "FTC_NOMBRE" = :name, "FTC_CALLE" = :street, "FTC_NUMERO" = :street_number,
             "FTC_COLONIA" = :colony, "FTC_DELEGACION" = :municipality, "FTN_CODIGO_POSTAL" = :zip,
             "FTC_ENTIDAD_FEDERATIVA" = :state, "FTC_NSS" = :nss, "FTC_CURP" = :curp, "FTC_RFC" = :rfc
-        """, "TCDATMAE_CLIENTE", limit=7_000_000)
+        """, "TCDATMAE_CLIENTE", limit=1_000_000)
 
         # Indicadores
         postgres.execute(text('UPDATE "TCDATMAE_CLIENTE" SET "FTO_INDICADORES" = \'{}\''))
@@ -96,7 +97,7 @@ with define_extraction(phase, postgres_pool, buc_pool) as (postgres, buc):
                     pool = postgres_pool
 
                 with pool.connect() as conn:
-                    extract_indicator(conn, postgres, indicator_query[0], indicator[0], limit=100_000)
+                    extract_indicator(conn, postgres, indicator_query[0], indicator[0], limit=1_000)
 
             print(f"Done extracting {indicator[1]}!")
 
@@ -108,7 +109,7 @@ with define_extraction(phase, postgres_pool, buc_pool) as (postgres, buc):
                    WHEN "FTO_INDICADORES"->>'3' = 'Asignado' THEN 'Asignado'
                    WHEN "FTO_INDICADORES"->>'4' = 'Pensionado' THEN 'Pensionado'
                    WHEN "FTO_INDICADORES"->>'3' = 'Afiliado' THEN 'Afiliado'
-               END AS tipo_formato,
+               END AS tipo_afiliación,
                "FTO_INDICADORES"->>'31' AS tipo_cliente,
                COUNT(*)
         FROM "TCDATMAE_CLIENTE"

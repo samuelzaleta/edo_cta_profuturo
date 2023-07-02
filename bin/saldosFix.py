@@ -68,7 +68,7 @@ GROUP BY SH.FTN_NUM_CTA_INVDUAL, SH.FCN_ID_SIEFORE, SH.FCN_ID_TIPO_SUBCTA, SH.FT
                        WHEN "FTO_INDICADORES"->>'3' = 'Asignado' THEN 'Asignado'
                        WHEN "FTO_INDICADORES"->>'4' = 'Pensionado' THEN 'Pensionado'
                        WHEN "FTO_INDICADORES"->>'3' = 'Afiliado' THEN 'Afiliado'
-                   END AS tipo_afiliación,
+                   END AS tipo_formato,
                    "FTO_INDICADORES"->>'33' AS tipo_cliente,
                    ts."FCC_VALOR" AS subcuenta,
                    s."FTC_DESCRIPCION" AS siefore,
