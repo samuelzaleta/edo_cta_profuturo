@@ -38,39 +38,6 @@ def extract_terms(conn: Connection, phase: int) -> Dict[str, Any]:
         raise ProfuturoException("TERMS_ERROR", phase) from e
 
 
-def extract_indicator(
-    origin: Connection,
-    destination: Connection,
-    query: str,
-    index: int,
-    params: Dict[str, Any] = None,
-    limit: int = None,
-):
-    if params is None:
-        params = {}
-    if limit is not None:
-        query = f"SELECT * FROM ({query}) WHERE ROWNUM <= :limit"
-        params["limit"] = limit
-
-    try:
-        cursor = origin.execute(text(query), params)
-        for value, accounts in group_by(cursor.fetchall(), lambda row: row[1], lambda row: row[0]).items():
-            for i, batch in enumerate(chunk(accounts, 1_000)):
-                destination.execute(text("""
-                UPDATE "TCDATMAE_CLIENTE"
-                SET "FTO_INDICADORES" = jsonb_set("FTO_INDICADORES", :field, :value)
-                WHERE "FTN_CUENTA" IN :accounts
-                """), {
-                    "accounts": tuple(batch),
-                    "field": f"{{{index}}}",
-                    "value": f'"{value}"',
-                })
-
-                print(f"Updating records {i * 1_000} throught {(i + 1) * 1_000}")
-    except Exception as e:
-        raise ProfuturoException("TABLE_SWITCH_ERROR") from e
-
-
 def extract_dataset(
     origin: Connection,
     destination: Connection,
@@ -124,22 +91,25 @@ def upsert_dataset(
     upsert_query: str,
     table: str,
     term: int = None,
-    params: Dict[str, Any] = None,
+    select_params: Dict[str, Any] = None,
+    upsert_params: Dict[str, Any] = None,
     limit: int = None,
 ):
-    if params is None:
-        params = {}
+    if select_params is None:
+        select_params = {}
+    if upsert_params is None:
+        upsert_params = {}
     if limit is not None:
         select_query = f"SELECT * FROM ({select_query})WHERE ROWNUM <= :limit"
-        params["limit"] = limit
+        select_params["limit"] = limit
 
     print(f"Upserting {table}...")
 
     try:
-        cursor = origin.execute(text(select_query), params)
+        cursor = origin.execute(text(select_query), select_params)
 
         for row in cursor.fetchall():
-            destination.execute(text(upsert_query), row._mapping)
+            destination.execute(text(upsert_query), {**upsert_params, **row._mapping})
     except Exception as e:
         raise ProfuturoException.from_exception(e, term) from e
 

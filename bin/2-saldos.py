@@ -79,6 +79,7 @@ GROUP BY SH.FTN_NUM_CTA_INVDUAL, SH.FCN_ID_SIEFORE, SH.FCN_ID_TIPO_SUBCTA, SH.FT
                 INNER JOIN "TCDATMAE_TIPO_SUBCUENTA" ts ON sh."FCN_ID_TIPO_SUBCTA" = ts."FTN_ID_TIPO_SUBCTA"
                 INNER JOIN "TCDATMAE_SIEFORE" s ON sh."FCN_ID_SIEFORE" = s."FTN_ID_SIEFORE"
                 INNER JOIN "TCDATMAE_CLIENTE" c ON sh."FCN_CUENTA" = c."FTN_CUENTA"
+                INNER JOIN "TCHECHOS_CLIENTE" i ON c."FTN_CUENTA" = i."FCN_CUENTA" AND i."FCN_ID_PERIODO" = :term
             GROUP BY "FTO_INDICADORES"->>'34',
                      "FTO_INDICADORES"->>'21',
                      CASE
@@ -92,6 +93,7 @@ GROUP BY SH.FTN_NUM_CTA_INVDUAL, SH.FCN_ID_SIEFORE, SH.FCN_ID_TIPO_SUBCTA, SH.FT
             """,
             ["Tipo Generación", "Vigencia", "Tipo Formato", "Indicador Afiliación", "Sub Cuenta", "SIEFORE"],
             ["Clientes", "Saldo inicial", "Saldo final"],
+            params={"term": term_id},
         )
 
         notify(

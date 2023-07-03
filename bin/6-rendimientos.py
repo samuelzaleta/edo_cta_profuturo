@@ -43,7 +43,8 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
             FROM "TTCALCUL_RENDIMIENTO" m
                 INNER JOIN "TCDATMAE_TIPO_SUBCUENTA" ts ON m."FCN_ID_TIPO_SUBCTA" = m."FCN_ID_TIPO_SUBCTA"
                 INNER JOIN "TCDATMAE_CLIENTE" c on m."FCN_CUENTA" = c."FTN_CUENTA"
-            WHERE "FCN_ID_PERIODO" = :term
+                INNER JOIN "TCHECHOS_CLIENTE" i ON c."FTN_CUENTA" = i."FCN_CUENTA" AND i."FCN_ID_PERIODO" = :term
+            WHERE m."FCN_ID_PERIODO" = :term
             GROUP BY "FTO_INDICADORES"->>'34',
                      "FTO_INDICADORES"->>'21',
                      CASE
@@ -56,7 +57,7 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
             """,
             ["Tipo Generación", "Vigencia", "Tipo Formato", "Indicador Afiliación", "Tipo Subcuenta"],
             ["Registros", "Rendimiento"],
-            {"term": term_id},
+            params={"term": term_id},
         )
 
         notify(

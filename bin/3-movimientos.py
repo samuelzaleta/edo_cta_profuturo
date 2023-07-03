@@ -137,6 +137,7 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
                 INNER JOIN "TTGESPRO_MOV_PROFUTURO_CONSAR" pc ON m."FCN_ID_TIPO_MOVIMIENTO" = pc."FCN_ID_MOVIMIENTO_PROFUTURO"
                 INNER JOIN "TCDATMAE_MOVIMIENTO_CONSAR" mc on pc."FCN_ID_MOVIMIENTO_CONSAR" = mc."FTN_ID_MOVIMIENTO_CONSAR"
                 INNER JOIN "TCDATMAE_CLIENTE" c on m."FCN_CUENTA" = c."FTN_CUENTA"
+                INNER JOIN "TCHECHOS_CLIENTE" i ON c."FTN_CUENTA" = i."FCN_CUENTA" AND i."FCN_ID_PERIODO" = :term
             GROUP BY "FTO_INDICADORES"->>'34',
                      "FTO_INDICADORES"->>'21',
                      CASE
@@ -149,6 +150,7 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
             """,
             ["Tipo Generación", "Vigencia", "Tipo Formato", "Indicador Afiliación", "SIEFORE"],
             ["Registros", "Comisiones"],
+            params={"term": term_id},
         )
 
         notify(

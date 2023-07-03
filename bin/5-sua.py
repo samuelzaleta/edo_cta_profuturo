@@ -43,6 +43,7 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
                    SUM(m."FTN_REFERENCIA") AS REFERENCIA
             FROM "TTHECHOS_SUA" m
                 INNER JOIN "TCDATMAE_CLIENTE" c on m."FCN_CUENTA" = c."FTN_CUENTA"
+                INNER JOIN "TCHECHOS_CLIENTE" i ON c."FTN_CUENTA" = i."FCN_CUENTA" AND i."FCN_ID_PERIODO" = :term
             GROUP BY "FTO_INDICADORES"->>'34',
                      "FTO_INDICADORES"->>'21',
                      CASE
@@ -54,6 +55,7 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
             """,
             ["Tipo Generación", "Vigencia", "Tipo Formato", "Indicador Afiliación", "SIEFORE"],
             ["Registros", "Comisiones"],
+            params={"term": term_id},
         )
 
         notify(
