@@ -72,6 +72,8 @@ def get_mit_pool():
 
 
 def get_buc_pool():
+    oracledb.init_oracle_client()
+
     return sqlalchemy.create_engine(
         "oracle+oracledb://",
         creator=get_buc_conn,

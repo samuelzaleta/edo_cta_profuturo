@@ -21,7 +21,9 @@ with define_extraction(phase, postgres_pool, buc_pool) as (postgres, buc):
         # Extracción
         upsert_dataset(buc, postgres, """
         SELECT C.NUMERO AS id,
-               (PF.NOMBRE || ' ' || PF.APELLIDOPATERNO || ' ' ||PF.APELIDOMATERNO) AS name,
+               PF.NOMBRE AS name,
+               PF.APELLIDOPATERNO AS middle_name,
+               PF.APELIDOMATERNO AS last_name,
                DI.CALLE AS street,
                DI.NUMEROEXTERIOR AS street_number,
                ASE.NOMBRE AS colony,
@@ -52,17 +54,20 @@ with define_extraction(phase, postgres_pool, buc_pool) as (postgres, buc):
           AND D.PREFERENTE = 1 -- Domicilio preferente
         """, """
         INSERT INTO "TCDATMAE_CLIENTE"(
-            "FTN_CUENTA", "FTC_NOMBRE", "FTC_CALLE", "FTC_NUMERO", 
-            "FTC_COLONIA", "FTC_DELEGACION", "FTN_CODIGO_POSTAL", 
-            "FTC_ENTIDAD_FEDERATIVA", "FTC_NSS", "FTC_CURP", "FTC_RFC"
+            "FTN_CUENTA", "FTC_NOMBRE", "FTC_AP_PATERNO", "FTC_AP_MATERNO",
+            "FTC_CALLE", "FTC_NUMERO", "FTC_COLONIA", "FTC_DELEGACION",
+            "FTN_CODIGO_POSTAL", "FTC_ENTIDAD_FEDERATIVA", "FTC_NSS",
+            "FTC_CURP", "FTC_RFC"
         )
         VALUES (
-            :id, :name, :street, :street_number,
-            :colony, :municipality,:zip,
-            :state, :nss, :curp, :rfc
+            :id, :name, :middle_name, :last_name, 
+            :street, :street_number, :colony, 
+            :municipality, :zip, :state, :nss, 
+            :curp, :rfc
         )
         ON CONFLICT ("FTN_CUENTA") DO UPDATE 
-        SET "FTC_NOMBRE" = :name, "FTC_CALLE" = :street, "FTC_NUMERO" = :street_number,
-            "FTC_COLONIA" = :colony, "FTC_DELEGACION" = :municipality, "FTN_CODIGO_POSTAL" = :zip,
-            "FTC_ENTIDAD_FEDERATIVA" = :state, "FTC_NSS" = :nss, "FTC_CURP" = :curp, "FTC_RFC" = :rfc
+        SET "FTC_NOMBRE" = :name, "FTC_AP_PATERNO" = :middle_name, "FTC_AP_MATERNO" = :last_name, 
+            "FTC_CALLE" = :street, "FTC_NUMERO" = :street_number, "FTC_COLONIA" = :colony, 
+            "FTC_DELEGACION" = :municipality, "FTN_CODIGO_POSTAL" = :zip, "FTC_ENTIDAD_FEDERATIVA" = :state, 
+            "FTC_NSS" = :nss, "FTC_CURP" = :curp, "FTC_RFC" = :rfc
         """, "TCDATMAE_CLIENTE", limit=1_000_000)
