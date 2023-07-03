@@ -53,12 +53,12 @@ def get_postgres_conn():
     )
 
 
-def get_integrity_conn():
-    return jaydebeapi.connect(
+def get_integrity_conn(database: str):
+    return lambda: jaydebeapi.connect(
         "oracle.rdb.jdbc.rdbThin.Driver",
-        "jdbc:rdbThin://130.40.30.144:1707/mexico$base:cierren",
+        f"jdbc:rdbThin://130.40.30.144:1707/mexico$base:{database}",
         {"user": "obadillo", "password": "BADILLO2022"},
-        "C:\\Users\\Brandon Antonio\\PycharmProjects\\edo_cta_profuturo\\libs\\RDBTHIN.JAR"
+        "/opt/profuturo/libs/RDBTHIN.JAR"
     )
 
 
@@ -78,10 +78,10 @@ def get_buc_pool():
     )
 
 
-def get_integrity_pool():
+def get_integrity_pool(database: str):
     return sqlalchemy.create_engine(
         "rdb+jaydebeapi://",
-        creator=get_integrity_conn,
+        creator=get_integrity_conn(database),
     )
 
 
