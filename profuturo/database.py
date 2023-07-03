@@ -56,7 +56,7 @@ def get_postgres_conn():
 def get_integrity_conn(database: str):
     return lambda: jaydebeapi.connect(
         "oracle.rdb.jdbc.rdbThin.Driver",
-        f"jdbc:rdbThin://130.40.30.144:1707/mexico$base:{database}",
+        f"jdbc:rdbThin://130.40.30.144:1714/mexico$base:{database}",
         {"user": "obadillo", "password": "BADILLO2022"},
         "/opt/profuturo/libs/RDBTHIN.JAR"
     )
