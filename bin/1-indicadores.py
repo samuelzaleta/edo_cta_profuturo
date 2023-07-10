@@ -1,6 +1,6 @@
 from profuturo.common import notify, register_time, define_extraction, truncate_table
 from profuturo.database import get_postgres_pool, get_mit_pool, get_buc_pool
-from profuturo.extraction import upsert_dataset
+from profuturo.extraction import upsert_dataset, upsert_values_sentence
 from profuturo.reporters import HtmlReporter
 from profuturo.extraction import extract_terms
 from sqlalchemy import text, Engine
@@ -11,6 +11,13 @@ postgres_pool = get_postgres_pool()
 mit_pool = get_mit_pool()
 buc_pool = get_buc_pool()
 phase = int(sys.argv[1])
+
+query_upsert = f"""
+INSERT INTO "TCHECHOS_CLIENTE" ("FCN_CUENTA", "FCN_ID_PERIODO", "FTO_INDICADORES")
+VALUES {upsert_values_sentence(lambda i: [f":account_{i}", ":term", f"jsonb_build_object(:field, :value_{i})"])}
+ON CONFLICT ("FCN_CUENTA", "FCN_ID_PERIODO") DO UPDATE
+SET "FTO_INDICADORES" = "TCHECHOS_CLIENTE"."FTO_INDICADORES" || EXCLUDED."FTO_INDICADORES"
+"""
 
 with define_extraction(phase, postgres_pool, buc_pool) as (postgres, buc):
     term = extract_terms(postgres, phase)
@@ -47,19 +54,18 @@ with define_extraction(phase, postgres_pool, buc_pool) as (postgres, buc):
                     pool = postgres_pool
 
                 with pool.connect() as conn:
-                    upsert_dataset(conn, postgres, indicator_query[0], """
-                    INSERT INTO "TCHECHOS_CLIENTE" ("FCN_CUENTA", "FCN_ID_PERIODO", "FTO_INDICADORES")
-                    VALUES (:account, :term, jsonb_build_object(:field, :value))
-                    ON CONFLICT ("FCN_CUENTA", "FCN_ID_PERIODO") DO UPDATE 
-                    SET "FTO_INDICADORES" = jsonb_set(
-                        EXCLUDED."FTO_INDICADORES", 
-                        CONCAT('{', :field, '}')::TEXT[], 
-                        CONCAT('"', :value, '"')::JSONB
+                    upsert_dataset(
+                        conn,
+                        postgres,
+                        indicator_query[0],
+                        query_upsert,
+                        "TCHECHOS_CLIENTE",
+                        term=term_id,
+                        upsert_params={
+                            "term": term_id,
+                            "field": indicator[0],
+                        },
                     )
-                    """, "TCHECHOS_CLIENTE", term=term_id, upsert_params={
-                        "term": term_id,
-                        "field": indicator[0],
-                    }, limit=1_000)
 
             print(f"Done extracting {indicator[1]}!")
 

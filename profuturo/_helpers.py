@@ -24,6 +24,18 @@ def group_by(
 
     return result
 
+
+def ingest_tables_list() -> List[str]:
+    tables = [
+        "THHECHOS_SALDO_HISTORICO",
+        "TTHECHOS_MOVIMIENTO",
+        "TTHECHOS_COMISION",
+        "TTHECHOS_SUA"
+    ]
+
+    return tables
+
+
 def sub_anverso_tables() -> List[str]:
     tables = [
         "TTCALCUL_RENDIMIENTO",
@@ -32,3 +44,12 @@ def sub_anverso_tables() -> List[str]:
     ]
     
     return tables
+
+
+def parse_query(query: str, params: Dict[str, Any] = None):
+    if params is None:
+        params = {}
+    for key, value in params.items():
+        placeholder = ":" + key
+        query = query.replace(placeholder, str(value))
+    return query

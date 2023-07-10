@@ -1,6 +1,6 @@
 from profuturo.common import register_time, define_extraction
 from profuturo.database import get_postgres_pool, get_buc_pool
-from profuturo.extraction import upsert_dataset
+from profuturo.extraction import upsert_dataset, upsert_values_sentence
 from profuturo.reporters import HtmlReporter
 from profuturo.extraction import extract_terms
 import sys
@@ -10,6 +10,28 @@ html_reporter = HtmlReporter()
 postgres_pool = get_postgres_pool()
 buc_pool = get_buc_pool()
 phase = int(sys.argv[1])
+
+query_upsert = f"""
+INSERT INTO "TCDATMAE_CLIENTE"(
+    "FTN_CUENTA", "FTC_NOMBRE", "FTC_AP_PATERNO", "FTC_AP_MATERNO",
+    "FTC_CALLE", "FTC_NUMERO", "FTC_COLONIA", "FTC_DELEGACION",
+    "FTN_CODIGO_POSTAL", "FTC_ENTIDAD_FEDERATIVA", "FTC_NSS",
+    "FTC_CURP", "FTC_RFC"
+)
+VALUES {upsert_values_sentence(lambda i: [
+    f":id_{i}", f":name_{i}", f":middle_name_{i}", f":last_name_{i}",
+    f":street_{i}", f":street_number_{i}", f":colony_{i}", f":municipality_{i}",
+    f":zip_{i}", f":state_{i}", f":nss_{i}",
+    f":curp_{i}", f":rfc_{i}",
+])}
+ON CONFLICT ("FTN_CUENTA") DO UPDATE 
+SET "FTC_NOMBRE" = EXCLUDED."FTC_NOMBRE", "FTC_AP_PATERNO" = EXCLUDED."FTC_AP_PATERNO", 
+    "FTC_AP_MATERNO" = EXCLUDED."FTC_AP_MATERNO", "FTC_CALLE" = EXCLUDED."FTC_CALLE", 
+    "FTC_NUMERO" = EXCLUDED."FTC_NUMERO", "FTC_COLONIA" = EXCLUDED."FTC_COLONIA", 
+    "FTC_DELEGACION" = EXCLUDED."FTC_DELEGACION", "FTN_CODIGO_POSTAL" = EXCLUDED."FTN_CODIGO_POSTAL", 
+    "FTC_ENTIDAD_FEDERATIVA" = EXCLUDED."FTC_ENTIDAD_FEDERATIVA", "FTC_NSS" = EXCLUDED."FTC_NSS", 
+    "FTC_CURP" = EXCLUDED."FTC_CURP", "FTC_RFC" = EXCLUDED."FTC_RFC"
+"""
 
 with define_extraction(phase, postgres_pool, buc_pool) as (postgres, buc):
     term = extract_terms(postgres, phase)
@@ -50,24 +72,6 @@ with define_extraction(phase, postgres_pool, buc_pool) as (postgres, buc):
         WHERE PCR.IDROL = 787 -- Rol cliente
           AND C.IDLINEANEGOCIO = 763 -- Linea de negocio
           AND D.IDTIPODOM = 818 -- Tipo de domicilio Particular
-          AND D.IDSTATUSDOM = 761 -- ACTIVO
-          AND D.PREFERENTE = 1 -- Domicilio preferente
-        """, """
-        INSERT INTO "TCDATMAE_CLIENTE"(
-            "FTN_CUENTA", "FTC_NOMBRE", "FTC_AP_PATERNO", "FTC_AP_MATERNO",
-            "FTC_CALLE", "FTC_NUMERO", "FTC_COLONIA", "FTC_DELEGACION",
-            "FTN_CODIGO_POSTAL", "FTC_ENTIDAD_FEDERATIVA", "FTC_NSS",
-            "FTC_CURP", "FTC_RFC"
-        )
-        VALUES (
-            :id, :name, :middle_name, :last_name, 
-            :street, :street_number, :colony, 
-            :municipality, :zip, :state, :nss, 
-            :curp, :rfc
-        )
-        ON CONFLICT ("FTN_CUENTA") DO UPDATE 
-        SET "FTC_NOMBRE" = :name, "FTC_AP_PATERNO" = :middle_name, "FTC_AP_MATERNO" = :last_name, 
-            "FTC_CALLE" = :street, "FTC_NUMERO" = :street_number, "FTC_COLONIA" = :colony, 
-            "FTC_DELEGACION" = :municipality, "FTN_CODIGO_POSTAL" = :zip, "FTC_ENTIDAD_FEDERATIVA" = :state, 
-            "FTC_NSS" = :nss, "FTC_CURP" = :curp, "FTC_RFC" = :rfc
-        """, "TCDATMAE_CLIENTE", limit=1_000_000)
+          -- AND D.IDSTATUSDOM = 761 ACTIVO
+          -- AND D.PREFERENTE = 1 Domicilio preferente
+        """, query_upsert, "TCDATMAE_CLIENTE")

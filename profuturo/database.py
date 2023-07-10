@@ -57,7 +57,7 @@ def get_integrity_conn(database: str):
     return lambda: jaydebeapi.connect(
         "oracle.rdb.jdbc.rdbThin.Driver",
         f"jdbc:rdbThin://130.40.30.144:1714/mexico$base:{database}",
-        {"user": "obadillo", "password": "BADILLO2022"},
+        {"user": "SIEFORE", "password": "SIEFORE2019"},
         "/opt/profuturo/libs/RDBTHIN.JAR"
     )
 
@@ -92,3 +92,33 @@ def get_postgres_pool():
         "postgresql+psycopg2://",
         creator=get_postgres_conn,
     )
+
+
+def get_mit_url():
+    user = "PROFUTURO_QAMOD"
+    password = "Pa55w0rd*19"
+    host = "172.22.180.190"
+    port='1521'
+    service_name="mitafore.profuturo-gnp.net"
+    
+    return f"oracle+oracledb://{user}:{password}@{host}:{port}/{service_name}"
+
+
+def get_buc_url():
+    user = "CLUNICO"
+    password = "temp4now13"
+    host = "172.22.164.19"
+    port = '16161'
+    service_name = "QA34"
+    
+    return f"oracle+oracledb://{user}:{password}@{host}:{port}/{service_name}" 
+
+
+def get_postgres_url():
+    host="34.72.193.129"
+    user="alexo"
+    password="Oxela3210"
+    database="PROFUTURO"
+    port='5432'
+    
+    return f'postgresql://{user}:{password}@{host}:{port}/{database}'    

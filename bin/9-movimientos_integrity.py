@@ -33,7 +33,6 @@ with define_extraction(phase, postgres_pool, integrity_pool) as (postgres, integ
               426, 430, 430, 430, 433, 436, 440, 440, 441,442, 443, 444, 446, 450, 450, 450, 450, 450, 450,452, 453, 
               453, 454, 454, 456, 470, 472, 474, 476, 610, 630, 710, 710, 760, 760, 805, 806, 841
           )
-        LIMIT 10
         """, "TEST_MOVIMIENTOS", term=term_id, params={
             "start": start_month.strftime("%Y%m%d"),
             "end": end_month.strftime("%Y%m%d"),
@@ -54,7 +53,6 @@ with define_extraction(phase, postgres_pool, integrity_pool) as (postgres, integ
               426, 430, 430, 430, 433, 436, 440, 440, 441,442, 443, 444, 446, 450, 450, 450, 450, 450, 450,452, 453, 
               453, 454, 454, 456, 470, 472, 474, 476, 610, 630, 710, 710, 760, 760, 805, 806, 841
           )
-        LIMIT 10
         """, "TEST_MOVIMIENTOS", term=term_id, params={
             "start": start_month.strftime("%Y%m%d"),
             "end": end_month.strftime("%Y%m%d"),
@@ -73,7 +71,6 @@ with define_extraction(phase, postgres_pool, integrity_pool) as (postgres, integ
               426, 430, 430, 430, 433, 436, 440, 440, 441,442, 443, 444, 446, 450, 450, 450, 450, 450, 450,452, 453, 
               453, 454, 454, 456, 470, 472, 474, 476, 610, 630, 710, 710, 760, 760, 805, 806, 841
           )
-        LIMIT 10
         """, "TEST_MOVIMIENTOS", term=term_id, params={
             "start": start_month.strftime("%Y%m%d"),
             "end": end_month.strftime("%Y%m%d"),
@@ -91,7 +88,6 @@ with define_extraction(phase, postgres_pool, integrity_pool) as (postgres, integ
               426, 430, 430, 430, 433, 436, 440, 440, 441,442, 443, 444, 446, 450, 450, 450, 450, 450, 450,452, 453, 
               453, 454, 454, 456, 470, 472, 474, 476, 610, 630, 710, 710, 760, 760, 805, 806, 841
           )
-        LIMIT 10
         """, "TEST_MOVIMIENTOS", term=term_id, params={
             "start": start_month.strftime("%Y%m%d"),
             "end": end_month.strftime("%Y%m%d"),
@@ -109,7 +105,6 @@ with define_extraction(phase, postgres_pool, integrity_pool) as (postgres, integ
               426, 430, 430, 430, 433, 436, 440, 440, 441,442, 443, 444, 446, 450, 450, 450, 450, 450, 450,452, 453, 
               453, 454, 454, 456, 470, 472, 474, 476, 610, 630, 710, 710, 760, 760, 805, 806, 841
           )
-        LIMIT 10
         """, "TEST_MOVIMIENTOS", term=term_id, params={
             "start": start_month.strftime("%Y%m%d"),
             "end": end_month.strftime("%Y%m%d"),
@@ -127,7 +122,6 @@ with define_extraction(phase, postgres_pool, integrity_pool) as (postgres, integ
               426, 430, 430, 430, 433, 436, 440, 440, 441,442, 443, 444, 446, 450, 450, 450, 450, 450, 450,452, 453, 
               453, 454, 454, 456, 470, 472, 474, 476, 610, 630, 710, 710, 760, 760, 805, 806, 841
           )
-        LIMIT 10
         """, "TEST_MOVIMIENTOS", term=term_id, params={
             "start": start_month.strftime("%Y%m%d"),
             "end": end_month.strftime("%Y%m%d"),
@@ -145,7 +139,6 @@ with define_extraction(phase, postgres_pool, integrity_pool) as (postgres, integ
               426, 430, 430, 430, 433, 436, 440, 440, 441,442, 443, 444, 446, 450, 450, 450, 450, 450, 450,452, 453, 
               453, 454, 454, 456, 470, 472, 474, 476, 610, 630, 710, 710, 760, 760, 805, 806, 841
           )
-        LIMIT 10
         """, "TEST_MOVIMIENTOS", term=term_id, params={
             "start": start_month.strftime("%Y%m%d"),
             "end": end_month.strftime("%Y%m%d"),
