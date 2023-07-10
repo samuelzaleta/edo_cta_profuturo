@@ -1,6 +1,6 @@
 from profuturo.common import notify, register_time, define_extraction, truncate_table
 from profuturo.database import get_postgres_pool, get_mit_pool, get_buc_pool
-from profuturo.extraction import upsert_dataset, upsert_values_sentence
+from profuturo.extraction import upsert_dataset, upsert_values_sentence, extract_indicator
 from profuturo.reporters import HtmlReporter
 from profuturo.extraction import extract_terms
 from sqlalchemy import text, Engine
@@ -12,13 +12,6 @@ mit_pool = get_mit_pool()
 buc_pool = get_buc_pool()
 phase = int(sys.argv[1])
 
-query_upsert = f"""
-INSERT INTO "TCHECHOS_CLIENTE" ("FCN_CUENTA", "FCN_ID_PERIODO", "FTO_INDICADORES")
-VALUES {upsert_values_sentence(lambda i: [f":account_{i}", ":term", f"jsonb_build_object(:field, :value_{i})"])}
-ON CONFLICT ("FCN_CUENTA", "FCN_ID_PERIODO") DO UPDATE
-SET "FTO_INDICADORES" = "TCHECHOS_CLIENTE"."FTO_INDICADORES" || EXCLUDED."FTO_INDICADORES"
-"""
-
 with define_extraction(phase, postgres_pool, buc_pool) as (postgres, buc):
     term = extract_terms(postgres, phase)
     term_id = term["id"]
@@ -28,6 +21,12 @@ with define_extraction(phase, postgres_pool, buc_pool) as (postgres, buc):
     with register_time(postgres_pool, phase, term_id):
         # Extracción
         truncate_table(postgres, "TCHECHOS_CLIENTE", term=term_id)
+
+        postgres.execute("""
+        INSERT INTO "TCHECHOS_CLIENTE" ("FCN_CUENTA", "FCN_ID_PERIODO", "FTO_INDICADORES")
+        SELECT "FTN_CUENTA", :term, '{}'::JSONB
+        FROM "TCDATMAE_CLIENTE"
+        """, {"term": term_id})
 
         indicators = postgres.execute(text("""
         SELECT "FTN_ID_INDICADOR", "FTC_DESCRIPCION" 
@@ -54,18 +53,7 @@ with define_extraction(phase, postgres_pool, buc_pool) as (postgres, buc):
                     pool = postgres_pool
 
                 with pool.connect() as conn:
-                    upsert_dataset(
-                        conn,
-                        postgres,
-                        indicator_query[0],
-                        query_upsert,
-                        "TCHECHOS_CLIENTE",
-                        term=term_id,
-                        upsert_params={
-                            "term": term_id,
-                            "field": indicator[0],
-                        },
-                    )
+                    extract_indicator(conn, postgres, indicator_query[0], indicator[0], term_id)
 
             print(f"Done extracting {indicator[1]}!")
 

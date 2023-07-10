@@ -2,7 +2,7 @@ from sqlalchemy import text, Connection
 from typing import Dict, Any, List, Callable
 from datetime import date
 from .exceptions import ProfuturoException
-from ._helpers import sub_anverso_tables
+from ._helpers import sub_anverso_tables, chunk, group_by
 import calendar
 import sys
 import pandas as pd
@@ -37,6 +37,42 @@ def extract_terms(conn: Connection, phase: int) -> Dict[str, Any]:
         raise RuntimeError("Can not retrieve the term")
     except Exception as e:
         raise ProfuturoException("TERMS_ERROR", phase) from e
+
+
+def extract_indicator(
+    origin: Connection,
+    destination: Connection,
+    query: str,
+    index: int,
+    term: int,
+    params: Dict[str, Any] = None,
+    limit: int = None,
+    partition_size: int = 1_000,
+):
+    if params is None:
+        params = {}
+    if limit is not None:
+        query = f"SELECT * FROM ({query}) WHERE ROWNUM <= :limit"
+        params["limit"] = limit
+
+    try:
+        cursor = origin.execute(text(query), params)
+        for value, accounts in group_by(cursor.fetchall(), lambda row: row[1], lambda row: row[0]).items():
+            for i, batch in enumerate(chunk(accounts, partition_size)):
+                destination.execute(text("""
+                UPDATE "TCHECHOS_CLIENTE"
+                SET "FTO_INDICADORES" = jsonb_set("FTO_INDICADORES", :field, :value)
+                WHERE "FCN_CUENTA" IN :accounts AND "FCN_ID_PERIODO" = :term
+                """), {
+                    "field": f"{{{index}}}",
+                    "value": f'"{value}"',
+                    "accounts": tuple(batch),
+                    "term": term,
+                })
+
+                print(f"Updating records {i * partition_size} throught {(i + 1) * partition_size}")
+    except Exception as e:
+        raise ProfuturoException("TABLE_SWITCH_ERROR", term) from e
 
 
 def extract_dataset(
