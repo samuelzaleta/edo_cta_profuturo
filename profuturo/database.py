@@ -1,15 +1,14 @@
-import jaydebeapi
-from sqlalchemy.engine import Engine
 from sqlalchemy.exc import OperationalError
-from contextlib import ExitStack
+from sqlalchemy import Engine
+from contextlib import ExitStack, contextmanager
 from .exceptions import ProfuturoException
-import contextlib
+import jaydebeapi
 import sqlalchemy
 import oracledb
 import psycopg2
 
 
-@contextlib.contextmanager
+@contextmanager
 def use_pools(phase: int, *pools: Engine):
     with ExitStack() as stack:
         conns = []
@@ -98,10 +97,10 @@ def get_mit_url():
     user = "PROFUTURO_QAMOD"
     password = "Pa55w0rd*19"
     host = "172.22.180.190"
-    port='1521'
-    service_name="mitafore.profuturo-gnp.net"
+    port = '1521'
+    service_name = "mitafore.profuturo-gnp.net"
     
-    return f"oracle+oracledb://{user}:{password}@{host}:{port}/{service_name}"
+    return f"oracle://{user}:{password}@{host}:{port}/{service_name}"
 
 
 def get_buc_url():
@@ -111,14 +110,14 @@ def get_buc_url():
     port = '16161'
     service_name = "QA34"
     
-    return f"oracle+oracledb://{user}:{password}@{host}:{port}/{service_name}" 
+    return f"oracle://{user}:{password}@{host}:{port}/{service_name}"
 
 
 def get_postgres_url():
-    host="34.72.193.129"
-    user="alexo"
-    password="Oxela3210"
-    database="PROFUTURO"
-    port='5432'
+    host = "34.72.193.129"
+    user = "alexo"
+    password = "Oxela3210"
+    database = "PROFUTURO"
+    port = '5432'
     
-    return f'postgresql://{user}:{password}@{host}:{port}/{database}'    
+    return f'postgresql://{user}:{password}@{host}:{port}/{database}'

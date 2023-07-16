@@ -1,6 +1,6 @@
 from profuturo.common import truncate_table, notify, register_time, define_extraction
-from profuturo.database import get_postgres_pool, get_mit_pool
-from profuturo.extraction import extract_terms, extract_dataset
+from profuturo.database import get_postgres_pool, get_mit_pool, get_mit_url, get_postgres_url
+from profuturo.extraction import extract_terms, extract_dataset_polars
 from profuturo.reporters import HtmlReporter
 import sys
 
@@ -20,43 +20,43 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
         # Extracción
         query = """
         SELECT SH.FTN_NUM_CTA_INVDUAL AS FCN_CUENTA,
-       SH.FCN_ID_SIEFORE,
-       SH.FCN_ID_TIPO_SUBCTA,
-       SH.FTD_FEH_LIQUIDACION,
-       :type AS FTC_TIPO_SALDO,
-       MAX(VA.FCD_FEH_ACCION) AS FCD_FEH_ACCION,
-       SUM(SH.FTN_DIA_ACCIONES) AS FTN_DIA_ACCIONES,
-       SUM(SH.FTN_DIA_ACCIONES * VA.FCN_VALOR_ACCION) AS FTF_SALDO_DIA
-FROM cierren.thafogral_saldo_historico_v2 SH
-INNER JOIN TCCRXGRAL_TIPO_SUBCTA R ON R.FCN_ID_TIPO_SUBCTA = SH.FCN_ID_TIPO_SUBCTA
-INNER JOIN (
-    SELECT SHMAX.FTN_NUM_CTA_INVDUAL,
-           SHMAX.FCN_ID_SIEFORE,
-           SHMAX.FCN_ID_TIPO_SUBCTA,
-           MAX(TRUNC(SHMAX.FTD_FEH_LIQUIDACION)) AS FTD_FEH_LIQUIDACION
-    FROM cierren.thafogral_saldo_historico_v2 SHMAX
-    WHERE SHMAX.FTD_FEH_LIQUIDACION <= :date
-      -- AND SHMAX.FTN_NUM_CTA_INVDUAL = 10044531
-      -- AND SHMAX.FCN_ID_TIPO_SUBCTA = 22
-      -- AND SHMAX.FCN_ID_SIEFORE = 83
-    GROUP BY SHMAX.FTN_NUM_CTA_INVDUAL, SHMAX.FCN_ID_SIEFORE, SHMAX.FCN_ID_TIPO_SUBCTA
-) SHMAXIMO ON SH.FTN_NUM_CTA_INVDUAL = SHMAXIMO.FTN_NUM_CTA_INVDUAL
-          AND SH.FCN_ID_TIPO_SUBCTA = SHMAXIMO.FCN_ID_TIPO_SUBCTA AND SH.FCN_ID_SIEFORE = SHMAXIMO.FCN_ID_SIEFORE
-          AND SH.FTD_FEH_LIQUIDACION = SHMAXIMO.FTD_FEH_LIQUIDACION
-INNER JOIN (
-    SELECT ROW_NUMBER() OVER(PARTITION BY FCN_ID_SIEFORE, FCN_ID_REGIMEN ORDER BY FCD_FEH_ACCION DESC) AS ROW_NUM,
-           FCN_ID_SIEFORE, FCN_ID_REGIMEN, FCN_VALOR_ACCION, FCD_FEH_ACCION
-    FROM TCAFOGRAL_VALOR_ACCION
-    WHERE FCD_FEH_ACCION <= :date
-) VA ON SH.FCN_ID_SIEFORE = VA.FCN_ID_SIEFORE
-    AND R.FCN_ID_REGIMEN = VA.FCN_ID_REGIMEN
-    AND VA.ROW_NUM = 1
-GROUP BY SH.FTN_NUM_CTA_INVDUAL, SH.FCN_ID_SIEFORE, SH.FCN_ID_TIPO_SUBCTA, SH.FTD_FEH_LIQUIDACION
+               SH.FCN_ID_SIEFORE,
+               SH.FCN_ID_TIPO_SUBCTA,
+               SH.FTD_FEH_LIQUIDACION,
+               :type AS FTC_TIPO_SALDO,
+               MAX(VA.FCD_FEH_ACCION) AS FCD_FEH_ACCION,
+               SUM(SH.FTN_DIA_ACCIONES) AS FTN_DIA_ACCIONES,
+               SUM(SH.FTN_DIA_ACCIONES * VA.FCN_VALOR_ACCION) AS FTF_SALDO_DIA
+        FROM cierren.thafogral_saldo_historico_v2 SH
+        INNER JOIN TCCRXGRAL_TIPO_SUBCTA R ON R.FCN_ID_TIPO_SUBCTA = SH.FCN_ID_TIPO_SUBCTA
+        INNER JOIN (
+            SELECT SHMAX.FTN_NUM_CTA_INVDUAL,
+                   SHMAX.FCN_ID_SIEFORE,
+                   SHMAX.FCN_ID_TIPO_SUBCTA,
+                   MAX(TRUNC(SHMAX.FTD_FEH_LIQUIDACION)) AS FTD_FEH_LIQUIDACION
+            FROM cierren.thafogral_saldo_historico_v2 SHMAX
+            WHERE SHMAX.FTD_FEH_LIQUIDACION <= :date
+              -- AND SHMAX.FTN_NUM_CTA_INVDUAL = 10044531
+              -- AND SHMAX.FCN_ID_TIPO_SUBCTA = 22
+              -- AND SHMAX.FCN_ID_SIEFORE = 83
+            GROUP BY SHMAX.FTN_NUM_CTA_INVDUAL, SHMAX.FCN_ID_SIEFORE, SHMAX.FCN_ID_TIPO_SUBCTA
+        ) SHMAXIMO ON SH.FTN_NUM_CTA_INVDUAL = SHMAXIMO.FTN_NUM_CTA_INVDUAL
+                  AND SH.FCN_ID_TIPO_SUBCTA = SHMAXIMO.FCN_ID_TIPO_SUBCTA AND SH.FCN_ID_SIEFORE = SHMAXIMO.FCN_ID_SIEFORE
+                  AND SH.FTD_FEH_LIQUIDACION = SHMAXIMO.FTD_FEH_LIQUIDACION
+        INNER JOIN (
+            SELECT ROW_NUMBER() OVER(PARTITION BY FCN_ID_SIEFORE, FCN_ID_REGIMEN ORDER BY FCD_FEH_ACCION DESC) AS ROW_NUM,
+                   FCN_ID_SIEFORE, FCN_ID_REGIMEN, FCN_VALOR_ACCION, FCD_FEH_ACCION
+            FROM TCAFOGRAL_VALOR_ACCION
+            WHERE FCD_FEH_ACCION <= :date
+        ) VA ON SH.FCN_ID_SIEFORE = VA.FCN_ID_SIEFORE
+            AND R.FCN_ID_REGIMEN = VA.FCN_ID_REGIMEN
+            AND VA.ROW_NUM = 1
+        GROUP BY SH.FTN_NUM_CTA_INVDUAL, SH.FCN_ID_SIEFORE, SH.FCN_ID_TIPO_SUBCTA, SH.FTD_FEH_LIQUIDACION
         """
 
         truncate_table(postgres, "THHECHOS_SALDO_HISTORICO", term=term_id)
-        extract_dataset(mit, postgres, query, "THHECHOS_SALDO_HISTORICO", term=term_id, params={"date": start_month, "type": "I"})
-        extract_dataset(mit, postgres, query, "THHECHOS_SALDO_HISTORICO", term=term_id, params={"date": end_month, "type": "F"})
+        extract_dataset_polars(get_mit_url(), get_postgres_url(), query, "THHECHOS_SALDO_HISTORICO", term=term_id, params={"date": start_month, "type": "I"})
+        extract_dataset_polars(get_mit_url(), get_postgres_url(), query, "THHECHOS_SALDO_HISTORICO", term=term_id, params={"date": end_month, "type": "F"})
 
         # Cifras de control
         report = html_reporter.generate(

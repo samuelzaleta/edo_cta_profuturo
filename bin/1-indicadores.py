@@ -1,6 +1,6 @@
 from profuturo.common import notify, register_time, define_extraction, truncate_table
 from profuturo.database import get_postgres_pool, get_mit_pool, get_buc_pool
-from profuturo.extraction import upsert_dataset, upsert_values_sentence, extract_indicator
+from profuturo.extraction import extract_indicator
 from profuturo.reporters import HtmlReporter
 from profuturo.extraction import extract_terms
 from sqlalchemy import text, Engine

@@ -1,19 +1,18 @@
-from sqlalchemy.engine import Connection
-from sqlalchemy import text, Engine
+from sqlalchemy import text, Engine, Connection
 from datetime import datetime, time, timedelta
+from contextlib import contextmanager
 from .database import use_pools
 from .exceptions import ProfuturoException
-import contextlib
 
 
-@contextlib.contextmanager
+@contextmanager
 def define_extraction(phase: int, main_pool: Engine, *pools: Engine):
     with notify_exceptions(main_pool, phase):
         with use_pools(phase, main_pool, *pools) as pools:
             yield pools
 
 
-@contextlib.contextmanager
+@contextmanager
 def register_time(pool: Engine, phase: int, term: int = None):
     with pool.begin() as conn:
         binnacle_id = register_start(conn, phase, datetime.now(), term=term)
@@ -86,7 +85,7 @@ def register_end(conn: Connection, binnacle_id: int, end: datetime) -> None:
         raise ProfuturoException("BINNACLE_ERROR") from e
 
 
-@contextlib.contextmanager
+@contextmanager
 def notify_exceptions(pool: Engine, phase: int):
     try:
         yield

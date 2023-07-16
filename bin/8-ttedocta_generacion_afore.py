@@ -1,6 +1,6 @@
 from profuturo.common import truncate_table, notify, register_time, define_extraction
 from profuturo.database import get_postgres_pool, get_mit_pool
-from profuturo.extraction import extract_terms, extract_dataset
+from profuturo.extraction import extract_terms, extract_dataset_polars
 from profuturo.reporters import HtmlReporter
 
 import sys
@@ -26,9 +26,8 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
     with register_time(postgres_pool, phase, term=term_id):
         # Extracción
         truncate_table(postgres, "TTEDOCTA_GENERACION_AFORE", term=term_id)
-        extract_dataset(postgres, postgres, """
-        SELECT
-            ctga.*
+        extract_dataset_polars(postgres, postgres, """
+        SELECT ctga.*
         FROM "RESULTADOS".calcular_ttedocta_generacion_afore(:term, :start, :end, :SALD_AVES, :SDOR_AVOL, :SDOR_ACR, :SDOR_ALP, :SDOR_AAS) AS ctga
         """, "TTEDOCTA_GENERACION_AFORE", term=term_id, params={"term": term_id, "start": start_month, "end": end_month, "SALD_AVES": SALD_AVES,
         "SDOR_AVOL": SDOR_AVOL, "SDOR_ACR": SDOR_ACR, "SDOR_ALP": SDOR_ALP, "SDOR_AAS": SDOR_AAS})
