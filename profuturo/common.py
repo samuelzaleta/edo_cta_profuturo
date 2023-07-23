@@ -1,12 +1,15 @@
 from sqlalchemy import text, Engine, Connection
 from datetime import datetime, time, timedelta
 from contextlib import contextmanager
+from dotenv import load_dotenv
 from .database import use_pools
 from .exceptions import ProfuturoException
 
 
 @contextmanager
 def define_extraction(phase: int, main_pool: Engine, *pools: Engine):
+    load_dotenv()
+
     with notify_exceptions(main_pool, phase):
         with use_pools(phase, main_pool, *pools) as pools:
             yield pools

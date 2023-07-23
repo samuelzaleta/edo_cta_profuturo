@@ -55,8 +55,8 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
         """
 
         truncate_table(postgres, "THHECHOS_SALDO_HISTORICO", term=term_id)
-        extract_dataset_polars(get_mit_url(), get_postgres_url(), query, "THHECHOS_SALDO_HISTORICO", term=term_id, params={"date": start_month, "type": "I"})
-        extract_dataset_polars(get_mit_url(), get_postgres_url(), query, "THHECHOS_SALDO_HISTORICO", term=term_id, params={"date": end_month, "type": "F"})
+        extract_dataset_polars(get_mit_url(), postgres, query, "THHECHOS_SALDO_HISTORICO", term=term_id, params={"date": start_month, "type": "I"})
+        extract_dataset_polars(get_mit_url(), postgres, query, "THHECHOS_SALDO_HISTORICO", term=term_id, params={"date": end_month, "type": "F"})
 
         # Cifras de control
         report = html_reporter.generate(

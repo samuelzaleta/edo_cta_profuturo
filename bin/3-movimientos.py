@@ -1,5 +1,5 @@
 from profuturo.common import truncate_table, notify, register_time, define_extraction
-from profuturo.database import get_postgres_pool, get_mit_pool
+from profuturo.database import get_postgres_pool, get_mit_pool, get_mit_url
 from profuturo.extraction import extract_terms, extract_dataset_polars
 from profuturo.reporters import HtmlReporter
 import sys
@@ -19,7 +19,7 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
     with register_time(postgres_pool, phase, term=term_id):
         # Extracción
         truncate_table(postgres, 'TTHECHOS_MOVIMIENTO', term=term_id)
-        extract_dataset_polars(mit, postgres, """
+        extract_dataset_polars(get_mit_url(), postgres, """
         SELECT DT.FTN_NUM_CTA_INVDUAL AS FCN_CUENTA,
                DT.FCN_ID_TIPO_MOV AS FCN_ID_TIPO_MOVIMIENTO,
                DT.FCN_ID_CONCEPTO_MOV AS FCN_ID_CONCEPTO_MOVIMIENTO,
@@ -45,7 +45,7 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
         LEFT JOIN  CIERREN.TNAFORECA_SUA SUA ON SUA.FTC_FOLIO = DT.FTC_FOLIO AND SUA.FNN_ID_REFERENCIA = DT.FNN_ID_REFERENCIA
         WHERE FTD_FEH_LIQUIDACION BETWEEN :start AND :end
         """, "TTHECHOS_MOVIMIENTO", term=term_id, params={"start": start_month, "end": end_month}, limit=1)
-        extract_dataset_polars(mit, postgres, """
+        extract_dataset_polars(get_mit_url(), postgres, """
         SELECT FTN_NUM_CTA_INVDUAL AS FCN_CUENTA,
                FCN_ID_TIPO_MOV AS FCN_ID_TIPO_MOVIMIENTO,
                FCN_ID_CONCEPTO_MOV AS FCN_ID_CONCEPTO_MOVIMIENTO,
@@ -59,7 +59,7 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
         FROM TTAFOGRAL_MOV_BONO
         WHERE FTD_FEH_LIQUIDACION BETWEEN :start AND :end
         """, "TTHECHOS_MOVIMIENTO", term=term_id, params={"start": start_month, "end": end_month}, limit=1)
-        extract_dataset_polars(mit, postgres, """
+        extract_dataset_polars(get_mit_url(), postgres, """
         SELECT DT.FTN_NUM_CTA_INVDUAL AS FCN_CUENTA,
                DT.FCN_ID_TIPO_MOV AS FCN_ID_TIPO_MOVIMIENTO,
                DT.FCN_ID_CONCEPTO_MOV AS FCN_ID_CONCEPTO_MOVIMIENTO,
@@ -85,7 +85,7 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
         LEFT JOIN  CIERREN.TNAFORECA_SUA SUA ON SUA.FTC_FOLIO = DT.FTC_FOLIO AND SUA.FNN_ID_REFERENCIA = DT.FNN_ID_REFERENCIA
         WHERE FTD_FEH_LIQUIDACION BETWEEN :start AND :end
         """, "TTHECHOS_MOVIMIENTO", term=term_id, params={"start": start_month, "end": end_month}, limit=1)
-        extract_dataset_polars(mit, postgres, """
+        extract_dataset_polars(get_mit_url(), postgres, """
         SELECT FTN_NUM_CTA_INVDUAL AS FCN_CUENTA,
                FCN_ID_TIPO_MOV AS FCN_ID_TIPO_MOVIMIENTO,
                FCN_ID_CONCEPTO_MOV AS FCN_ID_CONCEPTO_MOVIMIENTO,
@@ -99,7 +99,7 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
         FROM TTAFOGRAL_MOV_GOB
         WHERE FTD_FEH_LIQUIDACION BETWEEN :start AND :end
         """, "TTHECHOS_MOVIMIENTO", term=term_id, params={"start": start_month, "end": end_month}, limit=1)
-        extract_dataset_polars(mit, postgres, """
+        extract_dataset_polars(get_mit_url(), postgres, """
         SELECT DT.FTN_NUM_CTA_INVDUAL AS FCN_CUENTA,
                DT.FCN_ID_TIPO_MOV AS FCN_ID_TIPO_MOVIMIENTO,
                DT.FCN_ID_CONCEPTO_MOV AS FCN_ID_CONCEPTO_MOVIMIENTO,
@@ -125,7 +125,7 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
         LEFT JOIN  CIERREN.TNAFORECA_SUA SUA ON SUA.FTC_FOLIO = DT.FTC_FOLIO AND SUA.FNN_ID_REFERENCIA = DT.FNN_ID_REFERENCIA
         WHERE FTD_FEH_LIQUIDACION BETWEEN :start AND :end
         """, "TTHECHOS_MOVIMIENTO", term=term_id, params={"start": start_month, "end": end_month}, limit=1)
-        extract_dataset_polars(mit, postgres, """
+        extract_dataset_polars(get_mit_url(), postgres, """
         SELECT FTN_NUM_CTA_INVDUAL AS FCN_CUENTA,
                FCN_ID_TIPO_MOV AS FCN_ID_TIPO_MOVIMIENTO,
                FCN_ID_CONCEPTO_MOV AS FCN_ID_CONCEPTO_MOVIMIENTO,
@@ -139,7 +139,7 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
         FROM TTAFOGRAL_MOV_SAR
         WHERE FTD_FEH_LIQUIDACION BETWEEN :start AND :end
         """, "TTHECHOS_MOVIMIENTO", term=term_id, params={"start": start_month, "end": end_month}, limit=1)
-        extract_dataset_polars(mit, postgres, """
+        extract_dataset_polars(get_mit_url(), postgres, """
         SELECT FTN_NUM_CTA_INVDUAL AS FCN_CUENTA,
                FCN_ID_TIPO_MOV AS FCN_ID_TIPO_MOVIMIENTO,
                FCN_ID_CONCEPTO_MOV AS FCN_ID_CONCEPTO_MOVIMIENTO,

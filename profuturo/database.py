@@ -1,3 +1,5 @@
+import os
+
 from sqlalchemy.exc import OperationalError
 from sqlalchemy import Engine
 from contextlib import ExitStack, contextmanager
@@ -24,39 +26,45 @@ def use_pools(phase: int, *pools: Engine):
 
 def get_mit_conn() -> oracledb.Connection:
     return oracledb.connect(
-        host="172.22.180.190",
-        service_name="mitafore.profuturo-gnp.net",
-        user="PROFUTURO_QAMOD",
-        password="Pa55w0rd*19",
+        host=os.getenv("MIT_HOST"),
+        port=int(os.getenv("MIT_PORT")),
+        service_name=os.getenv("MIT_DATABASE"),
+        user=os.getenv("MIT_USER"),
+        password=os.getenv("MIT_PASSWORD"),
     )
 
 
 def get_buc_conn() -> oracledb.Connection:
     return oracledb.connect(
-        host="172.22.164.19",
-        port=16161,
-        service_name="QA34",
-        user="CLUNICO",
-        password="temp4now13",
+        host=os.getenv("BUC_HOST"),
+        port=int(os.getenv("BUC_PORT")),
+        service_name=os.getenv("BUC_DATABASE"),
+        user=os.getenv("BUC_USER"),
+        password=os.getenv("BUC_PASSWORD"),
     )
 
 
 def get_postgres_conn():
     return psycopg2.connect(
-        host="34.72.193.129",
-        user="alexo",
-        password="Oxela3210",
-        database="PROFUTURO",
-        port=5432,
+        host=os.getenv("POSTGRES_HOST"),
+        port=int(os.getenv("POSTGRES_PORT")),
+        database=os.getenv("POSTGRES_DATABASE"),
+        user=os.getenv("POSTGRES_USER"),
+        password=os.getenv("POSTGRES_PASSWORD"),
         options='-c search_path="MAESTROS","GESTOR","HECHOS","RESULTADOS"',
     )
 
 
 def get_integrity_conn(database: str):
+    host = os.getenv("INTEGRITY_HOST")
+    port = int(os.getenv("INTEGRITY_PORT"))
+    user = os.getenv("INTEGRITY_USER")
+    password = os.getenv("INTEGRITY_PASSWORD")
+
     return lambda: jaydebeapi.connect(
         "oracle.rdb.jdbc.rdbThin.Driver",
-        f"jdbc:rdbThin://130.40.30.144:1714/mexico$base:{database}",
-        {"user": "SIEFORE", "password": "SIEFORE2019"},
+        f"jdbc:rdbThin://{host}:{port}/mexico$base:{database}",
+        {"user": user, "password": password},
         "/opt/profuturo/libs/RDBTHIN.JAR"
     )
 
@@ -94,30 +102,30 @@ def get_postgres_pool():
 
 
 def get_mit_url():
-    user = "PROFUTURO_QAMOD"
-    password = "Pa55w0rd*19"
-    host = "172.22.180.190"
-    port = '1521'
-    service_name = "mitafore.profuturo-gnp.net"
+    host = os.getenv("MIT_HOST")
+    port = int(os.getenv("MIT_PORT"))
+    service_name = os.getenv("MIT_DATABASE")
+    user = os.getenv("MIT_USER")
+    password = os.getenv("MIT_PASSWORD")
     
     return f"oracle://{user}:{password}@{host}:{port}/{service_name}"
 
 
 def get_buc_url():
-    user = "CLUNICO"
-    password = "temp4now13"
-    host = "172.22.164.19"
-    port = '16161'
-    service_name = "QA34"
+    host = os.getenv("BUC_HOST")
+    port = int(os.getenv("BUC_PORT"))
+    service_name = os.getenv("BUC_DATABASE")
+    user = os.getenv("BUC_USER")
+    password = os.getenv("BUC_PASSWORD")
     
     return f"oracle://{user}:{password}@{host}:{port}/{service_name}"
 
 
 def get_postgres_url():
-    host = "34.72.193.129"
-    user = "alexo"
-    password = "Oxela3210"
-    database = "PROFUTURO"
-    port = '5432'
+    host = os.getenv("POSTGRES_HOST")
+    port = int(os.getenv("POSTGRES_PORT"))
+    database = os.getenv("POSTGRES_DATABASE")
+    user = os.getenv("POSTGRES_USER")
+    password = os.getenv("POSTGRES_PASSWORD")
     
     return f'postgresql://{user}:{password}@{host}:{port}/{database}'

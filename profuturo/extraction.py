@@ -1,4 +1,5 @@
 from sqlalchemy import text, Connection
+from pandas import DataFrame
 from typing import Dict, Any, List, Callable
 from datetime import datetime, date, time
 from numbers import Number
@@ -49,25 +50,41 @@ def extract_indicator(
     limit: int = None,
     partition_size: int = 1_000,
 ):
-    if params is None:
-        params = {}
+    update_indicator(origin, destination, query, """
+        UPDATE "TCHECHOS_CLIENTE"
+        SET "FTO_INDICADORES" = jsonb_set("FTO_INDICADORES", :field, :value)
+        WHERE "FCN_CUENTA" IN :accounts AND "FCN_ID_PERIODO" = :term
+    """, term, select_params=params, update_params={"field": f"{{{index}}}"}, limit=limit, partition_size=partition_size)
+
+
+def update_indicator(
+    origin: Connection,
+    destination: Connection,
+    select_query: str,
+    update_query: str,
+    term: int,
+    select_params: Dict[str, Any] = None,
+    update_params: Dict[str, Any] = None,
+    limit: int = None,
+    partition_size: int = 1_000,
+):
+    if select_params is None:
+        select_params = {}
+    if update_params is None:
+        update_params = {}
     if limit is not None:
-        query = f"SELECT * FROM ({query}) WHERE ROWNUM <= :limit"
-        params["limit"] = limit
+        select_query = f"SELECT * FROM ({select_query}) WHERE ROWNUM <= :limit"
+        select_params["limit"] = limit
 
     try:
-        cursor = origin.execute(text(query), params)
+        cursor = origin.execute(text(select_query), select_params)
         for i, batch in enumerate(cursor.partitions(partition_size)):
-            print(f"Updating records {i * partition_size} throught {(i + 1) * partition_size}")
+            print(f"Updating records {i * partition_size} through {(i + 1) * partition_size}")
 
             for value, accounts in group_by(batch, lambda row: row[1], lambda row: row[0]).items():
-                destination.execute(text("""
-                UPDATE "TCHECHOS_CLIENTE"
-                SET "FTO_INDICADORES" = jsonb_set("FTO_INDICADORES", :field, :value)
-                WHERE "FCN_CUENTA" IN :accounts AND "FCN_ID_PERIODO" = :term
-                """), {
-                    "field": f"{{{index}}}",
-                    "value": f'"{value}"',
+                destination.execute(text(update_query), {
+                    **update_params,
+                    "value": value,
                     "accounts": tuple(accounts),
                     "term": term,
                 })
@@ -83,6 +100,7 @@ def extract_dataset(
     term: int = None,
     params: Dict[str, Any] = None,
     limit: int = None,
+    transform: Callable[[DataFrame], DataFrame] = None,
 ):
     if params is None:
         params = {}
@@ -102,9 +120,11 @@ def extract_dataset(
 
         if term:
             df_pd = df_pd.assign(FCN_ID_PERIODO=term)
-
         if table in sub_anverso_tables():
-            df_pd = df_pd.assign(FTD_FECHAHORA_ALTA=datetime.datetime.now())
+            df_pd = df_pd.assign(FTD_FECHAHORA_ALTA=datetime.now())
+
+        if transform is not None:
+            df_pd = transform(df_pd)
 
         df_pd.to_sql(
             table,
@@ -123,12 +143,13 @@ def extract_dataset(
 
 def extract_dataset_polars(
     origin: str,
-    destination: str,
+    destination: Connection,
     query: str,
     table: str,
     term: int = None,
     params: Dict[str, Any] = None,
     limit: int = None,
+    transform: Callable[[DataFrame], DataFrame] = None,
 ):
     if params is None:
         params = {}
@@ -148,7 +169,6 @@ def extract_dataset_polars(
 
         if term:
             df_pl = df_pl.with_columns(pl.lit(term).alias("FCN_ID_PERIODO"))
-
         if table in sub_anverso_tables():
             df_pl = df_pl.with_columns(pl.lit(datetime.now()).alias("FTD_FECHAHORA_ALTA"))
 
@@ -159,13 +179,16 @@ def extract_dataset_polars(
             if schema.is_(pl.Datetime) or schema.is_(pl.Date) or schema.is_(pl.Time):
                 df_pd[column] = pd.to_datetime(df_pd[column])
 
+        if transform is not None:
+            df_pd = transform(df_pd)
+
         df_pd.to_sql(
             table,
             destination,
             if_exists="append",
             index=False,
             method="multi",
-            chunksize=1_000,
+            chunksize=100,
         )
     except Exception as e:
         raise ProfuturoException.from_exception(e, term) from e
@@ -221,10 +244,12 @@ def _replace_query_params(sql: str, params: Dict[str, Any]):
     statement = sql
 
     for key, value in params.items():
-        if isinstance(value, (datetime, date, time)):
+        if value is None:
+            formatted_value = 'NULL'
+        elif isinstance(value, (datetime, date, time)):
             formatted_value = f"date '{value.isoformat()}'"
         elif isinstance(value, Number):
-            formatted_value = value
+            formatted_value = str(value)
         else:
             formatted_value = f"'{value}'"
 

@@ -1,5 +1,5 @@
 from profuturo.common import truncate_table, notify, register_time, define_extraction
-from profuturo.database import get_postgres_pool, get_mit_pool
+from profuturo.database import get_postgres_pool, get_mit_pool, get_mit_url
 from profuturo.extraction import extract_terms, extract_dataset_polars
 from profuturo.reporters import HtmlReporter
 from datetime import date
@@ -20,7 +20,7 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
     with register_time(postgres_pool, phase, term=term_id):
         # Extracción
         truncate_table(postgres, 'TTHECHOS_COMISION', term=term_id)
-        extract_dataset_polars(mit, postgres, """
+        extract_dataset_polars(get_mit_url(), postgres, """
         SELECT FTN_NUM_CTA_INVDUAL AS FCN_CUENTA,
                FTN_ID_MOV AS FCN_ID_MOVIMIENTO,
                FCN_ID_SIEFORE,
