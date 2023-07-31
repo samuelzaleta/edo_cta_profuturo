@@ -1,5 +1,5 @@
-import os
-
+from typing import Union
+from pyspark.sql import DataFrameReader, DataFrameWriter
 from sqlalchemy.exc import OperationalError
 from sqlalchemy import Engine
 from contextlib import ExitStack, contextmanager
@@ -8,6 +8,7 @@ import jaydebeapi
 import sqlalchemy
 import oracledb
 import psycopg2
+import os
 
 
 @contextmanager
@@ -99,6 +100,51 @@ def get_postgres_pool():
         "postgresql+psycopg2://",
         creator=get_postgres_conn,
     )
+
+
+def configure_mit_spark(connection: Union[DataFrameReader, DataFrameWriter]) -> Union[DataFrameReader, DataFrameWriter]:
+    host = os.getenv("MIT_HOST")
+    port = int(os.getenv("MIT_PORT"))
+    service_name = os.getenv("MIT_DATABASE")
+    user = os.getenv("MIT_USER")
+    password = os.getenv("MIT_PASSWORD")
+
+    return connection \
+        .option("url", f"jdbc:oracle:thin:@//{host}:{port}/{service_name}") \
+        .option("driver", "oracle.jdbc.driver.OracleDriver") \
+        .option("oracle.jdbc.timezoneAsRegion", False) \
+        .option("user", user) \
+        .option("password", password)
+
+
+def configure_buc_spark(connection: Union[DataFrameReader, DataFrameWriter]) -> Union[DataFrameReader, DataFrameWriter]:
+    host = os.getenv("BUC_HOST")
+    port = int(os.getenv("BUC_PORT"))
+    service_name = os.getenv("BUC_DATABASE")
+    user = os.getenv("BUC_USER")
+    password = os.getenv("BUC_PASSWORD")
+
+    return connection \
+        .option("url", f"jdbc:oracle:thin:@//{host}:{port}/{service_name}") \
+        .option("driver", "oracle.jdbc.driver.OracleDriver") \
+        .option("oracle.jdbc.timezoneAsRegion", False) \
+        .option("user", user) \
+        .option("password", password)
+
+
+def configure_postgres_spark(connection: Union[DataFrameReader, DataFrameWriter]) -> Union[DataFrameReader, DataFrameWriter]:
+    host = os.getenv("POSTGRES_HOST")
+    port = int(os.getenv("POSTGRES_PORT"))
+    database = os.getenv("POSTGRES_DATABASE")
+    user = os.getenv("POSTGRES_USER")
+    password = os.getenv("POSTGRES_PASSWORD")
+
+    return connection \
+        .option("url", f"jdbc:postgresql://{host}:{port}/{database}") \
+        .option("driver", "org.postgresql.Driver") \
+        .option("search_path", '"MAESTROS","GESTOR","HECHOS","RESULTADOS"') \
+        .option("user", user) \
+        .option("password", password)
 
 
 def get_mit_url():

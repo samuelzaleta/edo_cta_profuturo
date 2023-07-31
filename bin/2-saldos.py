@@ -1,16 +1,15 @@
 from profuturo.common import truncate_table, notify, register_time, define_extraction
-from profuturo.database import get_postgres_pool, get_mit_pool, get_mit_url, get_postgres_url
-from profuturo.extraction import extract_terms, extract_dataset_polars
+from profuturo.database import get_postgres_pool, configure_mit_spark, configure_postgres_spark
+from profuturo.extraction import extract_terms, extract_dataset_spark
 from profuturo.reporters import HtmlReporter
 import sys
 
 
 html_reporter = HtmlReporter()
 postgres_pool = get_postgres_pool()
-mit_pool = get_mit_pool()
 phase = int(sys.argv[1])
 
-with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
+with define_extraction(phase, postgres_pool, postgres_pool) as (postgres, _):
     term = extract_terms(postgres, phase)
     term_id = term["id"]
     start_month = term["start_month"]
@@ -54,9 +53,9 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
         GROUP BY SH.FTN_NUM_CTA_INVDUAL, SH.FCN_ID_SIEFORE, SH.FCN_ID_TIPO_SUBCTA, SH.FTD_FEH_LIQUIDACION
         """
 
-        truncate_table(postgres, "THHECHOS_SALDO_HISTORICO", term=term_id)
-        extract_dataset_polars(get_mit_url(), postgres, query, "THHECHOS_SALDO_HISTORICO", term=term_id, params={"date": start_month, "type": "I"})
-        extract_dataset_polars(get_mit_url(), postgres, query, "THHECHOS_SALDO_HISTORICO", term=term_id, params={"date": end_month, "type": "F"})
+        truncate_table(postgres, 'THHECHOS_SALDO_HISTORICO', term=term_id)
+        extract_dataset_spark(configure_mit_spark, configure_postgres_spark, query, 'THHECHOS_SALDO_HISTORICO', term=term_id, params={"date": start_month, "type": "I"})
+        extract_dataset_spark(configure_mit_spark, configure_postgres_spark, query, 'THHECHOS_SALDO_HISTORICO', term=term_id, params={"date": end_month, "type": "F"})
 
         # Cifras de control
         report = html_reporter.generate(

@@ -25,17 +25,6 @@ def group_by(
     return result
 
 
-def ingest_tables_list() -> List[str]:
-    tables = [
-        "THHECHOS_SALDO_HISTORICO",
-        "TTHECHOS_MOVIMIENTO",
-        "TTHECHOS_COMISION",
-        "TTHECHOS_SUA"
-    ]
-
-    return tables
-
-
 def sub_anverso_tables() -> List[str]:
     tables = [
         "TTCALCUL_RENDIMIENTO",

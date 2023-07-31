@@ -8,10 +8,10 @@ psycopg2 = "*"
 pandas = "*"
 sqlalchemy = "*"
 oracledb = "*"
-polars = "*"
 profuturo = {editable = true, path = "."}
 jaydebeapi = "*"
 python-dotenv = "*"
+polars = {extras = ["connectorx", "pandas", "pyarrow"], version = "*"}
 
 [dev-packages]
 pyspark = "*"

@@ -72,4 +72,4 @@ with define_extraction(phase, postgres_pool, buc_pool) as (postgres, buc):
             f":street_{i}", f":street_number_{i}", f":colony_{i}", f":municipality_{i}",
             f":zip_{i}", f":state_{i}", f":nss_{i}",
             f":curp_{i}", f":rfc_{i}",
-        ], "TCDATMAE_CLIENTE", limit=100_000, partition_size=1)
+        ], "TCDATMAE_CLIENTE")

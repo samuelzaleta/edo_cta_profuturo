@@ -43,4 +43,4 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
         ON CONFLICT ("FTN_ID_TIPO_SUBCTA") DO UPDATE 
         SET "FCN_ID_REGIMEN" = EXCLUDED."FCN_ID_REGIMEN", "FCN_ID_CAT_SUBCTA" = EXCLUDED."FCN_ID_CAT_SUBCTA", 
             "FCC_VALOR" = EXCLUDED."FCC_VALOR"
-        """, lambda i: [f":id_{i}", f":regime_id_{i}", f":subacc_cat_id_{i}", f":description_{i}"], "TCDATMAE_TIPO_SUBCUENTA", partition_size=1)
+        """, lambda i: [f":id_{i}", f":regime_id_{i}", f":subacc_cat_id_{i}", f":description_{i}"], "TCDATMAE_TIPO_SUBCUENTA")

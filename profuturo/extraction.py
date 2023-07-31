@@ -1,6 +1,8 @@
-from sqlalchemy import text, Connection
-from pandas import DataFrame
-from typing import Dict, Any, List, Callable
+from pyspark.sql import SparkSession, DataFrame as SparkDataFrame, DataFrameReader, DataFrameWriter
+from pyspark.sql.functions import lit
+from sqlalchemy import text, Connection, Row
+from pandas import DataFrame as PandasDataFrame
+from typing import Dict, Any, List, Callable, Sequence
 from datetime import datetime, date, time
 from numbers import Number
 from .exceptions import ProfuturoException
@@ -100,7 +102,7 @@ def extract_dataset(
     term: int = None,
     params: Dict[str, Any] = None,
     limit: int = None,
-    transform: Callable[[DataFrame], DataFrame] = None,
+    transform: Callable[[PandasDataFrame], PandasDataFrame] = None,
 ):
     if params is None:
         params = {}
@@ -141,6 +143,59 @@ def extract_dataset(
     print(df_pd.info())
 
 
+def extract_dataset_spark(
+    origin_configurator: Callable[[DataFrameReader], DataFrameReader],
+    destination_configurator: Callable[[DataFrameWriter], DataFrameWriter],
+    query: str,
+    table: str,
+    term: int = None,
+    params: Dict[str, Any] = None,
+    limit: int = None,
+    transform: Callable[[SparkDataFrame], SparkDataFrame] = None,
+):
+    spark = SparkSession.builder \
+        .master('local') \
+        .appName("profuturo") \
+        .getOrCreate()
+
+    if params is None:
+        params = {}
+    if limit is not None:
+        if table in sub_anverso_tables():
+            f"SELECT Q.* FROM ({query}) AS Q LIMIT :limit"
+            params["limit"] = limit
+        else:
+            query = f"SELECT * FROM ({query}) WHERE ROWNUM <= :limit"
+            params["limit"] = limit
+
+    print(f"Extracting {table}...")
+
+    try:
+        df_sp = origin_configurator(spark.read) \
+            .format("jdbc") \
+            .option("dbtable", f"({_replace_query_params(query, params)}) dataset") \
+            .load()
+
+        if term:
+            df_sp = df_sp.withColumn("FCN_ID_PERIODO", lit(term))
+        if table in sub_anverso_tables():
+            df_sp = df_sp.withColumn("FTD_FECHAHORA_ALTA", lit(datetime.now()))
+
+        if transform is not None:
+            df_sp = transform(df_sp)
+
+        destination_configurator(df_sp.write) \
+            .format("jdbc") \
+            .mode("append") \
+            .option("dbtable", f'"{table}"') \
+            .save()
+    except Exception as e:
+        raise ProfuturoException.from_exception(e, term) from e
+
+    print(f"Done extracting {table}!")
+    print(df_sp.show())
+
+
 def extract_dataset_polars(
     origin: str,
     destination: Connection,
@@ -149,7 +204,7 @@ def extract_dataset_polars(
     term: int = None,
     params: Dict[str, Any] = None,
     limit: int = None,
-    transform: Callable[[DataFrame], DataFrame] = None,
+    transform: Callable[[PandasDataFrame], PandasDataFrame] = None,
 ):
     if params is None:
         params = {}
@@ -226,10 +281,11 @@ def upsert_dataset(
         for i, batch in enumerate(cursor.partitions(partition_size)):
             print(f"Upserting records {i * partition_size} through {(i + 1) * partition_size}")
 
-            query = upsert_query.replace('(...)', _upsert_values_sentence(upsert_values, len(batch)))
+            batch_set = list(_deduplicate_records(batch))
+            query = upsert_query.replace('(...)', _upsert_values_sentence(upsert_values, len(batch_set)))
 
             params = {}
-            for j, row in enumerate(batch):
+            for j, row in enumerate(batch_set):
                 for key, value in row._mapping.items():
                     params[f"{key}_{j}"] = value
 
@@ -238,6 +294,17 @@ def upsert_dataset(
         raise ProfuturoException.from_exception(e, term) from e
 
     print(f"Done upserting {table}!")
+
+
+def _deduplicate_records(records: Sequence[Row]):
+    ids = set()
+
+    for record in records:
+        if record[0] in ids:
+            continue
+
+        ids.add(record[0])
+        yield record
 
 
 def _replace_query_params(sql: str, params: Dict[str, Any]):
