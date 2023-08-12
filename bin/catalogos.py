@@ -15,15 +15,9 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
 
     with register_time(postgres_pool, phase, term_id):
         upsert_dataset(mit, postgres, """
-        WITH dataset AS (
-            SELECT ROW_NUMBER() OVER(PARTITION BY FCN_ID_CAT_CATALOGO ORDER BY FHD_HIST_FEH_CRE DESC) AS ROW_NUM,
-                   FCN_ID_CAT_CATALOGO, FCC_DESC
-            FROM THCRXGRAL_CAT_CATALOGO
-            WHERE FCN_ID_TIPO_CAT = 18 AND FCB_VIGENCIA = 1
-        )
-        SELECT FCN_ID_CAT_CATALOGO AS id, FCC_DESC AS description
-        FROM dataset
-        WHERE ROW_NUM = 1
+        SELECT S.FCN_ID_SIEFORE AS id, C.FCC_VALOR AS description
+        FROM TCCRXGRAL_SIEFORE S
+        INNER JOIN TCCRXGRAL_CAT_CATALOGO C ON S.FCN_ID_SIEFORE = C.FCN_ID_CAT_CATALOGO
         """, """
         INSERT INTO "TCDATMAE_SIEFORE"("FTN_ID_SIEFORE", "FTC_DESCRIPCION_CORTA")
         VALUES (...)
@@ -31,12 +25,10 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
         SET "FTC_DESCRIPCION_CORTA" = EXCLUDED."FTC_DESCRIPCION_CORTA"
         """, lambda i: [f":id_{i}", f":description_{i}"], "TCDATMAE_SIEFORE")
         upsert_dataset(mit, postgres, """
-        SELECT DISTINCT sct.FCN_ID_TIPO_SUBCTA AS id, 
-               sct.FCN_ID_REGIMEN AS regime_id, 
-               sct.FCN_ID_CAT_SUBCTA AS subacc_cat_id, 
-               cat.FCC_VALOR AS description
-        FROM TCCRXGRAL_TIPO_SUBCTA sct
-        INNER JOIN THCRXGRAL_CAT_CATALOGO cat ON sct.FCN_ID_CAT_SUBCTA = cat.FCN_ID_CAT_CATALOGO
+        SELECT S.FCN_ID_TIPO_SUBCTA AS id, S.FCN_ID_REGIMEN AS regime_id, S.FCN_ID_CAT_SUBCTA AS subacc_cat_id, 
+               C.FCC_VALOR AS description
+        FROM TCCRXGRAL_TIPO_SUBCTA S
+        INNER JOIN TCCRXGRAL_CAT_CATALOGO C ON S.FCN_ID_CAT_SUBCTA = C.FCN_ID_CAT_CATALOGO
         """, """
         INSERT INTO "TCDATMAE_TIPO_SUBCUENTA"("FTN_ID_TIPO_SUBCTA", "FCN_ID_REGIMEN", "FCN_ID_CAT_SUBCTA", "FCC_VALOR")
         VALUES (...)

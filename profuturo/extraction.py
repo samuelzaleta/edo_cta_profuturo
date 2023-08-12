@@ -5,6 +5,8 @@ from pandas import DataFrame as PandasDataFrame
 from typing import Dict, Any, List, Callable, Sequence
 from datetime import datetime, date, time
 from numbers import Number
+
+from .common import truncate_table
 from .exceptions import ProfuturoException
 from ._helpers import sub_anverso_tables, group_by
 import calendar
@@ -15,7 +17,7 @@ import polars as pl
 
 def extract_terms(conn: Connection, phase: int) -> Dict[str, Any]:
     try:
-        term_id = sys.argv[2]
+        term_id = int(sys.argv[2])
         cursor = conn.execute(text("""
         SELECT "FTC_PERIODO"
         FROM "TCGESPRO_PERIODO"
@@ -42,54 +44,24 @@ def extract_terms(conn: Connection, phase: int) -> Dict[str, Any]:
         raise ProfuturoException("TERMS_ERROR", phase) from e
 
 
-def extract_indicator(
-    origin: Connection,
-    destination: Connection,
+def update_indicator_spark(
+    origin_configurator: Callable[[DataFrameReader], DataFrameReader],
+    destination_configurator: Callable[[DataFrameWriter], DataFrameWriter],
     query: str,
-    index: int,
-    term: int,
+    term: int = None,
     params: Dict[str, Any] = None,
     limit: int = None,
-    partition_size: int = 1_000,
 ):
-    update_indicator(origin, destination, query, """
-        UPDATE "TCHECHOS_CLIENTE"
-        SET "FTO_INDICADORES" = jsonb_set("FTO_INDICADORES", :field, :value)
-        WHERE "FCN_CUENTA" IN :accounts AND "FCN_ID_PERIODO" = :term
-    """, term, select_params=params, update_params={"field": f"{{{index}}}"}, limit=limit, partition_size=partition_size)
-
-
-def update_indicator(
-    origin: Connection,
-    destination: Connection,
-    select_query: str,
-    update_query: str,
-    term: int,
-    select_params: Dict[str, Any] = None,
-    update_params: Dict[str, Any] = None,
-    limit: int = None,
-    partition_size: int = 1_000,
-):
-    if select_params is None:
-        select_params = {}
-    if update_params is None:
-        update_params = {}
-    if limit is not None:
-        select_query = f"SELECT * FROM ({select_query}) WHERE ROWNUM <= :limit"
-        select_params["limit"] = limit
-
     try:
-        cursor = origin.execute(text(select_query), select_params)
-        for i, batch in enumerate(cursor.partitions(partition_size)):
-            print(f"Updating records {i * partition_size} through {(i + 1) * partition_size}")
-
-            for value, accounts in group_by(batch, lambda row: row[1], lambda row: row[0]).items():
-                destination.execute(text(update_query), {
-                    **update_params,
-                    "value": value,
-                    "accounts": tuple(accounts),
-                    "term": term,
-                })
+        extract_dataset_spark(
+            origin_configurator,
+            destination_configurator,
+            query,
+            '"HECHOS"."TCHECHOS_INDICADOR"',
+            term=term,
+            params=params,
+            limit=limit
+        )
     except Exception as e:
         raise ProfuturoException("TABLE_SWITCH_ERROR", term) from e
 
@@ -153,42 +125,35 @@ def extract_dataset_spark(
     limit: int = None,
     transform: Callable[[SparkDataFrame], SparkDataFrame] = None,
 ):
-    spark = SparkSession.builder \
-        .master('local') \
-        .appName("profuturo") \
-        .getOrCreate()
+    spark = _get_spark_session()
 
     if params is None:
         params = {}
     if limit is not None:
-        if table in sub_anverso_tables():
-            f"SELECT Q.* FROM ({query}) AS Q LIMIT :limit"
-            params["limit"] = limit
-        else:
-            query = f"SELECT * FROM ({query}) WHERE ROWNUM <= :limit"
-            params["limit"] = limit
+        query = f"SELECT * FROM ({query}) WHERE ROWNUM <= :limit"
+        params["limit"] = limit
 
     print(f"Extracting {table}...")
 
     try:
-        df_sp = origin_configurator(spark.read) \
-            .format("jdbc") \
-            .option("dbtable", f"({_replace_query_params(query, params)}) dataset") \
-            .load()
+        print("Creating dataframe...")
+        df_sp = _create_spark_dataframe(spark, origin_configurator, query, params)
+        print("Done dataframe!")
 
         if term:
+            print("Adding period...")
             df_sp = df_sp.withColumn("FCN_ID_PERIODO", lit(term))
-        if table in sub_anverso_tables():
-            df_sp = df_sp.withColumn("FTD_FECHAHORA_ALTA", lit(datetime.now()))
+            print("Done adding period!")
 
         if transform is not None:
+            print("Transforming dataframe...")
             df_sp = transform(df_sp)
+            print("Done transforming dataframe!")
 
-        destination_configurator(df_sp.write) \
-            .format("jdbc") \
-            .mode("append") \
-            .option("dbtable", f'"{table}"') \
-            .save()
+        print("Writing dataframe...")
+        print("Schema", df_sp.schema)
+        _write_spark_dataframe(df_sp, destination_configurator, table)
+        print("Done writing dataframe!")
     except Exception as e:
         raise ProfuturoException.from_exception(e, term) from e
 
@@ -294,6 +259,34 @@ def upsert_dataset(
         raise ProfuturoException.from_exception(e, term) from e
 
     print(f"Done upserting {table}!")
+
+
+def _get_spark_session() -> SparkSession:
+    return SparkSession.builder \
+        .master('local[*]') \
+        .appName("profuturo") \
+        .config("spark.executor.memory", "34g") \
+        .config("spark.driver.memory", "34g") \
+        .config("spark.executor.instances", "5") \
+        .config("spark.default.parallelism", "900") \
+        .getOrCreate()
+
+
+def _create_spark_dataframe(spark: SparkSession, connection_configurator, query: str, params: Dict[str, Any]) -> SparkDataFrame:
+    return connection_configurator(spark.read) \
+        .format("jdbc") \
+        .option("dbtable", f"({_replace_query_params(query, params)}) dataset") \
+        .option("numPartitions", 50) \
+        .option("fetchsize", 20000) \
+        .load()
+
+
+def _write_spark_dataframe(df: SparkDataFrame, connection_configurator, table: str) -> None:
+    connection_configurator(df.write) \
+        .format("jdbc") \
+        .mode("append") \
+        .option("dbtable", f'{table}') \
+        .save()
 
 
 def _deduplicate_records(records: Sequence[Row]):

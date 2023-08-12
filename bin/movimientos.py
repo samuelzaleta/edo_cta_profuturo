@@ -1,6 +1,6 @@
 from profuturo.common import truncate_table, notify, register_time, define_extraction
-from profuturo.database import get_postgres_pool, get_mit_pool, get_mit_url
-from profuturo.extraction import extract_terms, extract_dataset_polars
+from profuturo.database import get_postgres_pool, get_mit_pool, configure_mit_spark, configure_postgres_spark
+from profuturo.extraction import extract_terms, extract_dataset, extract_dataset_spark
 from profuturo.reporters import HtmlReporter
 import sys
 
@@ -9,6 +9,7 @@ html_reporter = HtmlReporter()
 postgres_pool = get_postgres_pool()
 mit_pool = get_mit_pool()
 phase = int(sys.argv[1])
+table = '"HECHOS"."TTHECHOS_MOVIMIENTO"'
 
 with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
     term = extract_terms(postgres, phase)
@@ -19,7 +20,7 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
     with register_time(postgres_pool, phase, term=term_id):
         # Extracción
         truncate_table(postgres, 'TTHECHOS_MOVIMIENTO', term=term_id)
-        extract_dataset_polars(get_mit_url(), postgres, """
+        extract_dataset_spark(configure_mit_spark, configure_postgres_spark, """
         SELECT DT.FTN_NUM_CTA_INVDUAL AS FCN_CUENTA,
                DT.FCN_ID_TIPO_MOV AS FCN_ID_TIPO_MOVIMIENTO,
                DT.FCN_ID_CONCEPTO_MOV AS FCN_ID_CONCEPTO_MOVIMIENTO,
@@ -44,8 +45,8 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
         FROM TTAFOGRAL_MOV_AVOL DT
         LEFT JOIN CIERREN.TNAFORECA_SUA SUA ON SUA.FTC_FOLIO = DT.FTC_FOLIO AND SUA.FNN_ID_REFERENCIA = DT.FNN_ID_REFERENCIA
         WHERE FTD_FEH_LIQUIDACION BETWEEN :start AND :end
-        """, "TTHECHOS_MOVIMIENTO", term=term_id, params={"start": start_month, "end": end_month}, limit=1)
-        extract_dataset_polars(get_mit_url(), postgres, """
+        """, table, term=term_id, params={"start": start_month, "end": end_month})
+        extract_dataset_spark(configure_mit_spark, configure_postgres_spark, """
         SELECT FTN_NUM_CTA_INVDUAL AS FCN_CUENTA,
                FCN_ID_TIPO_MOV AS FCN_ID_TIPO_MOVIMIENTO,
                FCN_ID_CONCEPTO_MOV AS FCN_ID_CONCEPTO_MOVIMIENTO,
@@ -58,8 +59,8 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
                'M' AS FTC_BD_ORIGEN
         FROM TTAFOGRAL_MOV_BONO
         WHERE FTD_FEH_LIQUIDACION BETWEEN :start AND :end
-        """, "TTHECHOS_MOVIMIENTO", term=term_id, params={"start": start_month, "end": end_month}, limit=1)
-        extract_dataset_polars(get_mit_url(), postgres, """
+        """, table, term=term_id, params={"start": start_month, "end": end_month})
+        extract_dataset_spark(configure_mit_spark, configure_postgres_spark, """
         SELECT DT.FTN_NUM_CTA_INVDUAL AS FCN_CUENTA,
                DT.FCN_ID_TIPO_MOV AS FCN_ID_TIPO_MOVIMIENTO,
                DT.FCN_ID_CONCEPTO_MOV AS FCN_ID_CONCEPTO_MOVIMIENTO,
@@ -84,8 +85,8 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
         FROM TTAFOGRAL_MOV_COMP DT
         LEFT JOIN  CIERREN.TNAFORECA_SUA SUA ON SUA.FTC_FOLIO = DT.FTC_FOLIO AND SUA.FNN_ID_REFERENCIA = DT.FNN_ID_REFERENCIA
         WHERE FTD_FEH_LIQUIDACION BETWEEN :start AND :end
-        """, "TTHECHOS_MOVIMIENTO", term=term_id, params={"start": start_month, "end": end_month}, limit=1)
-        extract_dataset_polars(get_mit_url(), postgres, """
+        """, table, term=term_id, params={"start": start_month, "end": end_month})
+        extract_dataset_spark(configure_mit_spark, configure_postgres_spark, """
         SELECT FTN_NUM_CTA_INVDUAL AS FCN_CUENTA,
                FCN_ID_TIPO_MOV AS FCN_ID_TIPO_MOVIMIENTO,
                FCN_ID_CONCEPTO_MOV AS FCN_ID_CONCEPTO_MOVIMIENTO,
@@ -98,8 +99,8 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
                'M' AS FTC_BD_ORIGEN
         FROM TTAFOGRAL_MOV_GOB
         WHERE FTD_FEH_LIQUIDACION BETWEEN :start AND :end
-        """, "TTHECHOS_MOVIMIENTO", term=term_id, params={"start": start_month, "end": end_month}, limit=1)
-        extract_dataset_polars(get_mit_url(), postgres, """
+        """, table, term=term_id, params={"start": start_month, "end": end_month})
+        extract_dataset_spark(configure_mit_spark, configure_postgres_spark, """
         SELECT DT.FTN_NUM_CTA_INVDUAL AS FCN_CUENTA,
                DT.FCN_ID_TIPO_MOV AS FCN_ID_TIPO_MOVIMIENTO,
                DT.FCN_ID_CONCEPTO_MOV AS FCN_ID_CONCEPTO_MOVIMIENTO,
@@ -124,8 +125,8 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
         FROM TTAFOGRAL_MOV_RCV DT
         LEFT JOIN  CIERREN.TNAFORECA_SUA SUA ON SUA.FTC_FOLIO = DT.FTC_FOLIO AND SUA.FNN_ID_REFERENCIA = DT.FNN_ID_REFERENCIA
         WHERE FTD_FEH_LIQUIDACION BETWEEN :start AND :end
-        """, "TTHECHOS_MOVIMIENTO", term=term_id, params={"start": start_month, "end": end_month}, limit=1)
-        extract_dataset_polars(get_mit_url(), postgres, """
+        """, table, term=term_id, params={"start": start_month, "end": end_month})
+        extract_dataset_spark(configure_mit_spark, configure_postgres_spark, """
         SELECT FTN_NUM_CTA_INVDUAL AS FCN_CUENTA,
                FCN_ID_TIPO_MOV AS FCN_ID_TIPO_MOVIMIENTO,
                FCN_ID_CONCEPTO_MOV AS FCN_ID_CONCEPTO_MOVIMIENTO,
@@ -138,8 +139,8 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
                'M' AS FTC_BD_ORIGEN
         FROM TTAFOGRAL_MOV_SAR
         WHERE FTD_FEH_LIQUIDACION BETWEEN :start AND :end
-        """, "TTHECHOS_MOVIMIENTO", term=term_id, params={"start": start_month, "end": end_month}, limit=1)
-        extract_dataset_polars(get_mit_url(), postgres, """
+        """, table, term=term_id, params={"start": start_month, "end": end_month})
+        extract_dataset_spark(configure_mit_spark, configure_postgres_spark, """
         SELECT FTN_NUM_CTA_INVDUAL AS FCN_CUENTA,
                FCN_ID_TIPO_MOV AS FCN_ID_TIPO_MOVIMIENTO,
                FCN_ID_CONCEPTO_MOV AS FCN_ID_CONCEPTO_MOVIMIENTO,
@@ -152,20 +153,16 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
                'M' AS FTC_BD_ORIGEN
         FROM TTAFOGRAL_MOV_VIV
         WHERE FTD_FEH_LIQUIDACION BETWEEN :start AND :end
-        """, "TTHECHOS_MOVIMIENTO", term=term_id, params={"start": start_month, "end": end_month}, limit=1)
+        """, table, term=term_id, params={"start": start_month, "end": end_month})
 
         # Cifras de control
         report = html_reporter.generate(
             postgres,
             """
-            SELECT "FTO_INDICADORES"->>'34' AS generacion,
-                   "FTO_INDICADORES"->>'21' AS vigencia,
-                   CASE
-                       WHEN "FTO_INDICADORES"->>'3' = 'Asignado' THEN 'Asignado'
-                       WHEN "FTO_INDICADORES"->>'4' = 'Pensionado' THEN 'Pensionado'
-                       WHEN "FTO_INDICADORES"->>'3' = 'Afiliado' THEN 'Afiliado'
-                   END AS tipo_afiliado,
-                   "FTO_INDICADORES"->>'33' AS tipo_cliente,
+            SELECT i."FTC_GENERACION",
+                   i."FTC_VIGENCIA",
+                   i."FTC_ORIGEN",
+                   i."FTC_TIPO_CLIENTE",
                    mc."FTC_DESCRIPCION",
                    COUNT(DISTINCT c."FTN_CUENTA") AS clientes,
                    SUM(m."FTF_MONTO_PESOS") AS importe
@@ -174,14 +171,10 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
                 INNER JOIN "TCDATMAE_MOVIMIENTO_CONSAR" mc on pc."FCN_ID_MOVIMIENTO_CONSAR" = mc."FTN_ID_MOVIMIENTO_CONSAR"
                 INNER JOIN "TCDATMAE_CLIENTE" c on m."FCN_CUENTA" = c."FTN_CUENTA"
                 INNER JOIN "TCHECHOS_CLIENTE" i ON c."FTN_CUENTA" = i."FCN_CUENTA" AND i."FCN_ID_PERIODO" = :term
-            GROUP BY "FTO_INDICADORES"->>'34',
-                     "FTO_INDICADORES"->>'21',
-                     CASE
-                         WHEN "FTO_INDICADORES"->>'3' = 'Asignado' THEN 'Asignado'
-                         WHEN "FTO_INDICADORES"->>'4' = 'Pensionado' THEN 'Pensionado'
-                         WHEN "FTO_INDICADORES"->>'3' = 'Afiliado' THEN 'Afiliado'
-                     END,
-                     "FTO_INDICADORES"->>'33',
+            GROUP BY i."FTC_GENERACION",
+                     i."FTC_VIGENCIA",
+                     i."FTC_ORIGEN",
+                     i."FTC_TIPO_CLIENTE",
                      mc."FTC_DESCRIPCION"
             """,
             ["Tipo Generación", "Vigencia", "Tipo Formato", "Indicador Afiliación", "SIEFORE"],
@@ -191,7 +184,7 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
 
         notify(
             postgres,
-            "Cifras de control Comisiones generadas",
+            "Cifras de control movimientos generadas",
             "Se han generado las cifras de control para comisiones exitosamente",
             report,
             term=term_id,

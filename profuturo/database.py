@@ -18,7 +18,7 @@ def use_pools(phase: int, *pools: Engine):
 
         for pool in pools:
             try:
-                conns.append(stack.enter_context(pool.begin()))
+                conns.append(stack.enter_context(pool.connect()))
             except OperationalError as e:
                 raise ProfuturoException("DATABASE_CONNECTION_ERROR", phase) from e
 
@@ -99,6 +99,7 @@ def get_postgres_pool():
     return sqlalchemy.create_engine(
         "postgresql+psycopg2://",
         creator=get_postgres_conn,
+        execution_options={"isolation_level": "AUTOCOMMIT"},
     )
 
 

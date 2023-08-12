@@ -129,9 +129,11 @@ def notify(conn: Connection, title: str, message: str = None, details: str = Non
 
 def truncate_table(conn: Connection, table: str, term: int = None) -> None:
     try:
+        print(f"Truncating {table}...")
         if term:
             conn.execute(text(f'DELETE FROM "{table}" WHERE "FCN_ID_PERIODO" = :term'), {"term": term})
         else:
             conn.execute(text(f'TRUNCATE "{table}"'))
+        print(f"Truncated {table}!")
     except Exception as e:
         raise ProfuturoException.from_exception(e, term) from e

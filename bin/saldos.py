@@ -53,9 +53,9 @@ with define_extraction(phase, postgres_pool, postgres_pool) as (postgres, _):
         GROUP BY SH.FTN_NUM_CTA_INVDUAL, SH.FCN_ID_SIEFORE, SH.FCN_ID_TIPO_SUBCTA, SH.FTD_FEH_LIQUIDACION
         """
 
-        truncate_table(postgres, 'THHECHOS_SALDO_HISTORICO', term=term_id)
-        extract_dataset_spark(configure_mit_spark, configure_postgres_spark, query, 'THHECHOS_SALDO_HISTORICO', term=term_id, params={"date": start_month, "type": "I"})
-        extract_dataset_spark(configure_mit_spark, configure_postgres_spark, query, 'THHECHOS_SALDO_HISTORICO', term=term_id, params={"date": end_month, "type": "F"})
+        truncate_table(postgres, "THHECHOS_SALDO_HISTORICO", term=term_id)
+        extract_dataset_spark(configure_mit_spark, configure_postgres_spark, query, '"HECHOS"."THHECHOS_SALDO_HISTORICO"', term=term_id, params={"date": start_month, "type": "I"})
+        extract_dataset_spark(configure_mit_spark, configure_postgres_spark, query, '"HECHOS"."THHECHOS_SALDO_HISTORICO"', term=term_id, params={"date": end_month, "type": "F"})
 
         # Cifras de control
         report = html_reporter.generate(
