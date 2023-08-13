@@ -260,6 +260,19 @@ def upsert_dataset(
 
     print(f"Done upserting {table}!")
 
+def read_table_insert_temp_view(
+        origin_configurator: Callable[[DataFrameReader], DataFrameReader],
+        query: str,
+        view: str,
+        params: Dict[str, Any] = None
+):
+    spark = _get_spark_session()
+    print("EXTRACCIÓN")
+    df = _create_spark_dataframe(spark, origin_configurator, query, params)
+    print("DONE")
+    df.createTempView(view)
+    print("DONE VIEW")
+
 
 def _get_spark_session() -> SparkSession:
     return SparkSession.builder \
