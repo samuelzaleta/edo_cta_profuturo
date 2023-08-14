@@ -159,26 +159,22 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
         report = html_reporter.generate(
             postgres,
             """
-            SELECT i."FTC_GENERACION",
-                   i."FTC_VIGENCIA",
-                   i."FTC_ORIGEN",
-                   i."FTC_TIPO_CLIENTE",
-                   mc."FTC_DESCRIPCION",
-                   COUNT(DISTINCT c."FTN_CUENTA") AS clientes,
-                   SUM(m."FTF_MONTO_PESOS") AS importe
-            FROM "TTHECHOS_MOVIMIENTO" m
-                INNER JOIN "TTGESPRO_MOV_PROFUTURO_CONSAR" pc ON m."FCN_ID_TIPO_MOVIMIENTO" = pc."FCN_ID_MOVIMIENTO_PROFUTURO"
-                INNER JOIN "TCDATMAE_MOVIMIENTO_CONSAR" mc on pc."FCN_ID_MOVIMIENTO_CONSAR" = mc."FTN_ID_MOVIMIENTO_CONSAR"
-                INNER JOIN "TCDATMAE_CLIENTE" c on m."FCN_CUENTA" = c."FTN_CUENTA"
-                INNER JOIN "TCHECHOS_CLIENTE" i ON c."FTN_CUENTA" = i."FCN_CUENTA" AND i."FCN_ID_PERIODO" = :term
-            GROUP BY i."FTC_GENERACION",
-                     i."FTC_VIGENCIA",
-                     i."FTC_ORIGEN",
-                     i."FTC_TIPO_CLIENTE",
-                     mc."FTC_DESCRIPCION"
+            SELECT G."FTC_DESCRIPCION_CORTA" AS GENERACION,
+                   I."FTC_VIGENCIA" AS VIGENCIA,
+                   I."FTC_TIPO_CLIENTE" AS TIPO_CLIENTE,
+                   I."FTC_ORIGEN" AS ORIGEN,
+                   MC."FTC_DESCRIPCION" AS CONSAR,
+                   COUNT(DISTINCT M."FCN_CUENTA") AS CLIENTES,
+                   SUM(M."FTF_MONTO_PESOS") AS IMPORTE
+            FROM "TTHECHOS_MOVIMIENTO" M
+                INNER JOIN "TCHECHOS_CLIENTE" I ON M."FCN_CUENTA" = i."FCN_CUENTA" AND i."FCN_ID_PERIODO" = :term
+                INNER JOIN "TCGESPRO_GENERACION" G ON I."FTC_GENERACION" = G."FTN_ID_GENERACION"::varchar
+                INNER JOIN "TTGESPRO_MOV_PROFUTURO_CONSAR" PC ON M."FCN_ID_TIPO_MOVIMIENTO" = PC."FCN_ID_MOVIMIENTO_PROFUTURO"
+                INNER JOIN "TCDATMAE_MOVIMIENTO_CONSAR" MC ON PC."FCN_ID_MOVIMIENTO_CONSAR" = mc."FTN_ID_MOVIMIENTO_CONSAR"
+            GROUP BY G."FTC_DESCRIPCION_CORTA", I."FTC_VIGENCIA", I."FTC_TIPO_CLIENTE", I."FTC_ORIGEN", MC."FTC_DESCRIPCION"
             """,
-            ["Tipo Generación", "Vigencia", "Tipo Formato", "Indicador Afiliación", "SIEFORE"],
-            ["Registros", "Comisiones"],
+            ["Tipo Generación", "Vigencia", "Tipo Formato", "Indicador Afiliación", "CONSAR"],
+            ["Registros", "Importe"],
             params={"term": term_id},
         )
 

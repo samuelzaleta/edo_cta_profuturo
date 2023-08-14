@@ -54,44 +54,41 @@ with define_extraction(phase, postgres_pool, postgres_pool) as (postgres, _):
         """
 
         truncate_table(postgres, "THHECHOS_SALDO_HISTORICO", term=term_id)
-        extract_dataset_spark(configure_mit_spark, configure_postgres_spark, query, '"HECHOS"."THHECHOS_SALDO_HISTORICO"', term=term_id, params={"date": start_month, "type": "I"})
-        extract_dataset_spark(configure_mit_spark, configure_postgres_spark, query, '"HECHOS"."THHECHOS_SALDO_HISTORICO"', term=term_id, params={"date": end_month, "type": "F"})
+        extract_dataset_spark(
+            configure_mit_spark,
+            configure_postgres_spark,
+            query,
+            '"HECHOS"."THHECHOS_SALDO_HISTORICO"',
+            term=term_id,
+            params={"date": start_month, "type": "I"},
+        )
+        extract_dataset_spark(
+            configure_mit_spark,
+            configure_postgres_spark,
+            query,
+            '"HECHOS"."THHECHOS_SALDO_HISTORICO"',
+            term=term_id,
+            params={"date": end_month, "type": "F"},
+        )
 
         # Cifras de control
         report = html_reporter.generate(
             postgres,
             """
-            SELECT "FTO_INDICADORES"->>'34' AS generacion,
-                   "FTO_INDICADORES"->>'21' AS vigencia,
-                   CASE
-                       WHEN "FTO_INDICADORES"->>'3' = 'Asignado' THEN 'Asignado'
-                       WHEN "FTO_INDICADORES"->>'4' = 'Pensionado' THEN 'Pensionado'
-                       WHEN "FTO_INDICADORES"->>'3' = 'Afiliado' THEN 'Afiliado'
-                   END AS tipo_afiliación,
-                   "FTO_INDICADORES"->>'33' AS tipo_cliente,
-                   ts."FCC_VALOR" AS subcuenta,
-                   s."FTC_DESCRIPCION" AS siefore,
-                   COUNT(*) AS clientes,
-                   SUM(CASE sh."FTC_TIPO_SALDO" WHEN 'I' THEN sh."FTF_SALDO_DIA" ELSE 0 END) AS saldo_inicial,
-                   SUM(CASE sh."FTC_TIPO_SALDO" WHEN 'F' THEN sh."FTF_SALDO_DIA" ELSE 0 END) AS saldo_final
-            FROM "THHECHOS_SALDO_HISTORICO" sh
-                INNER JOIN "TCDATMAE_TIPO_SUBCUENTA" ts ON sh."FCN_ID_TIPO_SUBCTA" = ts."FTN_ID_TIPO_SUBCTA"
-                INNER JOIN "TCDATMAE_SIEFORE" s ON sh."FCN_ID_SIEFORE" = s."FTN_ID_SIEFORE"
-                INNER JOIN "TCDATMAE_CLIENTE" c ON sh."FCN_CUENTA" = c."FTN_CUENTA"
-                INNER JOIN "TCHECHOS_CLIENTE" i ON c."FTN_CUENTA" = i."FCN_CUENTA" AND i."FCN_ID_PERIODO" = :term
-            GROUP BY "FTO_INDICADORES"->>'34',
-                     "FTO_INDICADORES"->>'21',
-                     CASE
-                         WHEN "FTO_INDICADORES"->>'3' = 'Asignado' THEN 'Asignado'
-                         WHEN "FTO_INDICADORES"->>'4' = 'Pensionado' THEN 'Pensionado'
-                         WHEN "FTO_INDICADORES"->>'3' = 'Afiliado' THEN 'Afiliado'
-                     END,
-                     "FTO_INDICADORES"->>'33',
-                     ts."FCC_VALOR",
-                     s."FTC_DESCRIPCION"
+            SELECT TS."FCC_VALOR" AS TIPO_SUBCUENTA,
+                   S."FTC_DESCRIPCION_CORTA" AS SIEFORE,
+                   SUM(CASE WHEN SH."FTC_TIPO_SALDO" = 'I' THEN SH."FTF_SALDO_DIA" ELSE 0 END) AS SALDO_INICIAL_PESOS,
+                   SUM(CASE WHEN SH."FTC_TIPO_SALDO" = 'F' THEN SH."FTF_SALDO_DIA" ELSE 0 END) AS SALDO_FINAL_PESOS,
+                   SUM(CASE WHEN SH."FTC_TIPO_SALDO" = 'I' THEN SH."FTN_DIA_ACCIONES" ELSE 0 END) AS SALDO_INICIAL_ACCIONES,
+                   SUM(CASE WHEN SH."FTC_TIPO_SALDO" = 'F' THEN SH."FTN_DIA_ACCIONES" ELSE 0 END) AS SALDO_FINAL_ACCIONES
+            FROM "THHECHOS_SALDO_HISTORICO" SH
+                INNER JOIN "TCDATMAE_TIPO_SUBCUENTA" TS ON SH."FCN_ID_TIPO_SUBCTA" = TS."FTN_ID_TIPO_SUBCTA"
+                INNER JOIN "TCDATMAE_SIEFORE" S ON SH."FCN_ID_SIEFORE" = S."FTN_ID_SIEFORE"
+            WHERE "FCN_ID_PERIODO" = :term
+            GROUP BY TS."FCC_VALOR", S."FTC_DESCRIPCION_CORTA"
             """,
-            ["Tipo Generación", "Vigencia", "Tipo Formato", "Indicador Afiliación", "Sub Cuenta", "SIEFORE"],
-            ["Clientes", "Saldo inicial", "Saldo final"],
+            ["Sub cuenta", "SIEFORE"],
+            ["Saldo inicial en pesos", "Saldo final en pesos", "Saldo inicial en acciones", "Saldo final en acciones"],
             params={"term": term_id},
         )
 

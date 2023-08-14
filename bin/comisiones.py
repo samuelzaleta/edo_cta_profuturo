@@ -30,39 +30,27 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
                FTF_MONTO_PESOS
         FROM TTAFOGRAL_MOV_CMS
         WHERE FTD_FEH_LIQUIDACION BETWEEN :start AND :end
-        """, "TTHECHOS_COMISION", term=term_id, params={"start": date(2022, 9, 1), "end": date(2022, 9, 30)})
+        """, "TTHECHOS_COMISION", term=term_id, params={"start": start_month, "end": end_month})
 
         # Cifras de control
         report = html_reporter.generate(
             postgres,
             """
-            SELECT "FTO_INDICADORES"->>'34' AS generacion,
-                   "FTO_INDICADORES"->>'21' AS vigencia,
-                   CASE
-                       WHEN "FTO_INDICADORES"->>'3' = 'Asignado' THEN 'Asignado'
-                       WHEN "FTO_INDICADORES"->>'4' = 'Pensionado' THEN 'Pensionado'
-                       WHEN "FTO_INDICADORES"->>'3' = 'Afiliado' THEN 'Afiliado'
-                   END AS tipo_afiliado,
-                   "FTO_INDICADORES"->>'33' AS tipo_cliente,
-                   s."FTC_DESCRIPCION" AS siefore,
-                   COUNT(*) AS clientes,
-                   SUM("FTF_MONTO_PESOS") AS comisiones
-            FROM "TTHECHOS_COMISION" mc
-                LEFT JOIN "TCDATMAE_SIEFORE" s ON mc."FCN_ID_SIEFORE" = s."FTN_ID_SIEFORE"
-                INNER JOIN "TCDATMAE_CLIENTE" c ON mc."FCN_CUENTA" = c."FTN_CUENTA"
-                INNER JOIN "TCHECHOS_CLIENTE" i ON c."FTN_CUENTA" = i."FCN_CUENTA" AND i."FCN_ID_PERIODO" = :term
-            GROUP BY "FTO_INDICADORES"->>'34',
-                     "FTO_INDICADORES"->>'21',
-                     CASE
-                         WHEN "FTO_INDICADORES"->>'3' = 'Asignado' THEN 'Asignado'
-                         WHEN "FTO_INDICADORES"->>'4' = 'Pensionado' THEN 'Pensionado'
-                         WHEN "FTO_INDICADORES"->>'3' = 'Afiliado' THEN 'Afiliado'
-                     END,
-                     "FTO_INDICADORES"->>'33',
-                     s."FTC_DESCRIPCION"
+            SELECT G."FTC_DESCRIPCION_CORTA" AS GENERACION,
+                   I."FTC_VIGENCIA" AS VIGENCIA,
+                   I."FTC_TIPO_CLIENTE" AS TIPO_CLIENTE,
+                   I."FTC_ORIGEN" AS ORIGEN,
+                   S."FTC_DESCRIPCION_CORTA" AS SIEFORE,
+                   SUM(C."FTF_MONTO_PESOS") AS COMISIONES
+            FROM "TTHECHOS_COMISION" C
+                INNER JOIN "TCHECHOS_CLIENTE" I ON C."FCN_CUENTA" = I."FCN_CUENTA" AND C."FCN_ID_PERIODO" = I."FCN_ID_PERIODO"
+                INNER JOIN "TCGESPRO_GENERACION" G ON I."FTC_GENERACION" = G."FTN_ID_GENERACION"::varchar
+                INNER JOIN "TCDATMAE_SIEFORE" S ON C."FCN_ID_SIEFORE" = S."FTN_ID_SIEFORE"
+            WHERE C."FCN_ID_PERIODO" = :term
+            GROUP BY G."FTC_DESCRIPCION_CORTA", I."FTC_VIGENCIA", I."FTC_TIPO_CLIENTE", I."FTC_ORIGEN", S."FTC_DESCRIPCION_CORTA"
             """,
             ["Tipo Generación", "Vigencia", "Tipo Formato", "Indicador Afiliación", "SIEFORE"],
-            ["Registros", "Comisiones"],
+            ["Comisiones"],
             params={"term": term_id},
         )
 
