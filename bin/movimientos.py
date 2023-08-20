@@ -19,7 +19,7 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
 
     with register_time(postgres_pool, phase, term=term_id):
         # Extracción
-        truncate_table(postgres, 'TTHECHOS_MOVIMIENTO', term=term_id)
+        #truncate_table(postgres, 'TTHECHOS_MOVIMIENTO', term=term_id)
         extract_dataset_spark(configure_mit_spark, configure_postgres_spark, """
         SELECT DT.FTN_NUM_CTA_INVDUAL AS FCN_CUENTA,
                DT.FCN_ID_TIPO_MOV AS FCN_ID_TIPO_MOVIMIENTO,
@@ -156,10 +156,10 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
         """, table, term=term_id, params={"start": start_month, "end": end_month})
 
         # Cifras de control
-        report = html_reporter.generate(
+        report1 = html_reporter.generate(
             postgres,
             """
-            SELECT G."FTC_DESCRIPCION_CORTA" AS GENERACION,
+            SELECT I."FTC_GENERACION" AS GENERACION,
                    I."FTC_VIGENCIA" AS VIGENCIA,
                    I."FTC_TIPO_CLIENTE" AS TIPO_CLIENTE,
                    I."FTC_ORIGEN" AS ORIGEN,
@@ -168,12 +168,32 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
                    SUM(M."FTF_MONTO_PESOS") AS IMPORTE
             FROM "TTHECHOS_MOVIMIENTO" M
                 INNER JOIN "TCHECHOS_CLIENTE" I ON M."FCN_CUENTA" = i."FCN_CUENTA" AND i."FCN_ID_PERIODO" = :term
-                INNER JOIN "TCGESPRO_GENERACION" G ON I."FTC_GENERACION" = G."FTN_ID_GENERACION"::varchar
                 INNER JOIN "TTGESPRO_MOV_PROFUTURO_CONSAR" PC ON M."FCN_ID_TIPO_MOVIMIENTO" = PC."FCN_ID_MOVIMIENTO_PROFUTURO"
                 INNER JOIN "TCDATMAE_MOVIMIENTO_CONSAR" MC ON PC."FCN_ID_MOVIMIENTO_CONSAR" = mc."FTN_ID_MOVIMIENTO_CONSAR"
             GROUP BY G."FTC_DESCRIPCION_CORTA", I."FTC_VIGENCIA", I."FTC_TIPO_CLIENTE", I."FTC_ORIGEN", MC."FTC_DESCRIPCION"
             """,
-            ["Tipo Generación", "Vigencia", "Tipo Formato", "Indicador Afiliación", "CONSAR"],
+            ["Tipo Generación", "Vigencia", "Tipo Cliente", "Indicador Afiliación", "CONSAR"],
+            ["Registros", "Importe"],
+            params={"term": term_id},
+        )
+
+        report2 = html_reporter.generate(
+            postgres,
+            """
+            SELECT I."FTC_GENERACION" AS GENERACION,
+                   I."FTC_VIGENCIA" AS VIGENCIA,
+                   I."FTC_TIPO_CLIENTE" AS TIPO_CLIENTE,
+                   I."FTC_ORIGEN" AS ORIGEN,
+                   MC."FTC_DESCRIPCION" AS CONSAR,
+                   COUNT(DISTINCT M."FCN_CUENTA") AS CLIENTES,
+                   SUM(M."FTF_MONTO_PESOS") AS IMPORTE
+            FROM "TTHECHOS_MOVIMIENTO" M
+                INNER JOIN "TCHECHOS_CLIENTE" I ON M."FCN_CUENTA" = i."FCN_CUENTA" AND i."FCN_ID_PERIODO" = :term
+                INNER JOIN "TTGESPRO_MOV_PROFUTURO_CONSAR" PC ON M."FCN_ID_TIPO_MOVIMIENTO" = PC."FCN_ID_MOVIMIENTO_PROFUTURO"
+                INNER JOIN "TCDATMAE_MOVIMIENTO_CONSAR" MC ON PC."FCN_ID_MOVIMIENTO_CONSAR" = mc."FTN_ID_MOVIMIENTO_CONSAR"
+            GROUP BY G."FTC_DESCRIPCION_CORTA", I."FTC_VIGENCIA", I."FTC_TIPO_CLIENTE", I."FTC_ORIGEN", MC."FTC_DESCRIPCION"
+            """,
+            ["Tipo Generación", "Vigencia", "Tipo Cliente", "Indicador Afiliación", "CONSAR"],
             ["Registros", "Importe"],
             params={"term": term_id},
         )
@@ -182,7 +202,16 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
             postgres,
             "Cifras de control movimientos generadas",
             "Se han generado las cifras de control para comisiones exitosamente",
-            report,
+            report1,
             term=term_id,
             control=True,
         )
+        notify(
+            postgres,
+            "Cifras de control movimientos generadas",
+            "Se han generado las cifras de control para comisiones exitosamente",
+            report2,
+            term=term_id,
+            control=True,
+        )
+
