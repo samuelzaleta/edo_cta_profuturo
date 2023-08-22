@@ -79,6 +79,7 @@ with define_extraction(phase, postgres_pool, buc_pool) as (postgres, buc):
             f":curp_{i}", f":rfc_{i}",
         ], "TCDATMAE_CLIENTE")
 
+        # Extracción
         truncate_table(postgres, "TCHECHOS_CLIENTE", term=term_id)
         read_table_insert_temp_view(configure_mit_spark, """
         SELECT DISTINCT(IND.FTN_NUM_CTA_INVDUAL) AS FCN_CUENTA,
@@ -153,7 +154,7 @@ with define_extraction(phase, postgres_pool, buc_pool) as (postgres, buc):
                'AFORE' /*2 AFORE */ AS FCC_VALOR
         FROM cierren.thafogral_saldo_historico_v2 SH
         INNER JOIN TIPO_SUBCUENTA TS ON TS.FCN_ID_TIPO_SUBCTA = SH.FCN_ID_TIPO_SUBCTA
-        WHERE TS.FCC_VALOR LIKE '%SAR%' OR TS.FCC_VALOR LIKE '%92%'        
+        WHERE TS.FCC_VALOR LIKE '%SAR%' OR TS.FCC_VALOR LIKE '%92%'
         """, "generacion_afore")
         spark.sql("select count(*) as count_generacion_afore from generacion_afore").show()
 
@@ -203,7 +204,7 @@ with define_extraction(phase, postgres_pool, buc_pool) as (postgres, buc):
             LEFT JOIN indicador_vigencia v ON o.FCN_CUENTA = v.FCN_CUENTA
             LEFT JOIN indicador_bono b ON o.FCN_CUENTA = b.FCN_CUENTA
         """)
-        df = df.withColumn("FTO_INDICADORES", lit(None))
+        df = df.withColumn("FTO_INDICADORES", to_json(struct(lit('{}'))))
         df.show(2)
         df = df.dropDuplicates(["FCN_CUENTA"])
         _write_spark_dataframe(df, configure_postgres_spark, '"HECHOS"."TCHECHOS_CLIENTE"')
