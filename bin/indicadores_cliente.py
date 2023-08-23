@@ -3,13 +3,16 @@ from profuturo.database import get_postgres_pool, configure_mit_spark, configure
 from profuturo.extraction import _get_spark_session, _write_spark_dataframe, read_table_insert_temp_view
 from profuturo.reporters import HtmlReporter
 from profuturo.extraction import extract_terms
+from pyspark.sql.functions import lit, to_json, struct
 import sys
+import json
 
 html_reporter = HtmlReporter()
 postgres_pool = get_postgres_pool()
 phase = int(sys.argv[1])
 
-with (define_extraction(phase, postgres_pool, postgres_pool) as (postgres, _)):
+
+with define_extraction(phase, postgres_pool, postgres_pool) as (postgres, _):
     term = extract_terms(postgres, phase)
     term_id = term["id"]
     start_month = term["start_month"]
@@ -19,12 +22,12 @@ with (define_extraction(phase, postgres_pool, postgres_pool) as (postgres, _)):
         spark = _get_spark_session()
 
         # Extracción
-        #truncate_table(postgres, 'TCHECHOS_CLIENTE', term=term_id)
+        truncate_table(postgres, "TCHECHOS_CLIENTE", term=term_id)
         read_table_insert_temp_view(configure_mit_spark, """
-        SELECT IND.FTN_NUM_CTA_INVDUAL AS FCN_CUENTA,
+        SELECT DISTINCT(IND.FTN_NUM_CTA_INVDUAL) AS FCN_CUENTA,
                CASE IND.FCC_VALOR_IND
-                   WHEN '1' THEN 1
-                   WHEN '0' THEN 0
+                   WHEN '1' THEN 'TRUE'
+                   WHEN '0' THEN 'FALSE'
                END AS FCC_VALOR
         FROM TTAFOGRAL_IND_CTA_INDV IND
         INNER JOIN tfafogral_config_indi CONF ON IND.FFN_ID_CONFIG_INDI = CONF.FFN_ID_CONFIG_INDI
@@ -34,12 +37,12 @@ with (define_extraction(phase, postgres_pool, postgres_pool) as (postgres, _)):
         spark.sql("select count(*) as count_indicador_pension from indicador_pension").show()
 
         read_table_insert_temp_view(configure_mit_spark, """
-        SELECT IND.FTN_NUM_CTA_INVDUAL AS FCN_CUENTA,
+        SELECT DISTINCT IND.FTN_NUM_CTA_INVDUAL AS FCN_CUENTA,
                CASE IND.FCC_VALOR_IND
-                   WHEN '66' THEN 66 --'IMSS'
-                   WHEN '67' THEN 67 --'ISSSTE'
-                   WHEN '68' THEN 68 --'INDEPENDIENTE'
-                   WHEN '69' THEN 69 --'MIXTO'
+                   WHEN '66' THEN 'IMSS'
+                   WHEN '67' THEN 'ISSSTE'
+                   WHEN '68' THEN 'INDEPENDIENTE'
+                   WHEN '69' THEN 'MIXTO'
                END AS FCC_VALOR
         FROM TTAFOGRAL_IND_CTA_INDV IND
         INNER JOIN tfafogral_config_indi CONF ON IND.FFN_ID_CONFIG_INDI = CONF.FFN_ID_CONFIG_INDI
@@ -47,12 +50,13 @@ with (define_extraction(phase, postgres_pool, postgres_pool) as (postgres, _)):
           AND FTC_VIGENCIA= 1
         """, "indicador_origen")
         spark.sql("select count(*) as count_indicador_origen from indicador_origen").show()
+        spark.sql("select * from indicador_origen").show(20)
 
         read_table_insert_temp_view(configure_mit_spark, """
-        SELECT IND.FTN_NUM_CTA_INVDUAL AS FCN_CUENTA,
+        SELECT DISTINCT IND.FTN_NUM_CTA_INVDUAL AS FCN_CUENTA,
                CASE IND.FCC_VALOR_IND
-                   WHEN '713' THEN 713 --'Asignado'
-                   WHEN '714' THEN 714 --'Afiliado'
+                   WHEN '713' THEN 'Asignado'
+                   WHEN '714' THEN 'Afiliado'
                END AS FCC_VALOR
         FROM TTAFOGRAL_IND_CTA_INDV IND
         INNER JOIN tfafogral_config_indi CONF ON IND.FFN_ID_CONFIG_INDI = CONF.FFN_ID_CONFIG_INDI
@@ -60,12 +64,13 @@ with (define_extraction(phase, postgres_pool, postgres_pool) as (postgres, _)):
           AND FTC_VIGENCIA= 1
         """, "indicador_tipo_cliente")
         spark.sql("select count(*) as count_indicador_tipo_cliente from indicador_tipo_cliente").show()
+        spark.sql("select * from indicador_tipo_cliente").show(20)
 
         read_table_insert_temp_view(configure_mit_spark, """
-        SELECT IND.FTN_NUM_CTA_INVDUAL AS FCN_CUENTA,
+        SELECT DISTINCT IND.FTN_NUM_CTA_INVDUAL AS FCN_CUENTA,
                CASE IND.FCC_VALOR_IND 
-                   WHEN '1' THEN 1 --'V'
-                   WHEN '0' THEN 0 --'N'
+                   WHEN '1' THEN 'V'
+                   WHEN '0' THEN 'N'
                END AS FCC_VALOR
         FROM TTAFOGRAL_IND_CTA_INDV IND
         INNER JOIN tfafogral_config_indi CONF ON IND.FFN_ID_CONFIG_INDI = CONF.FFN_ID_CONFIG_INDI
@@ -75,7 +80,7 @@ with (define_extraction(phase, postgres_pool, postgres_pool) as (postgres, _)):
         spark.sql("select count(*) as count_indicador_vigencia from indicador_vigencia").show()
 
         read_table_insert_temp_view(configure_mit_spark, """
-        SELECT DISTINCT FTN_NUM_CTA_INVDUAL AS FCN_CUENTA, 1 /* TRUE */ AS FCC_VALOR
+        SELECT DISTINCT FTN_NUM_CTA_INVDUAL AS FCN_CUENTA, 'TRUE' /* TRUE */ AS FCC_VALOR
         FROM CIERREN.THAFOGRAL_SALDO_HISTORICO_V2
         WHERE FCN_ID_SIEFORE = 81
         """, "indicador_bono")
@@ -88,10 +93,10 @@ with (define_extraction(phase, postgres_pool, postgres_pool) as (postgres, _)):
             INNER JOIN THCRXGRAL_CAT_CATALOGO C ON TS.FCN_ID_CAT_SUBCTA = C.FCN_ID_CAT_CATALOGO
         )
         SELECT DISTINCT SH.FTN_NUM_CTA_INVDUAL AS FCN_CUENTA,
-               2 /* AFORE */ AS FCC_VALOR
+               'AFORE' /*2 AFORE */ AS FCC_VALOR
         FROM cierren.thafogral_saldo_historico_v2 SH
         INNER JOIN TIPO_SUBCUENTA TS ON TS.FCN_ID_TIPO_SUBCTA = SH.FCN_ID_TIPO_SUBCTA
-        WHERE TS.FCC_VALOR LIKE '%SAR%' OR TS.FCC_VALOR LIKE '%92%'        
+        WHERE TS.FCC_VALOR LIKE '%SAR%' OR TS.FCC_VALOR LIKE '%92%'
         """, "generacion_afore")
         spark.sql("select count(*) as count_generacion_afore from generacion_afore").show()
 
@@ -102,7 +107,7 @@ with (define_extraction(phase, postgres_pool, postgres_pool) as (postgres, _)):
             INNER JOIN THCRXGRAL_CAT_CATALOGO C ON TS.FCN_ID_CAT_SUBCTA = C.FCN_ID_CAT_CATALOGO
         )
         SELECT DISTINCT SH.FTN_NUM_CTA_INVDUAL AS FCN_CUENTA,
-               3 /* TRANSICION */ AS FCC_VALOR
+               'TRANSICION' /* 3 TRANSICION */ AS FCC_VALOR
         FROM cierren.thafogral_saldo_historico_v2 SH
             INNER JOIN TIPO_SUBCUENTA TS ON TS.FCN_ID_TIPO_SUBCTA = SH.FCN_ID_TIPO_SUBCTA
         WHERE TS.FCC_VALOR NOT LIKE '%SAR%' OR TS.FCC_VALOR NOT LIKE '%92%'
@@ -121,19 +126,19 @@ with (define_extraction(phase, postgres_pool, postgres_pool) as (postgres, _)):
             
             UNION ALL
             
-            SELECT FCN_CUENTA, 4 /* MIXTO */ AS FCC_VALOR 
+            SELECT FCN_CUENTA, 'MIXTO' /* 4 MIXTO */ AS FCC_VALOR 
             FROM indicador_origen ori
             WHERE FCC_VALOR = 69
         )
-        SELECT o.FCN_CUENTA,
-               {term_id} AS FCN_ID_PERIDO,
-               coalesce(p.FCC_VALOR, 0) AS FTB_PENSION, 
+        SELECT DISTINCT o.FCN_CUENTA,
+               {term_id} AS FCN_ID_PERIODO,
+               coalesce(cast(p.FCC_VALOR AS BOOLEAN), cast('FALSE' as BOOLEAN)) AS FTB_PENSION, 
                t.FCC_VALOR AS  FTC_TIPO_CLIENTE,
                o.FCC_VALOR AS FTC_ORIGEN,
                v.FCC_VALOR AS FTC_VIGENCIA,
                g.FCC_VALOR AS FTC_GENERACION,
-               '{{}}' as FTO_INDICADORES,
-               coalesce(b.FCC_VALOR, 0) AS FTC_BONO
+               coalesce(cast(p.FCC_VALOR AS BOOLEAN), cast('FALSE' as BOOLEAN))  AS FTB_BONO
+               --JSON_OBJECT('Vigencia', v.FCC_VALOR, 'Generacion', g.FCC_VALOR) AS FTO_INDICADORES
         FROM indicador_origen o
             LEFT JOIN indicador_generacion g ON o.FCN_CUENTA = g.FCN_CUENTA
             LEFT JOIN indicador_tipo_cliente t ON o.FCN_CUENTA = t.FCN_CUENTA
@@ -141,13 +146,33 @@ with (define_extraction(phase, postgres_pool, postgres_pool) as (postgres, _)):
             LEFT JOIN indicador_vigencia v ON o.FCN_CUENTA = v.FCN_CUENTA
             LEFT JOIN indicador_bono b ON o.FCN_CUENTA = b.FCN_CUENTA
         """)
+        df = df.withColumn("FTO_INDICADORES", to_json(struct(lit('{}'))))
         df.show(2)
-        _write_spark_dataframe(df, configure_postgres_spark, "TCHECHOS_CLIENTE")
+        df = df.dropDuplicates(["FCN_CUENTA"])
+        _write_spark_dataframe(df, configure_postgres_spark, '"HECHOS"."TCHECHOS_CLIENTE"')
+
+        # Cifras de control
+        report = html_reporter.generate(
+            postgres,
+            """
+             SELECT I."FTC_GENERACION" AS GENERACION,
+               I."FTC_VIGENCIA" AS VIGENCIA,
+               I."FTC_TIPO_CLIENTE" AS TIPO_CLIENTE,
+               I."FTC_ORIGEN" AS ORIGEN,
+               COUNT(DISTINCT I."FCN_CUENTA") AS CLIENTES
+        FROM "HECHOS"."TCHECHOS_CLIENTE" I
+         WHERE I."FCN_ID_PERIODO" = 27
+        GROUP BY I."FTC_GENERACION", I."FTC_VIGENCIA", I."FTC_TIPO_CLIENTE", I."FTC_ORIGEN"
+             """,
+            ["Tipo Generación", "Vigencia", "Tipo Cliente", "Indicador Afiliación"],
+            ["Clientes"],
+            params={"term": term_id},
+        )
 
         notify(
             postgres,
             "Clientes ingestados",
             "Se han ingestado los clientes de forma exitosa",
+            report,
             term=term_id,
         )
-
