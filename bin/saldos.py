@@ -113,7 +113,7 @@ with define_extraction(phase, postgres_pool, postgres_pool) as (postgres, _):
             WHERE "FCN_ID_PERIODO" = :term
             GROUP BY TS."FCC_VALOR", S."FTC_DESCRIPCION_CORTA"
             """,
-            ["SIEFORE"],
+            ["TIPO_SUBCUENTA","SIEFORE"],
             ["Saldo inicial en pesos", "Saldo final en pesos", "Saldo inicial en acciones", "Saldo final en acciones"],
             params={"term": term_id},
         )
