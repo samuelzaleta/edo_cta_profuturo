@@ -115,6 +115,50 @@ def extract_dataset(
     print(df_pd.info())
 
 
+def extract_dataset_write_view_spark(
+    origin: Connection,
+    query: str,
+    table: str,
+    term: int = None,
+    params: Dict[str, Any] = None,
+    limit: int = None,
+    transform: Callable[[PandasDataFrame], PandasDataFrame] = None,
+):
+    spark = _get_spark_session()
+
+    if params is None:
+        params = {}
+    if limit is not None:
+        if table in sub_anverso_tables():
+            f"SELECT Q.* FROM ({query}) AS Q LIMIT :limit"
+            params["limit"] = limit
+        else:
+            query = f"SELECT * FROM ({query}) WHERE ROWNUM <= :limit"
+            params["limit"] = limit
+
+    print(f"Extracting {table}...")
+
+    try:
+        df_pd = pd.read_sql_query(text(query), origin, params=params)
+        df_pd = df_pd.rename(columns=str.upper)
+
+        if term:
+            df_pd = df_pd.assign(FCN_ID_PERIODO=term)
+        if table in sub_anverso_tables():
+            df_pd = df_pd.assign(FTD_FECHAHORA_ALTA=datetime.now())
+
+        if transform is not None:
+            df_pd = transform(df_pd)
+
+        df_spark = spark.createDataFrame(df_pd)
+        df_spark.createOrReplaceTempView(table)
+
+        print("DONE VIEW")
+
+    except Exception as e:
+        raise ProfuturoException.from_exception(e, term) from e
+
+
 def extract_dataset_spark(
     origin_configurator: Callable[[DataFrameReader], DataFrameReader],
     destination_configurator: Callable[[DataFrameWriter], DataFrameWriter],
@@ -150,6 +194,8 @@ def extract_dataset_spark(
             df_sp = transform(df_sp)
             print("Done transforming dataframe!")
 
+        print("Count:", df_sp.count())
+        df_sp.show(10)
         print("Writing dataframe...")
         print("Schema", df_sp.schema)
         _write_spark_dataframe(df_sp, destination_configurator, table)
@@ -158,7 +204,6 @@ def extract_dataset_spark(
         raise ProfuturoException.from_exception(e, term) from e
 
     print(f"Done extracting {table}!")
-    print(df_sp.show())
 
 
 def extract_dataset_polars(
@@ -278,12 +323,13 @@ def read_table_insert_temp_view(
     print("DONE VIEW")
 
 
+
 def _get_spark_session() -> SparkSession:
     return SparkSession.builder \
         .master('local[*]') \
         .appName("profuturo") \
-        .config("spark.executor.memory", "34g") \
-        .config("spark.driver.memory", "34g") \
+        .config("spark.executor.memory", "32g") \
+        .config("spark.driver.memory", "32g") \
         .config("spark.executor.instances", "5") \
         .config("spark.default.parallelism", "900") \
         .getOrCreate()
@@ -293,8 +339,8 @@ def _create_spark_dataframe(spark: SparkSession, connection_configurator, query:
     return connection_configurator(spark.read) \
         .format("jdbc") \
         .option("dbtable", f"({_replace_query_params(query, params)}) dataset") \
-        .option("numPartitions", 50) \
-        .option("fetchsize", 20000) \
+        .option("numPartitions", 80) \
+        .option("fetchsize", 100000) \
         .load()
 
 
@@ -302,8 +348,13 @@ def _write_spark_dataframe(df: SparkDataFrame, connection_configurator, table: s
     connection_configurator(df.write) \
         .format("jdbc") \
         .mode("append") \
+        .option("numPartitions", "20") \
+        .option("fetchsize", "100000") \
+        .option("batchsize", "100000") \
         .option("dbtable", f'{table}') \
         .save()
+    spark = _get_spark_session()
+    spark.stop()
 
 
 def _deduplicate_records(records: Sequence[Row]):

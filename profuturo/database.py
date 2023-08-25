@@ -57,10 +57,10 @@ def get_postgres_conn():
 
 
 def get_integrity_conn(database: str):
-    host = os.getenv("INTEGRITY_HOST")
-    port = int(os.getenv("INTEGRITY_PORT"))
-    user = os.getenv("INTEGRITY_USER")
-    password = os.getenv("INTEGRITY_PASSWORD")
+    host = '130.40.30.144' #os.getenv("INTEGRITY_HOST")
+    port = int(1714) #int(os.getenv("INTEGRITY_PORT"))
+    user = 'SIEFORE' #os.getenv("INTEGRITY_USER")
+    password = 'SIEFORE2019' #os.getenv("INTEGRITY_PASSWORD")
 
     return lambda: jaydebeapi.connect(
         "oracle.rdb.jdbc.rdbThin.Driver",
