@@ -1,6 +1,6 @@
 from profuturo.common import truncate_table, notify, register_time, define_extraction
 from profuturo.database import get_postgres_pool, get_mit_pool, configure_mit_spark, configure_postgres_spark
-from profuturo.extraction import extract_terms, extract_dataset, extract_dataset_spark
+from profuturo.extraction import extract_terms, extract_dataset_spark
 from profuturo.reporters import HtmlReporter
 import sys
 

@@ -1,4 +1,4 @@
-from typing import Union
+from typing import Union, Callable
 from pyspark.sql import DataFrameReader, DataFrameWriter
 from sqlalchemy.exc import OperationalError
 from sqlalchemy import Engine
@@ -9,6 +9,10 @@ import sqlalchemy
 import oracledb
 import psycopg2
 import os
+
+
+SparkConnection = Union[DataFrameReader, DataFrameWriter]
+SparkConnectionConfigurator = Callable[[SparkConnection], SparkConnection]
 
 
 @contextmanager
@@ -103,7 +107,7 @@ def get_postgres_pool():
     )
 
 
-def configure_mit_spark(connection: Union[DataFrameReader, DataFrameWriter]) -> Union[DataFrameReader, DataFrameWriter]:
+def configure_mit_spark(connection: SparkConnection) -> SparkConnection:
     host = os.getenv("MIT_HOST")
     port = int(os.getenv("MIT_PORT"))
     service_name = os.getenv("MIT_DATABASE")
@@ -118,7 +122,7 @@ def configure_mit_spark(connection: Union[DataFrameReader, DataFrameWriter]) -> 
         .option("password", password)
 
 
-def configure_buc_spark(connection: Union[DataFrameReader, DataFrameWriter]) -> Union[DataFrameReader, DataFrameWriter]:
+def configure_buc_spark(connection: SparkConnection) -> SparkConnection:
     host = os.getenv("BUC_HOST")
     port = int(os.getenv("BUC_PORT"))
     service_name = os.getenv("BUC_DATABASE")
@@ -133,7 +137,21 @@ def configure_buc_spark(connection: Union[DataFrameReader, DataFrameWriter]) -> 
         .option("password", password)
 
 
-def configure_postgres_spark(connection: Union[DataFrameReader, DataFrameWriter]) -> Union[DataFrameReader, DataFrameWriter]:
+def configure_integrity_spark(database: str) -> SparkConnectionConfigurator:
+    host = '130.40.30.144'
+    port = int(1714)
+    user = 'SIEFORE'
+    password = 'SIEFORE2019'
+
+    return lambda connection: connection \
+        .option("url", f"jdbc:rdbThin://{host}:{port}/mexico$base:{database}") \
+        .option("driver", "oracle.rdb.jdbc.rdbThin.Driver") \
+        .option("oracle.jdbc.timezoneAsRegion", False) \
+        .option("user", user) \
+        .option("password", password)
+
+
+def configure_postgres_spark(connection: SparkConnection) -> SparkConnection:
     host = os.getenv("POSTGRES_HOST")
     port = int(os.getenv("POSTGRES_PORT"))
     database = os.getenv("POSTGRES_DATABASE")
@@ -154,7 +172,7 @@ def get_mit_url():
     service_name = os.getenv("MIT_DATABASE")
     user = os.getenv("MIT_USER")
     password = os.getenv("MIT_PASSWORD")
-    
+
     return f"oracle://{user}:{password}@{host}:{port}/{service_name}"
 
 
@@ -164,7 +182,7 @@ def get_buc_url():
     service_name = os.getenv("BUC_DATABASE")
     user = os.getenv("BUC_USER")
     password = os.getenv("BUC_PASSWORD")
-    
+
     return f"oracle://{user}:{password}@{host}:{port}/{service_name}"
 
 
@@ -174,5 +192,5 @@ def get_postgres_url():
     database = os.getenv("POSTGRES_DATABASE")
     user = os.getenv("POSTGRES_USER")
     password = os.getenv("POSTGRES_PASSWORD")
-    
+
     return f'postgresql://{user}:{password}@{host}:{port}/{database}'

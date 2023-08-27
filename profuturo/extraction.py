@@ -1,14 +1,12 @@
-from pyspark.sql import SparkSession, DataFrame as SparkDataFrame, DataFrameReader, DataFrameWriter
+from pyspark.sql import SparkSession, DataFrame as SparkDataFrame
 from pyspark.sql.functions import lit
 from sqlalchemy import text, Connection, Row
 from pandas import DataFrame as PandasDataFrame
 from typing import Dict, Any, List, Callable, Sequence
 from datetime import datetime, date, time
 from numbers import Number
-
-from .common import truncate_table
+from .database import SparkConnectionConfigurator
 from .exceptions import ProfuturoException
-from ._helpers import sub_anverso_tables, group_by
 import calendar
 import sys
 import pandas as pd
@@ -45,8 +43,8 @@ def extract_terms(conn: Connection, phase: int) -> Dict[str, Any]:
 
 
 def update_indicator_spark(
-    origin_configurator: Callable[[DataFrameReader], DataFrameReader],
-    destination_configurator: Callable[[DataFrameWriter], DataFrameWriter],
+    origin_configurator: SparkConnectionConfigurator,
+    destination_configurator: SparkConnectionConfigurator,
     query: str,
     term: int = None,
     params: Dict[str, Any] = None,
@@ -79,12 +77,8 @@ def extract_dataset(
     if params is None:
         params = {}
     if limit is not None:
-        if table in sub_anverso_tables():
-            f"SELECT Q.* FROM ({query}) AS Q LIMIT :limit"
-            params["limit"] = limit
-        else:
-            query = f"SELECT * FROM ({query}) WHERE ROWNUM <= :limit"
-            params["limit"] = limit
+        query = f"SELECT * FROM ({query}) WHERE ROWNUM <= :limit"
+        params["limit"] = limit
 
     print(f"Extracting {table}...")
 
@@ -94,8 +88,6 @@ def extract_dataset(
 
         if term:
             df_pd = df_pd.assign(FCN_ID_PERIODO=term)
-        if table in sub_anverso_tables():
-            df_pd = df_pd.assign(FTD_FECHAHORA_ALTA=datetime.now())
 
         if transform is not None:
             df_pd = transform(df_pd)
@@ -129,12 +121,8 @@ def extract_dataset_write_view_spark(
     if params is None:
         params = {}
     if limit is not None:
-        if table in sub_anverso_tables():
-            f"SELECT Q.* FROM ({query}) AS Q LIMIT :limit"
-            params["limit"] = limit
-        else:
-            query = f"SELECT * FROM ({query}) WHERE ROWNUM <= :limit"
-            params["limit"] = limit
+        query = f"SELECT * FROM ({query}) WHERE ROWNUM <= :limit"
+        params["limit"] = limit
 
     print(f"Extracting {table}...")
 
@@ -144,8 +132,6 @@ def extract_dataset_write_view_spark(
 
         if term:
             df_pd = df_pd.assign(FCN_ID_PERIODO=term)
-        if table in sub_anverso_tables():
-            df_pd = df_pd.assign(FTD_FECHAHORA_ALTA=datetime.now())
 
         if transform is not None:
             df_pd = transform(df_pd)
@@ -160,8 +146,8 @@ def extract_dataset_write_view_spark(
 
 
 def extract_dataset_spark(
-    origin_configurator: Callable[[DataFrameReader], DataFrameReader],
-    destination_configurator: Callable[[DataFrameWriter], DataFrameWriter],
+    origin_configurator: SparkConnectionConfigurator,
+    destination_configurator: SparkConnectionConfigurator,
     query: str,
     table: str,
     term: int = None,
@@ -219,12 +205,8 @@ def extract_dataset_polars(
     if params is None:
         params = {}
     if limit is not None:
-        if table in sub_anverso_tables():
-            query = f"SELECT Q.* FROM ({query}) AS Q LIMIT :limit"
-            params["limit"] = limit
-        else:
-            query = f"SELECT * FROM ({query}) WHERE ROWNUM <= :limit"
-            params["limit"] = limit
+        query = f"SELECT * FROM ({query}) WHERE ROWNUM <= :limit"
+        params["limit"] = limit
 
     print(f"Extracting {table}...")
 
@@ -234,8 +216,6 @@ def extract_dataset_polars(
 
         if term:
             df_pl = df_pl.with_columns(pl.lit(term).alias("FCN_ID_PERIODO"))
-        if table in sub_anverso_tables():
-            df_pl = df_pl.with_columns(pl.lit(datetime.now()).alias("FTD_FECHAHORA_ALTA"))
 
         df_pd = df_pl.to_pandas(use_pyarrow_extension_array=True)
 
@@ -307,7 +287,7 @@ def upsert_dataset(
 
 
 def read_table_insert_temp_view(
-    origin_configurator: Callable[[DataFrameReader], DataFrameReader],
+    origin_configurator: SparkConnectionConfigurator,
     query: str,
     view: str,
     params: Dict[str, Any] = None
@@ -321,7 +301,6 @@ def read_table_insert_temp_view(
     print("DONE")
     df.createTempView(view)
     print("DONE VIEW")
-
 
 
 def _get_spark_session() -> SparkSession:
