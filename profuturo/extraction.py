@@ -1,6 +1,6 @@
 from pyspark.sql import SparkSession, DataFrame as SparkDataFrame
-from pyspark.sql.functions import lit
-from sqlalchemy import text, Connection, Row
+from pyspark.sql.functions import lit, array
+from sqlalchemy import text, Connection, Row, RowMapping
 from pandas import DataFrame as PandasDataFrame
 from typing import Dict, Any, List, Callable, Sequence
 from datetime import datetime, date, time
@@ -46,19 +46,31 @@ def update_indicator_spark(
     origin_configurator: SparkConnectionConfigurator,
     destination_configurator: SparkConnectionConfigurator,
     query: str,
+    indicator: RowMapping,
     term: int = None,
     params: Dict[str, Any] = None,
     limit: int = None,
 ):
+    def transform(df: SparkDataFrame) -> SparkDataFrame:
+        return df \
+            .withColumn('FCN_ID_INDICADOR', lit(indicator["FTN_ID_INDICADOR"])) \
+            .withColumn('FTN_EVALUA_INDICADOR', lit(
+                (indicator["FTB_DISPONIBLE"] << 3) +
+                (indicator["FTB_IMPRESION"] << 2) +
+                (indicator["FTB_ENVIO"] << 1) +
+                indicator["FTB_GENERACION"]
+            ))
+
     try:
         extract_dataset_spark(
             origin_configurator,
             destination_configurator,
             query,
-            '"HECHOS"."TCHECHOS_INDICADOR"',
+            '"HECHOS"."TCHECHOS_CLIENTE_INDICADOR"',
             term=term,
             params=params,
-            limit=limit
+            limit=limit,
+            transform=transform,
         )
     except Exception as e:
         raise ProfuturoException("TABLE_SWITCH_ERROR", term) from e
