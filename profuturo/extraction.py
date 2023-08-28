@@ -1,5 +1,5 @@
 from pyspark.sql import SparkSession, DataFrame as SparkDataFrame
-from pyspark.sql.functions import lit, array
+from pyspark.sql.functions import lit
 from sqlalchemy import text, Connection, Row, RowMapping
 from pandas import DataFrame as PandasDataFrame
 from typing import Dict, Any, List, Callable, Sequence

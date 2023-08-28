@@ -1,7 +1,7 @@
 from sqlalchemy import text
 from profuturo.common import register_time, define_extraction, truncate_table
-from profuturo.database import SparkConnectionConfigurator, get_postgres_pool, configure_mit_spark, configure_postgres_spark, configure_buc_spark, configure_integrity_spark
-from profuturo.extraction import update_indicator_spark
+from profuturo.database import SparkConnectionConfigurator, get_postgres_pool, configure_mit_spark, configure_postgres_spark, configure_buc_spark, configure_integrity_spark, configure_bigquery_spark
+from profuturo.extraction import update_indicator_spark, extract_dataset_spark
 from profuturo.reporters import HtmlReporter
 from profuturo.extraction import extract_terms
 import sys
@@ -51,3 +51,24 @@ with define_extraction(phase, postgres_pool, postgres_pool) as (postgres, _):
                 update_indicator_spark(origin_configurator, configure_postgres_spark, query, indicator._mapping, term=term_id)
 
             print(f"Done extracting {indicator[1]}!")
+
+        extract_dataset_spark(
+            configure_postgres_spark,
+            configure_bigquery_spark,
+            f"""
+            SELECT "FCN_CUENTA",
+                   "FCN_ID_PERIODO",
+                   ("FTN_EVALUA_INDICADOR" & 8) >> 3 AS FTB_DISPONIBLE,
+                   ("FTN_EVALUA_INDICADOR" & 4) >> 2 AS FTB_IMPRESION,
+                   ("FTN_EVALUA_INDICADOR" & 2) >> 1 AS FTB_ENVIO,
+                   "FTN_EVALUA_INDICADOR" & 1 AS FTB_GENERACION
+            FROM (
+                SELECT "FCN_CUENTA", "FCN_ID_PERIODO", bit_and("FTN_EVALUA_INDICADOR") AS "FTN_EVALUA_INDICADOR"
+                FROM "HECHOS"."TCHECHOS_CLIENTE_INDICADOR"
+                WHERE "FCN_ID_PERIODO" = :term
+                GROUP BY "FCN_CUENTA", "FCN_ID_PERIODO"
+            ) AS temp
+            """,
+            'cifras_control.TEST_INDICADORES',
+            term=term_id,
+        )
