@@ -8,12 +8,14 @@ import sys
 html_reporter = HtmlReporter()
 postgres_pool = get_postgres_pool()
 phase = int(sys.argv[1])
+print("argumento 1",int(sys.argv[1]))
 
 with define_extraction(phase, postgres_pool, postgres_pool) as (postgres, _):
     term = extract_terms(postgres, phase)
     term_id = term["id"]
-    start_month = term["start_month"]
-    end_month = term["end_month"]
+    print(term_id)
+    end_saldos = term["end_saldos"]
+    valor_accion = term["valor_accion"]
 
     with register_time(postgres_pool, phase, term=term_id):
         # Extracción
@@ -24,7 +26,7 @@ with define_extraction(phase, postgres_pool, postgres_pool) as (postgres, _):
                SH.FTD_FEH_LIQUIDACION,
                :type AS FTC_TIPO_SALDO,
                MAX(VA.FCD_FEH_ACCION) AS FCD_FEH_ACCION,
-               SUM(SH.FTN_DIA_ACCIONES) AS FTN_DIA_ACCIONES,
+               SUM(SH.FTN_DIA_ACCIONES) AS FTF_DIA_ACCIONES,
                SUM(SH.FTN_DIA_ACCIONES * VA.FCN_VALOR_ACCION) AS FTF_SALDO_DIA
         FROM cierren.thafogral_saldo_historico_v2 SH
         INNER JOIN cierren.TCCRXGRAL_TIPO_SUBCTA R ON R.FCN_ID_TIPO_SUBCTA = SH.FCN_ID_TIPO_SUBCTA
@@ -46,7 +48,7 @@ with define_extraction(phase, postgres_pool, postgres_pool) as (postgres, _):
             SELECT ROW_NUMBER() OVER(PARTITION BY FCN_ID_SIEFORE, FCN_ID_REGIMEN ORDER BY FCD_FEH_ACCION DESC) AS ROW_NUM,
                    FCN_ID_SIEFORE, FCN_ID_REGIMEN, FCN_VALOR_ACCION, FCD_FEH_ACCION
             FROM cierren.TCAFOGRAL_VALOR_ACCION
-            WHERE FCD_FEH_ACCION <= :date
+            WHERE FCD_FEH_ACCION <= :accion
         ) VA ON SH.FCN_ID_SIEFORE = VA.FCN_ID_SIEFORE
             AND R.FCN_ID_REGIMEN = VA.FCN_ID_REGIMEN
             AND VA.ROW_NUM = 1
@@ -60,15 +62,7 @@ with define_extraction(phase, postgres_pool, postgres_pool) as (postgres, _):
             query,
             '"HECHOS"."THHECHOS_SALDO_HISTORICO"',
             term=term_id,
-            params={"date": start_month, "type": "I"},
-        )
-        extract_dataset_spark(
-            configure_mit_spark,
-            configure_postgres_spark,
-            query,
-            '"HECHOS"."THHECHOS_SALDO_HISTORICO"',
-            term=term_id,
-            params={"date": end_month, "type": "F"},
+            params={"date": end_saldos, "type": "F", "accion": valor_accion},
         )
 
         # Cifras de control
@@ -82,9 +76,9 @@ with define_extraction(phase, postgres_pool, postgres_pool) as (postgres, _):
                 I."FTC_ORIGEN" AS ORIGEN,
                 TS."FCC_VALOR" AS TIPO_SUBCUENTA,
                 S."FTC_DESCRIPCION_CORTA" AS SIEFORE,
-                ROUND(SUM(CASE WHEN SH."FTC_TIPO_SALDO" = 'I' THEN SH."FTF_SALDO_DIA" ELSE 0 END)::numeric,2) AS SALDO_INICIAL_PESOS,
+                --ROUND(SUM(CASE WHEN SH."FTC_TIPO_SALDO" = 'I' THEN SH."FTF_SALDO_DIA" ELSE 0 END)::numeric,2) AS SALDO_INICIAL_PESOS,
                 ROUND(SUM(CASE WHEN SH."FTC_TIPO_SALDO" = 'F' THEN SH."FTF_SALDO_DIA" ELSE 0 END)::numeric,2)AS SALDO_FINAL_PESOS,
-                ROUND(SUM(CASE WHEN SH."FTC_TIPO_SALDO" = 'I' THEN SH."FTN_DIA_ACCIONES" ELSE 0 END)::numeric,6) AS SALDO_INICIAL_ACCIONES,
+                --ROUND(SUM(CASE WHEN SH."FTC_TIPO_SALDO" = 'I' THEN SH."FTN_DIA_ACCIONES" ELSE 0 END)::numeric,6) AS SALDO_INICIAL_ACCIONES,
                 ROUND(SUM(CASE WHEN SH."FTC_TIPO_SALDO" = 'F' THEN SH."FTN_DIA_ACCIONES" ELSE 0 END)::numeric,6) AS SALDO_FINAL_ACCIONES
             FROM "HECHOS"."THHECHOS_SALDO_HISTORICO" SH
             INNER JOIN "HECHOS"."TCHECHOS_CLIENTE" I ON SH."FCN_CUENTA" = I."FCN_CUENTA"
@@ -94,7 +88,7 @@ with define_extraction(phase, postgres_pool, postgres_pool) as (postgres, _):
             GROUP BY TS."FCC_VALOR", S."FTC_DESCRIPCION_CORTA",I."FTC_GENERACION" , I."FTC_VIGENCIA", I."FTC_TIPO_CLIENTE", I."FTC_ORIGEN"
             """,
             ["Generación", "Vigencia", "tipo_cliente", "Origen", "Sub cuenta", "SIEFORE"],
-            ["Saldo inicial en pesos", "Saldo final en pesos", "Saldo inicial en acciones", "Saldo final en acciones"],
+            ["Saldo final en pesos", "Saldo final en acciones"],
             params={"term": term_id},
         )
 
@@ -103,9 +97,9 @@ with define_extraction(phase, postgres_pool, postgres_pool) as (postgres, _):
             """
             SELECT TS."FCC_VALOR" AS TIPO_SUBCUENTA,
                    S."FTC_DESCRIPCION_CORTA" AS SIEFORE,
-                   ROUND(SUM(CASE WHEN SH."FTC_TIPO_SALDO" = 'I' THEN SH."FTF_SALDO_DIA" ELSE 0 END)::numeric,2) AS SALDO_INICIAL_PESOS,
+                   --ROUND(SUM(CASE WHEN SH."FTC_TIPO_SALDO" = 'I' THEN SH."FTF_SALDO_DIA" ELSE 0 END)::numeric,2) AS SALDO_INICIAL_PESOS,
                    ROUND(SUM(CASE WHEN SH."FTC_TIPO_SALDO" = 'F' THEN SH."FTF_SALDO_DIA" ELSE 0 END)::numeric,2)AS SALDO_FINAL_PESOS,
-                   ROUND(SUM(CASE WHEN SH."FTC_TIPO_SALDO" = 'I' THEN SH."FTN_DIA_ACCIONES" ELSE 0 END)::numeric,6) AS SALDO_INICIAL_ACCIONES,
+                   --ROUND(SUM(CASE WHEN SH."FTC_TIPO_SALDO" = 'I' THEN SH."FTN_DIA_ACCIONES" ELSE 0 END)::numeric,6) AS SALDO_INICIAL_ACCIONES,
                    ROUND(SUM(CASE WHEN SH."FTC_TIPO_SALDO" = 'F' THEN SH."FTN_DIA_ACCIONES" ELSE 0 END)::numeric,6) AS SALDO_FINAL_ACCIONES
             FROM "HECHOS"."THHECHOS_SALDO_HISTORICO" SH
                 INNER JOIN "MAESTROS"."TCDATMAE_TIPO_SUBCUENTA" TS ON SH."FCN_ID_TIPO_SUBCTA" = TS."FTN_ID_TIPO_SUBCTA"
@@ -114,7 +108,7 @@ with define_extraction(phase, postgres_pool, postgres_pool) as (postgres, _):
             GROUP BY TS."FCC_VALOR", S."FTC_DESCRIPCION_CORTA"
             """,
             ["TIPO_SUBCUENTA","SIEFORE"],
-            ["Saldo inicial en pesos", "Saldo final en pesos", "Saldo inicial en acciones", "Saldo final en acciones"],
+            ["Saldo final en pesos", "Saldo final en acciones"],
             params={"term": term_id},
         )
 
@@ -125,6 +119,7 @@ with define_extraction(phase, postgres_pool, postgres_pool) as (postgres, _):
             report1,
             term=term_id,
             control=True,
+            user= int(sys.argv[3])
         )
 
         notify(
@@ -134,4 +129,5 @@ with define_extraction(phase, postgres_pool, postgres_pool) as (postgres, _):
             report2,
             term=term_id,
             control=True,
+            user=int(sys.argv[3])
         )

@@ -233,4 +233,5 @@ with define_extraction(phase, postgres_pool, buc_pool) as (postgres, buc):
             "Se han ingestado los clientes de forma exitosa",
             report,
             term=term_id,
+            user=int(sys.argv[3])
         )

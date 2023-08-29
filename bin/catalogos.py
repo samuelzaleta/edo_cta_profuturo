@@ -51,11 +51,12 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
         ON CONFLICT ("FTN_ID_MOVIMIENTO_PROFUTURO", "FTN_MONPES") DO UPDATE 
         SET "FCN_ID_TIPO_SUBCUENTA" = EXCLUDED."FCN_ID_TIPO_SUBCUENTA", "FTC_ORIGEN" = EXCLUDED."FTC_ORIGEN",
             "FTC_DESCRIPCION" = EXCLUDED."FTC_DESCRIPCION"
-        """, lambda i: [f":cod_mov_{i}", f":monpes_{i}", f":tipo_subcta_{i}", "'INTEGRITY'", f":description_{i}"], "TCGESPRO_MOVIMIENTO_PROFUTURO")
+        """, lambda i: [f":cod_mov_{i}", f":monpes_{i}", f":tipo_subcta_{i}", "'MIT'", f":description_{i}"], "TCGESPRO_MOVIMIENTO_PROFUTURO")
 
         notify(
             postgres,
             "Catálogos ingestados",
             "Se han ingestado los catálogos de forma exitosa",
             term=term_id,
+            user=int(sys.argv[3])
         )

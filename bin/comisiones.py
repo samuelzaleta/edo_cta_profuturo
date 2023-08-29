@@ -67,4 +67,5 @@ with define_extraction(phase, postgres_pool, postgres_pool) as (postgres, _):
             report,
             term=term_id,
             control=True,
+            user=int(sys.argv[3])
         )

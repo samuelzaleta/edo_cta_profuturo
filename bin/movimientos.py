@@ -213,5 +213,6 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
             report2,
             term=term_id,
             control=True,
+            user=int(sys.argv[3])
         )
 
