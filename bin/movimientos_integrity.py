@@ -80,8 +80,7 @@ with define_extraction(phase, postgres_pool, integrity_pool) as (postgres, integ
     WHERE "FTB_SWITCH" = TRUE
     AND "FTC_ORIGEN" in ('INTEGRITY')
     """))
-    cod_mov = cursor1.fetchall()
-    cod_movs = [x for x in cod_mov]
+    cod_movs = [cod_mov[0] for cod_mov in cursor1.fetchall()]
 
     #SWITCH
     cursor2: CursorResult = postgres.execute(text("""
@@ -107,9 +106,7 @@ with define_extraction(phase, postgres_pool, integrity_pool) as (postgres, integ
         FROM MOV_GOBIERNO
         WHERE CSIE1_FECCON >= :start
           AND CSIE1_FECCON <= :end
-          AND CSIE1_CODMOV  IN (
-              {cod_movs}
-          )
+          AND CSIE1_CODMOV IN ({','.join(cod_movs)})
         """, "TEST_MOVIMIENTOS", term=term_id, params={
             "start": start_month.strftime("%Y%m%d"),
             "end": end_month.strftime("%Y%m%d"),

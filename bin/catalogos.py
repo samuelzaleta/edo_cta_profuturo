@@ -38,20 +38,46 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
         """, lambda i: [f":id_{i}", f":regime_id_{i}", f":subacc_cat_id_{i}", f":description_{i}"], "TCDATMAE_TIPO_SUBCUENTA")
 
         upsert_dataset(mit, postgres, """
-        SELECT FFN_ID_CONCEPTO_MOV AS cod_mov, 0 AS monpes, S.FCN_ID_TIPO_SUBCTA AS tipo_subcta,
+        SELECT FFN_ID_CONCEPTO_MOV AS cod_mov,
+               COALESCE(FFN_POSICION_ITGY, 0) AS monpes,
+               S.FCN_ID_TIPO_SUBCTA AS tipo_subcta,
                FFC_DESCRIPCION_MIT AS description
         FROM CIERREN.TFCRXGRAL_CONFIG_MOV_ITGY M
         INNER JOIN TRAFOGRAL_MOV_SUBCTA S ON M.FRN_ID_MOV_SUBCTA = S.FRN_ID_MOV_SUBCTA
         --WHERE FFN_COD_MOV_ITGY IS NOT NULL AND FFN_POSICION_ITGY IS NOT NULL
         """, """
         INSERT INTO "TCGESPRO_MOVIMIENTO_PROFUTURO"(
-            "FTN_ID_MOVIMIENTO_PROFUTURO", "FTN_MONPES", "FCN_ID_TIPO_SUBCUENTA", "FTC_ORIGEN", "FTC_DESCRIPCION"
+            "FTN_ID_MOVIMIENTO_PROFUTURO", "FTN_MONPES", "FCN_ID_TIPO_SUBCUENTA", "FTC_ORIGEN", "FTC_DESCRIPCION",
+            "FTB_SWITCH"
         )
         VALUES (...)
         ON CONFLICT ("FTN_ID_MOVIMIENTO_PROFUTURO", "FTN_MONPES") DO UPDATE 
         SET "FCN_ID_TIPO_SUBCUENTA" = EXCLUDED."FCN_ID_TIPO_SUBCUENTA", "FTC_ORIGEN" = EXCLUDED."FTC_ORIGEN",
-            "FTC_DESCRIPCION" = EXCLUDED."FTC_DESCRIPCION"
-        """, lambda i: [f":cod_mov_{i}", f":monpes_{i}", f":tipo_subcta_{i}", "'MIT'", f":description_{i}"], "TCGESPRO_MOVIMIENTO_PROFUTURO")
+            "FTC_DESCRIPCION" = EXCLUDED."FTC_DESCRIPCION", "FTB_SWITCH" = EXCLUDED."FTB_SWITCH"
+        """, lambda i: [f":cod_mov_{i}", f":monpes_{i}", f":tipo_subcta_{i}", "'MIT'", f":description_{i}", "false"], "TCGESPRO_MOVIMIENTO_PROFUTURO")
+        upsert_dataset(mit, postgres, """
+        SELECT FFN_ID_CONCEPTO_MOV AS cod_mov,
+               COALESCE(FFN_POSICION_ITGY, 0) AS monpes,
+               S.FCN_ID_TIPO_SUBCTA AS tipo_subcta,
+               FFC_DESCRIPCION_MIT AS description
+        FROM CIERREN.TFCRXGRAL_CONFIG_MOV_ITGY M
+        INNER JOIN TRAFOGRAL_MOV_SUBCTA S ON M.FRN_ID_MOV_SUBCTA = S.FRN_ID_MOV_SUBCTA
+        --WHERE FFN_COD_MOV_ITGY IS NOT NULL AND FFN_POSICION_ITGY IS NOT NULL
+        WHERE FFN_COD_MOV_ITGY IN (
+            106, 109, 129, 210, 260, 405, 406, 410, 412, 413, 414, 416, 420, 421, 423, 424, 426, 430, 433, 436, 440, 
+            440, 441, 442, 443, 444, 446, 450, 452, 453, 453, 454, 454, 456, 470, 472, 474, 476, 610, 630, 710, 760, 
+            805, 806, 841
+        )
+        """, """
+        INSERT INTO "TCGESPRO_MOVIMIENTO_PROFUTURO"(
+            "FTN_ID_MOVIMIENTO_PROFUTURO", "FTN_MONPES", "FCN_ID_TIPO_SUBCUENTA", "FTC_ORIGEN", "FTC_DESCRIPCION",
+            "FTB_SWITCH"
+        )
+        VALUES (...)
+        ON CONFLICT ("FTN_ID_MOVIMIENTO_PROFUTURO", "FTN_MONPES") DO UPDATE 
+        SET "FCN_ID_TIPO_SUBCUENTA" = EXCLUDED."FCN_ID_TIPO_SUBCUENTA", "FTC_ORIGEN" = EXCLUDED."FTC_ORIGEN",
+            "FTC_DESCRIPCION" = EXCLUDED."FTC_DESCRIPCION", "FTB_SWITCH" = EXCLUDED."FTB_SWITCH"
+        """, lambda i: [f":cod_mov_{i}", f":monpes_{i}", f":tipo_subcta_{i}", "'INTEGRITY'", f":description_{i}", "true"], "TCGESPRO_MOVIMIENTO_PROFUTURO")
 
         notify(
             postgres,
