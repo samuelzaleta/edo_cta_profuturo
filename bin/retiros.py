@@ -1,9 +1,14 @@
-from profuturo.common import truncate_table, register_time, define_extraction
-from profuturo.database import get_postgres_pool, get_mit_pool, get_mit_url
-from profuturo.extraction import extract_terms, extract_dataset_polars
+from profuturo.common import truncate_table, register_time, define_extraction, notify
+from profuturo.database import get_postgres_pool, get_mit_pool, get_mit_url, configure_postgres_spark
+from profuturo.extraction import extract_terms, extract_dataset_polars, _get_spark_session, read_table_insert_temp_view
+from profuturo.reporters import HtmlReporter
+from pyspark.sql.functions import col
+from warnings import filterwarnings
 import sys
 
 
+filterwarnings(action='ignore', category=DeprecationWarning, message='`np.bool` is a deprecated alias')
+html_reporter = HtmlReporter()
 postgres_pool = get_postgres_pool()
 mit_pool = get_mit_pool()
 phase = int(sys.argv[1])
@@ -13,6 +18,7 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
     term_id = term["id"]
     start_month = term["start_month"]
     end_month = term["end_month"]
+    spark = _get_spark_session()
 
     with register_time(postgres_pool, phase, term=term_id):
         truncate_table(postgres, 'TEST_RETIROS', term=term_id)
@@ -36,7 +42,7 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
             WHERE ttls.FTB_IND_FOLIO_AGRUP = '1'
                 AND ttls.FCN_ID_ESTATUS = 6649
                 AND FCN_ID_PROCESO IN (4045, 4046, 4047, 4048, 4049, 4050, 4051)
-                AND TO_CHAR(ttls.FTD_FEH_CRE, 'YYYYMM') = '202304'
+                AND ttls.FTD_FEH_CRE BETWEEN :start AND :end
         ),
         MOVIMIENTOS AS (
             SELECT
@@ -79,7 +85,7 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
                 ttat.FTC_CVE_TIPO_PEN,
                 ttat.FTD_FEH_CRE
             FROM BENEFICIOS.TTAFORETI_TRAMITE ttat
-            WHERE TO_CHAR(ttat.FTD_FEH_CRE, 'YYYYMM') = '202304'
+            WHERE ttat.FTD_FEH_CRE BETWEEN :start AND :end
                 AND ttat.FTC_TIPO_TRAMITE NOT IN (314, 324, 341, 9542)
         ),
         LIQ_DIS AS (
@@ -120,7 +126,7 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
                 ttatr.FTC_REGIMEN,
                 ttatr.FTD_FEH_CRE
             FROM BENEFICIOS.TTAFORETI_TRANS_RETI ttatr
-            WHERE TO_CHAR(ttatr.FTD_FEH_CRE, 'YYYYMM') = '202304'
+            WHERE ttatr.FTD_FEH_CRE BETWEEN :start AND :end
          ),
         LIQ_DIS_TRA AS (
             SELECT
@@ -291,7 +297,7 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
             FROM BENEFICIOS.TTCRXGRAL_PAGO ttcp
             LEFT JOIN CIERREN.TCCRXGRAL_CAT_CATALOGO thccc
             ON ttcp.FCC_CVE_BANCO = thccc.FCN_ID_CAT_CATALOGO
-            WHERE TO_CHAR(ttcp.FTD_FEH_CRE, 'YYYYMM') = '202304'
+            WHERE ttcp.FTD_FEH_CRE BETWEEN :start AND :end
         ),
         DATOS_PAGO AS (
             SELECT
@@ -362,4 +368,89 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
         FROM LIQ_DIS_TRA_TSU_PTR ldttp
         LEFT JOIN DATOS_PAGO dpg
         ON ldttp.FTC_FOLIO = dpg.FTC_FOLIO_LIQUIDACION
-        """, "TEST_RETIROS", term=term_id)
+        """, "HECHOS"."TEST_RETIROS",
+        term=term_id,
+        params={"start": start_month, "end": end_month})
+
+        columnas = [
+            "FTC_FOLIO_LDTTP",
+            "FTC_FOLIO_REL",
+            "FCN_ID_PROCESO_LDTTP",
+            "FCN_ID_SUBPROCESO_LDTTP",
+            "FCN_ID_ESTATUS",
+            "TB_IND_FOLIO_AGRUP",
+            "FTC_NSS",
+            "FTC_CURP",
+            "FTD_FEH_CRE",
+            "FTC_USU_CRE",
+            "FTD_FEH_ACT",
+            "FTC_USU_ACT",
+            "FCN_ID_TIPO_SUBCTA",
+            "FCN_ID_SIEFORE",
+            "FTF_MONTO_PESOS",
+            "FTN_FOLIO_TRAMITE",
+            "FTC_TIPO_TRAMITE",
+            "FTC_TIPO_PRESTACION",
+            "FTC_CVE_REGIMEN",
+            "FTC_CVE_TIPO_SEG",
+            "FTC_CVE_TIPO_PEN",
+            "FTC_FOLIO_PROCESAR",
+            "FTC_FOLIO_TRANSACCION",
+            "FCC_TPSEGURO",
+            "FCC_TPPENSION",
+            "FTC_REGIMEN",
+            "FCN_ID_REGIMEN",
+            "FCN_ID_CAT_SUBCTA",
+            "FCN_ID_CAT_CATALOGO_LDTTP",
+            "FCC_LEY_PENSION",
+            "TMC_USO",
+            "TMN_ID_CONFIG",
+            "TMC_DESC_ITGY",
+            "TMN_CVE_ITGY",
+            "TMC_DESC_NCI",
+            "TMN_CVE_NCI",
+            "FTC_FOLIO_DPG",
+            "FCN_ID_PROCESO_DPG",
+            "FCN_ID_SUBPROCESO_DPG",
+            "FCN_TIPO_PAGO",
+            "FTC_FOLIO_LIQUIDACION",
+            "FCC_CVE_BANCO",
+            "FTN_ISR",
+            "FCN_ID_CAT_CATALOGO_DPG",
+            "FCC_TIPO_BANCO",
+            "FCC_MEDIO_PAGO"
+        ]
+        # Cifras de control
+        read_table_insert_temp_view(
+            configure_postgres_spark,
+            """
+            SELECT ROW_NUMBER() over (ORDER BY "FCN_CUENTA") id,
+            * 
+            FROM "HECHOS"."TEST_RETIROS"
+            """,
+            "retiros")
+        df = spark.sql("select * from retiros")
+
+        pandas_df = df.select(*[col(c).cast("string") for c in df.columns]).toPandas()
+
+        # Obtener el valor máximo de id
+        max_id = spark.sql("SELECT MAX(id) FROM retiros").collect()[0][0]
+
+        pandas_df['id'] = pandas_df['id'].astype(int)
+        # Dividir el resultado en tablas HTML de 50 en 50
+        batch_size = 100
+        for start in range(0, max_id, batch_size):
+            end = start + batch_size
+            batch_pandas_df = pandas_df[(pandas_df['id'] >= start) & (pandas_df['id'] < end)]
+            batch_html_table = batch_pandas_df.to_html(index=False)
+
+            # Enviar notificación con la tabla HTML de este lote
+            notify(
+                postgres,
+                f"Cifras de control Retiros generadas - Parte {start}-{end - 1}",
+                "Se han generado las cifras de control para retiros exitosamente",
+                batch_html_table,
+                term=term_id,
+                control=True,
+            )
+

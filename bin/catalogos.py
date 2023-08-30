@@ -14,6 +14,7 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
     term_id = term["id"]
 
     with register_time(postgres_pool, phase, term_id):
+
         upsert_dataset(mit, postgres, """
         SELECT S.FCN_ID_SIEFORE AS id, C.FCC_VALOR AS description
         FROM TCCRXGRAL_SIEFORE S
@@ -24,6 +25,7 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
         ON CONFLICT ("FTN_ID_SIEFORE") DO UPDATE 
         SET "FTC_DESCRIPCION_CORTA" = EXCLUDED."FTC_DESCRIPCION_CORTA"
         """, lambda i: [f":id_{i}", f":description_{i}"], "TCDATMAE_SIEFORE")
+
         upsert_dataset(mit, postgres, """
         SELECT S.FCN_ID_TIPO_SUBCTA AS id, S.FCN_ID_REGIMEN AS regime_id, S.FCN_ID_CAT_SUBCTA AS subacc_cat_id, 
                C.FCC_VALOR AS description
@@ -55,6 +57,7 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
         SET "FCN_ID_TIPO_SUBCUENTA" = EXCLUDED."FCN_ID_TIPO_SUBCUENTA", "FTC_ORIGEN" = EXCLUDED."FTC_ORIGEN",
             "FTC_DESCRIPCION" = EXCLUDED."FTC_DESCRIPCION", "FTB_SWITCH" = EXCLUDED."FTB_SWITCH"
         """, lambda i: [f":cod_mov_{i}", f":monpes_{i}", f":tipo_subcta_{i}", "'MIT'", f":description_{i}", "false"], "TCGESPRO_MOVIMIENTO_PROFUTURO")
+
         upsert_dataset(mit, postgres, """
         SELECT FFN_ID_CONCEPTO_MOV AS cod_mov,
                COALESCE(FFN_POSICION_ITGY, 0) AS monpes,
