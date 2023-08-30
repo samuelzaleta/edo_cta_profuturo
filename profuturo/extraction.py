@@ -16,6 +16,7 @@ import polars as pl
 def extract_terms(conn: Connection, phase: int) -> Dict[str, Any]:
     try:
         term_id = int(sys.argv[2])
+        print("argumento 2",int(sys.argv[2]))
         cursor = conn.execute(text("""
         SELECT "FTC_PERIODO"
         FROM "TCGESPRO_PERIODO"
@@ -33,9 +34,11 @@ def extract_terms(conn: Connection, phase: int) -> Dict[str, Any]:
             month_range = calendar.monthrange(year, month)
             start_month = date(year, month, 1)
             end_month = date(year, month, month_range[1])
+            end_saldos = date(year, month + 1,1)
+            valor_accion = date(year, month, month_range[1])
 
             print(f"Extracting period: from {start_month} to {end_month}")
-            return {"id": term_id, "start_month": start_month, "end_month": end_month}
+            return {"id": term_id, "start_month": start_month, "end_month": end_month, "valor_accion": valor_accion, "end_saldos": end_saldos}
 
         raise RuntimeError("Can not retrieve the term")
     except Exception as e:

@@ -58,5 +58,5 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
             "Catálogos ingestados",
             "Se han ingestado los catálogos de forma exitosa",
             term=term_id,
-            user=int(sys.argv[3])
+            area=int(sys.argv[4])
         )

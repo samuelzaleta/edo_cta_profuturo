@@ -17,6 +17,22 @@ class HtmlReporter:
     _current_totals: Dict[str, float]
     _html: str
 
+    def _append_header(self) -> None:
+        self._append_html("""
+        <table>
+        <thead>
+          <tr style="background-color: #004B8D; color: white;">
+        """)
+
+        for column in self._display_columns + self._value_columns:
+            self._append_html(f"<th>{column}</th>")
+
+        self._append_html("""
+          </tr>
+        </thead>
+        <tbody>
+        """)
+
     def generate(
         self,
         conn: Connection,

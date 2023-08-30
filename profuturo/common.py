@@ -111,20 +111,42 @@ def notify_exceptions(pool: Engine, phase: int):
 
 
 def notify(conn: Connection, title: str, message: str = None, details: str = None, term: int = None,
-           control: bool = False):
-    conn.execute(text("""
-    INSERT INTO "TTGESPRO_NOTIFICACION" (
-        "FTC_TITULO", "FTC_DETALLE_TEXTO", "FTC_DETALLE_BLOB", 
-        "FTB_CIFRAS_CONTROL", "FCN_ID_PERIODO", "FCN_ID_USUARIO"
-    )
-    VALUES (:title, :message, :details, :control, :term, 0)
-    """), {
-        "title": title,
-        "message": message,
-        "details": details,
-        "control": control,
-        "term": term,
-    })
+           control: bool = False, area: int = 0):
+    cursor = conn.execute(text(f"""
+    select
+        DISTINCT "FCN_ID_USUARIO"
+    from "MAESTROS"."TCDATMAE_AREA" ma
+    INNER JOIN "GESTOR"."TCGESPRO_ROL_AREA" ra
+    ON ma."FTN_ID_AREA" = ra."FCN_ID_AREA"
+    INNER JOIN "GESTOR"."TCGESPRO_ROL" rp
+    ON ra."FCN_ID_ROL" =  rp."FTN_ID_ROL"
+    inner join "GESTOR"."TCGESPRO_ROL_MENU_PRIVILEGIO" rmp
+    on rp."FTN_ID_ROL" = rmp."FCN_ID_ROL"
+    inner join "GESTOR"."TTGESPRO_ROL_USUARIO" ru
+    on ra."FCN_ID_ROL" = ru."FCN_ID_ROL"
+    INNER JOIN "GESTOR"."TCGESPRO_MENU_FUNCION" mf
+    on rmp."FCN_ID_MENU" =  mf."FTN_ID_FUNCION"
+    where
+    "FTN_ID_AREA" = {area}
+    and "FTN_ID_MENU" = 7
+    """))
+    if cursor.rowcount == 0:
+        raise ValueError("The area does not exist")
+    for row in cursor.fetchall():
+        conn.execute(text("""
+        INSERT INTO "TTGESPRO_NOTIFICACION" (
+            "FTC_TITULO", "FTC_DETALLE_TEXTO", "FTC_DETALLE_BLOB", 
+            "FTB_CIFRAS_CONTROL", "FCN_ID_PERIODO", "FCN_ID_USUARIO"
+        )
+        VALUES (:title, :message, :details, :control, :term, :user)
+        """), {
+            "title": title,
+            "message": message,
+            "details": details,
+            "control": control,
+            "term": term,
+            "user": row[0]
+        })
 
 
 def truncate_table(conn: Connection, table: str, term: int = None) -> None:
