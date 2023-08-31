@@ -1,7 +1,7 @@
 from profuturo.common import register_time, define_extraction, notify
 from profuturo.database import get_postgres_pool, get_mit_pool
-from profuturo.extraction import upsert_dataset
-from profuturo.extraction import extract_terms
+from profuturo.extraction import upsert_dataset, extract_terms, _get_spark_session
+from pyspark.sql.functions import col
 import sys
 
 
@@ -12,6 +12,7 @@ phase = int(sys.argv[1])
 with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
     term = extract_terms(postgres, phase)
     term_id = term["id"]
+    spark = _get_spark_session()
 
     with register_time(postgres_pool, phase, term_id):
 
@@ -81,6 +82,36 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
         SET "FCN_ID_TIPO_SUBCUENTA" = EXCLUDED."FCN_ID_TIPO_SUBCUENTA", "FTC_ORIGEN" = EXCLUDED."FTC_ORIGEN",
             "FTC_DESCRIPCION" = EXCLUDED."FTC_DESCRIPCION", "FTB_SWITCH" = EXCLUDED."FTB_SWITCH"
         """, lambda i: [f":cod_mov_{i}", f":monpes_{i}", f":tipo_subcta_{i}", "'INTEGRITY'", f":description_{i}", "true"], "TCGESPRO_MOVIMIENTO_PROFUTURO")
+
+        tables = ["TCDATMAE_SIEFORE", "TCDATMAE_TIPO_SUBCUENTA", "TCGESPRO_MOVIMIENTO_PROFUTURO"]
+        def print_html_tables(tables):
+            for table in tables:
+                df = spark.sql(f"select * from {table}")
+
+                pandas_df = df.select(*[col(c).cast("string") for c in df.columns]).toPandas()
+
+                # Obtener el valor máximo de id
+                max_id = spark.sql(f"SELECT MAX(id) FROM {table}").collect()[0][0]
+
+                pandas_df['id'] = pandas_df['id'].astype(int)
+                # Dividir el resultado en tablas HTML de 50 en 50
+                batch_size = 100
+                for start in range(0, max_id, batch_size):
+                    end = start + batch_size
+                    batch_pandas_df = pandas_df[(pandas_df['id'] >= start) & (pandas_df['id'] < end)]
+                    batch_html_table = batch_pandas_df.to_html(index=False)
+
+                    # Enviar notificación con la tabla HTML de este lote
+                    notify(
+                        postgres,
+                        f"Cifras de control {table} generadas - Parte {start}-{end - 1}",
+                        f"Se han generado las cifras de control para {table} exitosamente",
+                        batch_html_table,
+                        term=term_id,
+                        control=True,
+                    )
+
+        print_html_tables(tables)
 
         notify(
             postgres,
