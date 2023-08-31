@@ -8,6 +8,7 @@ import sys
 html_reporter = HtmlReporter()
 postgres_pool = get_postgres_pool()
 phase = int(sys.argv[1])
+area=int(sys.argv[4])
 print("argumento 1",int(sys.argv[1]))
 
 with define_extraction(phase, postgres_pool, postgres_pool) as (postgres, _):
@@ -119,7 +120,7 @@ with define_extraction(phase, postgres_pool, postgres_pool) as (postgres, _):
             report1,
             term=term_id,
             control=True,
-            user= int(sys.argv[3])
+            area=area
         )
 
         notify(
@@ -129,5 +130,5 @@ with define_extraction(phase, postgres_pool, postgres_pool) as (postgres, _):
             report2,
             term=term_id,
             control=True,
-            area=int(sys.argv[4])
+            area=area
         )

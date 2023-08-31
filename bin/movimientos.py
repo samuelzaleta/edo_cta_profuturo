@@ -9,6 +9,7 @@ html_reporter = HtmlReporter()
 postgres_pool = get_postgres_pool()
 mit_pool = get_mit_pool()
 phase = int(sys.argv[1])
+area = int(sys.argv[4])
 table = '"HECHOS"."TTHECHOS_MOVIMIENTO"'
 
 with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
@@ -19,7 +20,7 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
 
     with register_time(postgres_pool, phase, term=term_id):
         # Extracción
-        #truncate_table(postgres, 'TTHECHOS_MOVIMIENTO', term=term_id)
+        truncate_table(postgres, 'TTHECHOS_MOVIMIENTO', term=term_id)
         extract_dataset_spark(configure_mit_spark, configure_postgres_spark, """
         SELECT DT.FTN_NUM_CTA_INVDUAL AS FCN_CUENTA,
                DT.FCN_ID_TIPO_MOV AS FCN_ID_TIPO_MOVIMIENTO,
@@ -170,7 +171,7 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
                 INNER JOIN "TCHECHOS_CLIENTE" I ON M."FCN_CUENTA" = i."FCN_CUENTA" AND i."FCN_ID_PERIODO" = :term
                 INNER JOIN "TTGESPRO_MOV_PROFUTURO_CONSAR" PC ON M."FCN_ID_TIPO_MOVIMIENTO" = PC."FCN_ID_MOVIMIENTO_PROFUTURO"
                 INNER JOIN "TCDATMAE_MOVIMIENTO_CONSAR" MC ON PC."FCN_ID_MOVIMIENTO_CONSAR" = mc."FTN_ID_MOVIMIENTO_CONSAR"
-            GROUP BY G."FTC_DESCRIPCION_CORTA", I."FTC_VIGENCIA", I."FTC_TIPO_CLIENTE", I."FTC_ORIGEN", MC."FTC_DESCRIPCION"
+            GROUP BY I."FTC_GENERACION", I."FTC_VIGENCIA", I."FTC_TIPO_CLIENTE", I."FTC_ORIGEN", MC."FTC_DESCRIPCION"
             """,
             ["Tipo Generación", "Vigencia", "Tipo Cliente", "Indicador Afiliación", "CONSAR"],
             ["Registros", "Importe"],
@@ -180,21 +181,25 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
         report2 = html_reporter.generate(
             postgres,
             """
-            SELECT I."FTC_GENERACION" AS GENERACION,
-                   I."FTC_VIGENCIA" AS VIGENCIA,
-                   I."FTC_TIPO_CLIENTE" AS TIPO_CLIENTE,
-                   I."FTC_ORIGEN" AS ORIGEN,
-                   MC."FTC_DESCRIPCION" AS CONSAR,
-                   COUNT(DISTINCT M."FCN_CUENTA") AS CLIENTES,
-                   SUM(M."FTF_MONTO_PESOS") AS IMPORTE
-            FROM "TTHECHOS_MOVIMIENTO" M
-                INNER JOIN "TCHECHOS_CLIENTE" I ON M."FCN_CUENTA" = i."FCN_CUENTA" AND i."FCN_ID_PERIODO" = :term
-                INNER JOIN "TTGESPRO_MOV_PROFUTURO_CONSAR" PC ON M."FCN_ID_TIPO_MOVIMIENTO" = PC."FCN_ID_MOVIMIENTO_PROFUTURO"
-                INNER JOIN "TCDATMAE_MOVIMIENTO_CONSAR" MC ON PC."FCN_ID_MOVIMIENTO_CONSAR" = mc."FTN_ID_MOVIMIENTO_CONSAR"
-            GROUP BY G."FTC_DESCRIPCION_CORTA", I."FTC_VIGENCIA", I."FTC_TIPO_CLIENTE", I."FTC_ORIGEN", MC."FTC_DESCRIPCION"
+            --movimientos postgres
+            SELECT
+            g."FTC_PERIODO" AS PERIODO,
+            s."FTC_DESCRIPCION" AS SIEFORE,
+            sb."FCC_VALOR" AS SUBCUENTA,
+            ROUND(cast(SUM (m."FTF_MONTO_PESOS") as numeric(16,2)),2) as MONTO_PESOS
+            FROM "HECHOS"."TTHECHOS_MOVIMIENTO" m
+            INNER JOIN "MAESTROS"."TCDATMAE_SIEFORE" s ON m."FCN_ID_SIEFORE" = s."FTN_ID_SIEFORE"
+            --INNER JOIN "GESTOR"."TCGESPRO_MOVIMIENTO_PROFUTURO" mp ON mp."FTN_ID_MOVIMIENTO_PROFUTURO" = m."FCN_ID_CONCEPTO_MOVIMIENTO"
+            INNER JOIN "MAESTROS"."TCDATMAE_TIPO_SUBCUENTA" sb ON m."FCN_ID_TIPO_SUBCTA" = sb."FTN_ID_TIPO_SUBCTA"
+            INNER JOIN "GESTOR"."TCGESPRO_PERIODO" g ON g."FTN_ID_PERIODO" = m."FCN_ID_PERIODO"
+            WHERE "FCN_ID_PERIODO" = 27
+            GROUP BY
+            g."FTC_PERIODO", s."FTC_DESCRIPCION", sb."FCC_VALOR"
+            ORDER BY
+            s."FTC_DESCRIPCION", sb."FCC_VALOR"
             """,
-            ["Tipo Generación", "Vigencia", "Tipo Cliente", "Indicador Afiliación", "CONSAR"],
-            ["Registros", "Importe"],
+            ["PERIODO", "SIEFORE", "SUBCUENTA"],
+            ["MONTO_PESOS"],
             params={"term": term_id},
         )
 
@@ -205,6 +210,7 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
             report1,
             term=term_id,
             control=True,
+            area=area
         )
         notify(
             postgres,
@@ -213,6 +219,6 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
             report2,
             term=term_id,
             control=True,
-            user=int(sys.argv[3])
+            area=area
         )
 
