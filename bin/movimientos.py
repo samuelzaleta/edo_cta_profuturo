@@ -18,7 +18,7 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
     start_month = term["start_month"]
     end_month = term["end_month"]
 
-    with register_time(postgres_pool, phase, term=term_id):
+    with register_time(postgres_pool, phase,area ,term_id):
         # Extracción
         truncate_table(postgres, 'TTHECHOS_MOVIMIENTO', term=term_id)
         extract_dataset_spark(configure_mit_spark, configure_postgres_spark, """
@@ -192,7 +192,7 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
             --INNER JOIN "GESTOR"."TCGESPRO_MOVIMIENTO_PROFUTURO" mp ON mp."FTN_ID_MOVIMIENTO_PROFUTURO" = m."FCN_ID_CONCEPTO_MOVIMIENTO"
             INNER JOIN "MAESTROS"."TCDATMAE_TIPO_SUBCUENTA" sb ON m."FCN_ID_TIPO_SUBCTA" = sb."FTN_ID_TIPO_SUBCTA"
             INNER JOIN "GESTOR"."TCGESPRO_PERIODO" g ON g."FTN_ID_PERIODO" = m."FCN_ID_PERIODO"
-            WHERE "FCN_ID_PERIODO" = 27
+            WHERE "FCN_ID_PERIODO" = :term
             GROUP BY
             g."FTC_PERIODO", s."FTC_DESCRIPCION", sb."FCC_VALOR"
             ORDER BY

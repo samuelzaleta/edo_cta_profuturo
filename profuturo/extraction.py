@@ -314,8 +314,10 @@ def read_table_insert_temp_view(
     print("EXTRACCIÓN")
     df = _create_spark_dataframe(spark, origin_configurator, query, params)
     print("DONE")
-    df.createTempView(view)
+    df.createOrReplaceTempView(view)
     print("DONE VIEW")
+    df.show()
+    print(df.count())
 
 
 def _get_spark_session() -> SparkSession:
@@ -348,7 +350,7 @@ def _write_spark_dataframe(df: SparkDataFrame, connection_configurator, table: s
         .option("dbtable", f'{table}') \
         .save()
     spark = _get_spark_session()
-    spark.stop()
+
 
 
 def _deduplicate_records(records: Sequence[Row]):

@@ -8,13 +8,13 @@ import sys
 postgres_pool = get_postgres_pool()
 mit_pool = get_mit_pool()
 phase = int(sys.argv[1])
-
+area = int(sys.argv[4])
 with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
     term = extract_terms(postgres, phase)
     term_id = term["id"]
     spark = _get_spark_session()
 
-    with register_time(postgres_pool, phase, term_id):
+    with register_time(postgres_pool, phase,area ,term_id):
 
         upsert_dataset(mit, postgres, """
         SELECT S.FCN_ID_SIEFORE AS id, C.FCC_VALOR AS description
@@ -118,5 +118,5 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
             "Catálogos ingestados",
             "Se han ingestado los catálogos de forma exitosa",
             term=term_id,
-            area=int(sys.argv[4])
+            area=area
         )
