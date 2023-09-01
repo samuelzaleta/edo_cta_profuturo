@@ -18,7 +18,7 @@ with define_extraction(phase, postgres_pool, postgres_pool) as (postgres, _):
     end_saldos = term["end_saldos"]
     valor_accion = term["valor_accion"]
 
-    with register_time(postgres_pool, phase, term=term_id):
+    with register_time(postgres_pool, phase,area ,term_id):
         # Extracción
         query = """
         SELECT SH.FTN_NUM_CTA_INVDUAL AS FCN_CUENTA,
