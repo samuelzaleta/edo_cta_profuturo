@@ -83,6 +83,7 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
             "FTC_DESCRIPCION" = EXCLUDED."FTC_DESCRIPCION", "FTB_SWITCH" = EXCLUDED."FTB_SWITCH"
         """, lambda i: [f":cod_mov_{i}", f":monpes_{i}", f":tipo_subcta_{i}", "'INTEGRITY'", f":description_{i}", "true"], "TCGESPRO_MOVIMIENTO_PROFUTURO")
 
+        """
         tables = ["TCDATMAE_SIEFORE", "TCDATMAE_TIPO_SUBCUENTA", "TCGESPRO_MOVIMIENTO_PROFUTURO"]
         def print_html_tables(tables):
             for table in tables:
@@ -112,7 +113,7 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
                     )
 
         print_html_tables(tables)
-
+"""
         notify(
             postgres,
             "Catálogos ingestados",
