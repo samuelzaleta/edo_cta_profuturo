@@ -16,7 +16,6 @@ import polars as pl
 def extract_terms(conn: Connection, phase: int) -> Dict[str, Any]:
     try:
         term_id = int(sys.argv[2])
-        print("argumento 2",int(sys.argv[2]))
         cursor = conn.execute(text("""
         SELECT "FTC_PERIODO"
         FROM "TCGESPRO_PERIODO"
@@ -315,8 +314,8 @@ def read_table_insert_temp_view(
     df = _create_spark_dataframe(spark, origin_configurator, query, params)
     print("DONE")
     df.createOrReplaceTempView(view)
-    print("DONE VIEW")
-    df.show()
+    print("DONE VIEW:",view)
+    df.show(2)
     print(df.count())
 
 

@@ -21,7 +21,7 @@ class ProfuturoException(Exception):
         "TERMS_ERROR": "No se pudo leer correctamente el período o fecha asociada a los datos a cargar.",
         "TABLE_SWITCH_ERROR": "No se pudo leer correctamente el estado del switch o parámetro necesario para la carga de datos.",
         "TABLE_NO_DATA": "No se encuentraron data en la tabla de origen",
-        "UNKNOWN_ERROR": "Error desconocido",
+        "UNKNOWN_ERROR": "Error desconocido"
     }
 
     code: str
