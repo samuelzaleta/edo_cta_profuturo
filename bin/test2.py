@@ -12,6 +12,7 @@ phase = int(sys.argv[1])
 with define_extraction(phase, postgres_pool, postgres_pool) as (postgres, _):
     term = extract_terms(postgres, phase)
     term_id = term["id"]
+    time_period = term["time_period"]
     start_month = term["start_month"]
     end_month = term["end_month"]
     # Cifras de control
@@ -35,7 +36,7 @@ with define_extraction(phase, postgres_pool, postgres_pool) as (postgres, _):
     notify(
         postgres,
         "Clientes ingestados",
-        "Se han ingestado los clientes de forma exitosa",
+        f"Se han ingestado los clientes de forma exitosa para el periodo {time_period}",
         report,
         term=term_id,
     )
@@ -91,7 +92,7 @@ with define_extraction(phase, postgres_pool, postgres_pool) as (postgres, _):
     notify(
         postgres,
         "Cifras de control Saldos generadas 1 de 2",
-        "Se han generado las cifras de control para saldos exitosamente",
+        f"Se han generado las cifras de control para saldos exitosamente para el periodo {time_period}",
         report1,
         term=term_id,
         control=True,
@@ -121,7 +122,7 @@ with define_extraction(phase, postgres_pool, postgres_pool) as (postgres, _):
     notify(
         postgres,
         "Cifras de control movimientos generadas",
-        "Se han generado las cifras de control para comisiones exitosamente",
+        f"Se han generado las cifras de control para comisiones exitosamente para el periodo {time_period}",
         report1,
         term=term_id,
         control=True,

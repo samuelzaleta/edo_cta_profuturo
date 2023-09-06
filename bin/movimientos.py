@@ -15,6 +15,7 @@ table = '"HECHOS"."TTHECHOS_MOVIMIENTO"'
 with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
     term = extract_terms(postgres, phase)
     term_id = term["id"]
+    time_period = term["time_period"]
     start_month = term["start_month"]
     end_month = term["end_month"]
 
@@ -206,7 +207,7 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
         notify(
             postgres,
             "Cifras de control movimientos generadas",
-            "Se han generado las cifras de control para comisiones exitosamente",
+            f"Se han generado las cifras de control para comisiones exitosamente para el periodo {time_period}",
             report1,
             term=term_id,
             control=True,
@@ -215,7 +216,7 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
         notify(
             postgres,
             "Cifras de control movimientos generadas",
-            "Se han generado las cifras de control para comisiones exitosamente",
+            f"Se han generado las cifras de control para comisiones exitosamente para el periodo {time_period}",
             report2,
             term=term_id,
             control=True,

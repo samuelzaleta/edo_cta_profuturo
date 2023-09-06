@@ -16,6 +16,7 @@ area =int(sys.argv[4])
 with define_extraction(phase, postgres_pool, buc_pool) as (postgres, buc):
     term = extract_terms(postgres, phase)
     term_id = term["id"]
+    time_period = term["time_period"]
     start_month = term["start_month"]
     end_month = term["end_month"]
     spark = _get_spark_session()
@@ -231,7 +232,7 @@ with define_extraction(phase, postgres_pool, buc_pool) as (postgres, buc):
         notify(
             postgres,
             "Clientes ingestados",
-            "Se han ingestado los clientes de forma exitosa",
+            f"Se han ingestado los catálogos de forma exitosa para el periodo {time_period}",
             report,
             term=term_id,
             area=area

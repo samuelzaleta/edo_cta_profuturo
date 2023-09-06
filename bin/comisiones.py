@@ -13,6 +13,7 @@ area = int(sys.argv[4])
 with define_extraction(phase, postgres_pool, postgres_pool) as (postgres, _):
     term = extract_terms(postgres, phase)
     term_id = term["id"]
+    time_period = term["time_period"]
     start_month = term["start_month"]
     end_month = term["end_month"]
 
@@ -64,7 +65,7 @@ with define_extraction(phase, postgres_pool, postgres_pool) as (postgres, _):
         notify(
             postgres,
             "Cifras de control Comisiones generadas",
-            "Se han generado las cifras de control para comisiones exitosamente",
+            f"Se han ingestado los catálogos de forma exitosa para el periodo {time_period}",
             report,
             term=term_id,
             control=True,

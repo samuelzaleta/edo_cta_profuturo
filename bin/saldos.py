@@ -14,6 +14,7 @@ print("argumento 1",int(sys.argv[1]))
 with define_extraction(phase, postgres_pool, postgres_pool) as (postgres, _):
     term = extract_terms(postgres, phase)
     term_id = term["id"]
+    time_period = term["time_period"]
     print(term_id)
     end_saldos = term["end_saldos"]
     valor_accion = term["valor_accion"]
@@ -116,7 +117,7 @@ with define_extraction(phase, postgres_pool, postgres_pool) as (postgres, _):
         notify(
             postgres,
             "Cifras de control Saldos generadas 1 de 2",
-            "Se han generado las cifras de control para saldos exitosamente",
+            f"Se han generado las cifras de control para saldos exitosamente para el periodo {time_period}",
             report1,
             term=term_id,
             control=True,
@@ -126,7 +127,7 @@ with define_extraction(phase, postgres_pool, postgres_pool) as (postgres, _):
         notify(
             postgres,
             "Cifras de control Saldos generadas 2 de 2",
-            "Se han generado las cifras de control para saldos exitosamente",
+            f"Se han generado las cifras de control para saldos exitosamente para el periodo {time_period}",
             report2,
             term=term_id,
             control=True,

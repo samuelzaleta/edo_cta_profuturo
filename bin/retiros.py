@@ -18,6 +18,7 @@ print(int(sys.argv[1]),int(sys.argv[2]),int(sys.argv[3]),int(sys.argv[4]))
 with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
     term = extract_terms(postgres, phase)
     term_id = term["id"]
+    time_period = term["time_period"]
     start_month = term["start_month"]
     end_month = term["end_month"]
     spark = _get_spark_session()
@@ -554,7 +555,7 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
             notify(
                 postgres,
                 f"Cifras de control Retiros generadas - Parte {start}-{end - 1}",
-                "Se han generado las cifras de control para retiros exitosamente",
+                f"Se han generado las cifras de control para retiros exitosamente para el periodo",
                 batch_html_table,
                 term=term_id,
                 control=True,
