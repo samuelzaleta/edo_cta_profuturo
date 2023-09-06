@@ -86,6 +86,7 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
         """, lambda i: [f":cod_mov_{i}", f":monpes_{i}", f":tipo_subcta_{i}", "'INTEGRITY'", f":description_{i}",
                         "true"], "TCGESPRO_MOVIMIENTO_PROFUTURO")
 
+        """
         tables = ["TCDATMAE_SIEFORE", "TCDATMAE_TIPO_SUBCUENTA", "TCGESPRO_MOVIMIENTO_PROFUTURO"]
 
 
@@ -118,7 +119,7 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
 
 
         print_html_tables(tables)
-
+"""
         notify(
             postgres,
             "Catálogos ingestados",

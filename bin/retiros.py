@@ -46,7 +46,7 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
                 WHERE tthls.FTB_IND_FOLIO_AGRUP = '1'
                 AND tthls.FCN_ID_ESTATUS = 6649
                 AND tthls.FCN_ID_PROCESO IN (4045, 4046, 4047, 4048, 4049, 4050, 4051)
-                --AND ttls.FTD_FEH_CRE BETWEEN :start AND :end
+                AND tthls.FTD_FEH_CRE BETWEEN to_date('01/03/2023','dd/MM/yyyy') AND to_date('30/03/2023','dd/MM/yyyy') --:start AND :end
                 union all
                 select
                 FTC_FOLIO,
@@ -66,6 +66,7 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
                 WHERE ttls.FTB_IND_FOLIO_AGRUP = '1'
                 AND ttls.FCN_ID_ESTATUS = 6649
                 AND ttls.FCN_ID_PROCESO IN (4045, 4046, 4047, 4048, 4049, 4050, 4051)
+                AND ttls.FTD_FEH_CRE BETWEEN to_date('01/03/2023','dd/MM/yyyy') AND to_date('30/03/2023','dd/MM/yyyy') --:start AND :end
             ),
             MOVIMIENTOS AS (
                 SELECT
@@ -74,6 +75,7 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
                 ttem.FCN_ID_SIEFORE,
                 ttem.FTF_MONTO_PESOS
                 FROM CIERREN_ETL.TTSISGRAL_ETL_MOVIMIENTOS ttem
+                --WHERE ttem.FCD_FEH_CRE BETWEEN :start AND :end
             ),
             LIQUIDACIONES AS(
                 SELECT
@@ -94,7 +96,7 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
                 ms.FCN_ID_SIEFORE,
                 ms.FTF_MONTO_PESOS
                 FROM LIQ_SOLICITUDES ls
-                LEFT JOIN MOVIMIENTOS ms
+                INNER JOIN MOVIMIENTOS ms
                 ON ls.FTC_FOLIO = ms.FTC_FOLIO
                 where ms.FTF_MONTO_PESOS > 0
             ),
@@ -109,7 +111,7 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
                     ttat.FTC_CVE_TIPO_PEN,
                     ttat.FTD_FEH_CRE
                 FROM BENEFICIOS.TTAFORETI_TRAMITE ttat
-                WHERE ttat.FTD_FEH_CRE BETWEEN :start AND :end
+                WHERE ttat.FTD_FEH_CRE BETWEEN  to_date('01/03/2023','dd/MM/yyyy') AND to_date('30/03/2023','dd/MM/yyyy') --:start AND :end
                     AND ttat.FTC_TIPO_TRAMITE NOT IN (314, 324, 341, 9542)
             ),
             LIQ_DIS AS (
@@ -150,7 +152,7 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
                     ttatr.FTC_REGIMEN,
                     ttatr.FTD_FEH_CRE
                 FROM BENEFICIOS.TTAFORETI_TRANS_RETI ttatr
-                WHERE ttatr.FTD_FEH_CRE BETWEEN :start AND :end
+                WHERE ttatr.FTD_FEH_CRE BETWEEN to_date('01/03/2023','dd/MM/yyyy') AND to_date('30/03/2023','dd/MM/yyyy') --:start AND :end
              ),
             LIQ_DIS_TRA AS (
                 SELECT
@@ -321,7 +323,7 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
                 FROM BENEFICIOS.TTCRXGRAL_PAGO ttcp
                 LEFT JOIN CIERREN.TCCRXGRAL_CAT_CATALOGO thccc
                 ON ttcp.FCC_CVE_BANCO = thccc.FCN_ID_CAT_CATALOGO
-                WHERE ttcp.FTD_FEH_CRE BETWEEN :start AND :end
+                WHERE ttcp.FTD_FEH_CRE BETWEEN to_date('01/03/2023','dd/MM/yyyy') AND to_date('30/03/2023','dd/MM/yyyy') --:start AND :end
             ),
             DATOS_PAGO AS (
                 SELECT
@@ -357,7 +359,7 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
                            SHMAX.FCN_ID_TIPO_SUBCTA,
                            MAX(TRUNC(SHMAX.FTD_FEH_LIQUIDACION)) AS FTD_FEH_LIQUIDACION
                     FROM cierren.thafogral_saldo_historico_v2 SHMAX
-                    WHERE SHMAX.FTD_FEH_LIQUIDACION <= :start
+                    WHERE SHMAX.FTD_FEH_LIQUIDACION <= to_date('01/03/2023','dd/MM/yyyy')
                     GROUP BY SHMAX.FTN_NUM_CTA_INVDUAL, SHMAX.FCN_ID_SIEFORE, SHMAX.FCN_ID_TIPO_SUBCTA
                 ) SHMAXIMO ON SH.FTN_NUM_CTA_INVDUAL = SHMAXIMO.FTN_NUM_CTA_INVDUAL
                           AND SH.FCN_ID_TIPO_SUBCTA = SHMAXIMO.FCN_ID_TIPO_SUBCTA AND SH.FCN_ID_SIEFORE = SHMAXIMO.FCN_ID_SIEFORE
@@ -366,13 +368,12 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
                     SELECT ROW_NUMBER() OVER(PARTITION BY FCN_ID_SIEFORE, FCN_ID_REGIMEN ORDER BY FCD_FEH_ACCION DESC) AS ROW_NUM,
                            FCN_ID_SIEFORE, FCN_ID_REGIMEN, FCN_VALOR_ACCION, FCD_FEH_ACCION
                     FROM cierren.TCAFOGRAL_VALOR_ACCION
-                    WHERE FCD_FEH_ACCION <= :start 
+                    WHERE FCD_FEH_ACCION <= to_date('01/03/2023','dd/MM/yyyy')
                 ) VA ON SH.FCN_ID_SIEFORE = VA.FCN_ID_SIEFORE
                     AND R.FCN_ID_REGIMEN = VA.FCN_ID_REGIMEN
                     AND VA.ROW_NUM = 1
                 GROUP BY SH.FTN_NUM_CTA_INVDUAL, SH.FCN_ID_SIEFORE, SH.FCN_ID_TIPO_SUBCTA, SH.FTD_FEH_LIQUIDACION
             )
-            --select * from (
             SELECT
                 ldttp.FTN_NUM_CTA_INVDUAL AS FCN_CUENTA,
                 ldttp.FTC_FOLIO AS FTC_FOLIO_LDTTP,
@@ -380,7 +381,7 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
                 ldttp.FCN_ID_PROCESO AS FCN_ID_PROCESO_LDTTP,
                 ldttp.FCN_ID_SUBPROCESO AS FCN_ID_SUBPROCESO_LDTTP,
                 ldttp.FCN_ID_ESTATUS,
-                ldttp.FTB_IND_FOLIO_AGRUP,
+                ldttp.FTB_IND_FOLIO_AGRUP AS FTC_IND_FOLIO_AGRUP,
                 ldttp.FTC_NSS,
                 ldttp.FTC_CURP,
                 ldttp.FTD_FEH_CRE, -- CONDICION
@@ -398,37 +399,42 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
                 ldttp.FTC_CVE_TIPO_PEN,
                 ldttp.FTC_FOLIO_PROCESAR,
                 ldttp.FTC_FOLIO_TRANSACCION,
-                ldttp.FCC_TPSEGURO,
-                ldttp.FCC_TPPENSION,
+                ldttp.FCC_TPSEGURO AS FTC_TPSEGURO,
+                ldttp.FCC_TPPENSION AS FTC_TPPENSION,
                 ldttp.FTC_REGIMEN,
                 ldttp.FCN_ID_REGIMEN,
                 ldttp.FCN_ID_CAT_SUBCTA,
                 ldttp.FCN_ID_CAT_CATALOGO AS FCN_ID_CAT_CATALOGO_LDTTP,
-                ldttp.FCC_VALOR,
-                ldttp.TMC_USO,
-                ldttp.TMN_ID_CONFIG,
-                ldttp.TMC_DESC_ITGY,
-                ldttp.TMN_CVE_ITGY,
-                ldttp.TMC_DESC_NCI,
-                ldttp.TMN_CVE_NCI,
+                ldttp.FCC_VALOR AS FTC_LEY_PENSION,
+                ldttp.TMC_USO AS FTC_TMC_USO,
+                ldttp.TMN_ID_CONFIG AS FTN_TMN_ID_CONFIG,
+                ldttp.TMC_DESC_ITGY AS FTC_TMC_DESC_ITGY,
+                ldttp.TMN_CVE_ITGY AS FTN_TMN_CVE_ITGY,
+                ldttp.TMC_DESC_NCI AS FTC_TMC_DESC_NCI,
+                ldttp.TMN_CVE_NCI AS FTN_TMN_CVE_NCI,
                 dpg.FTC_FOLIO AS FTC_FOLIO_DPG,
                 dpg.FCN_ID_PROCESO AS FCN_ID_PROCESO_DPG,
                 dpg.FCN_ID_SUBPROCESO AS FCN_ID_SUBPROCESO_DPG,
-                dpg.FCN_TIPO_PAGO,
+                dpg.FCN_TIPO_PAGO as FTN_TIPO_PAGO,
                 dpg.FTC_FOLIO_LIQUIDACION,
                 -- dpg.FTD_FEH_CRE,
-                dpg.FCC_CVE_BANCO,
-                dpg.FTN_ISR,
+                dpg.FCC_CVE_BANCO as FTC_CVE_BANCO,
+                dpg.FTN_ISR as FTF_ISR,
                 dpg.FCN_ID_CAT_CATALOGO AS FCN_ID_CAT_CATALOGO_DPG,
-                dpg.FCC_TIPO_BANCO,
-                dpg.FCC_MEDIO_PAGO,
-                s.FTF_SALDO_DIA AS FTF_SALDO_INICIAL
+                dpg.FCC_TIPO_BANCO FTC_TIPO_BANCO,
+                dpg.FCC_MEDIO_PAGO as FTC_MEDIO_PAGO,
+                s.FTF_SALDO_DIA AS FTF_SALDO_INICIAL,
+                CASE 
+                    WHEN ldttp.FCN_ID_TIPO_SUBCTA = 14 THEN 0
+                    WHEN ldttp.FCN_ID_TIPO_SUBCTA = 15 THEN 2
+                    WHEN ldttp.FCN_ID_TIPO_SUBCTA = 16 THEN 2
+                    ELSE 1
+                END AS "FTN_TIPO_AHORRO"
             FROM LIQ_DIS_TRA_TSU_PTR ldttp
             LEFT JOIN DATOS_PAGO dpg
-            ON ldttp.FTC_FOLIO = dpg.FTC_FOLIO_LIQUIDACION
+            ON ldttp.FTC_FOLIO = dpg.FTC_FOLIO
             INNER JOIN SALDOS s 
-            on ldttp.FTN_NUM_CTA_INVDUAL = s.FCN_CUENTA 
-            --) where rownum <100
+            on ldttp.FTN_NUM_CTA_INVDUAL = s.FCN_CUENTA and ldttp.FCN_ID_TIPO_SUBCTA = s.FCN_ID_TIPO_SUBCTA
             """, '"HECHOS"."TEST_RETIROS"',
         term = term_id,
         params = {"start": start_month, "end": end_month})
@@ -443,82 +449,91 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
             "retiros")
 
         columnas = [
-            "id",
-            "FCN_ID_TIPO_SUBCTA",
-            "FCN_ID_SIEFORE",
-            "FTF_SALDO_INICIAL",
-            "FTF_MONTO_PESOS_LIQUIDADO",
-            "FTC_TIPO_TRAMITE",
-            "FTC_TIPO_PRESTACION",
-            "FTC_CVE_REGIMEN",
-            "FTC_CVE_TIPO_SEG",
-            "FTC_CVE_TIPO_PEN",
-            "FTC_FOLIO_PROCESAR",
-            "FTC_FOLIO_TRANSACCION",
-            "FCC_TPSEGURO",
-            "FCC_TPPENSION",
-            "FTC_REGIMEN",
-            "FCN_ID_REGIMEN",
-            "FCN_ID_CAT_SUBCTA",
-            "FCN_ID_CAT_CATALOGO_LDTTP",
-            "FCC_VALOR",
-            "TMC_USO",
-            "TMN_ID_CONFIG",
-            "TMC_DESC_ITGY",
-            "TMN_CVE_ITGY",
-            "TMC_DESC_NCI",
-            "TMN_CVE_NCI",
-            "FTC_FOLIO_DPG",
-            "FCN_ID_PROCESO_DPG",
-            "FCN_ID_SUBPROCESO_DPG",
-            "FCN_TIPO_PAGO",
-            "FTC_FOLIO_LIQUIDACION",
-            "FCC_CVE_BANCO",
-            "FTN_ISR",
-            "FCN_ID_CAT_CATALOGO_DPG",
-            "FCC_TIPO_BANCO",
-            "FCC_MEDIO_PAGO"
+                "id",
+                "FCN_CUENTA",
+                "FCN_ID_TIPO_SUBCTA",
+                "FTN_TIPO_AHORRO",
+                "FCN_ID_SIEFORE",
+                "FTF_SALDO_INICIAL",
+                "FTF_ISR",
+                "FTF_MONTO_PESOS_LIQUIDADO",
+                "FTC_TIPO_TRAMITE",
+                "FTC_TIPO_PRESTACION",
+                "FTC_LEY_PENSION",
+                "FTC_CVE_REGIMEN",
+                "FTC_CVE_TIPO_SEG",
+                "FTC_CVE_TIPO_PEN",
+                "FTC_TPSEGURO",
+                "FTC_TPPENSION",
+                "FTC_REGIMEN",
+                "FCN_ID_REGIMEN",
+                "FTC_TMC_DESC_ITGY",
+                "FCN_ID_PROCESO_DPG",
+                "FCN_ID_SUBPROCESO_DPG",
+                "FTN_TIPO_PAGO",
+                "FTC_CVE_BANCO",
+                "FTC_TIPO_BANCO",
+                "FTC_MEDIO_PAGO"
         ]
 
         # Cifras de control
         df = spark.sql("""
-        select 
+        WITH dataset as (select 
             id,
+            FCN_CUENTA,
             FCN_ID_TIPO_SUBCTA,
+            FTN_TIPO_AHORRO,
             FCN_ID_SIEFORE,
             FTF_SALDO_INICIAL,
             FTF_MONTO_PESOS_LIQUIDADO,
+            FTF_ISR,
             FTC_TIPO_TRAMITE,
             FTC_TIPO_PRESTACION,
+            FTC_LEY_PENSION,
             FTC_CVE_REGIMEN,
             FTC_CVE_TIPO_SEG,
             FTC_CVE_TIPO_PEN,
-            FTC_FOLIO_PROCESAR,
-            FTC_FOLIO_TRANSACCION,
-            FCC_TPSEGURO,
-            FCC_TPPENSION,
+            FTC_TPSEGURO,
+            FTC_TPPENSION,
             FTC_REGIMEN,
             FCN_ID_REGIMEN,
-            FCN_ID_CAT_SUBCTA,
-            FCN_ID_CAT_CATALOGO_LDTTP,
-            FCC_VALOR,
-            TMC_USO,
-            TMN_ID_CONFIG,
-            TMC_DESC_ITGY,
-            TMN_CVE_ITGY,
-            TMC_DESC_NCI,
-            TMN_CVE_NCI,
-            FTC_FOLIO_DPG,
+            FTC_TMC_DESC_ITGY,
             FCN_ID_PROCESO_DPG,
             FCN_ID_SUBPROCESO_DPG,
-            FCN_TIPO_PAGO,
-            FTC_FOLIO_LIQUIDACION,
-            FCC_CVE_BANCO,
-            FTN_ISR,
-            FCN_ID_CAT_CATALOGO_DPG,
-            FCC_TIPO_BANCO,
-            FCC_MEDIO_PAGO
-        from retiros""")
+            FTN_TIPO_PAGO,
+            FTC_CVE_BANCO,
+            FTC_TIPO_BANCO,
+            FTC_MEDIO_PAGO
+        from retiros)
+        SELECT 
+            id,
+            FCN_CUENTA,
+            FCN_ID_TIPO_SUBCTA,
+            IF(FTN_TIPO_AHORRO == 1, 'VOL', 'VIV') AS FTN_TIPO_AHORRO ,
+            FCN_ID_SIEFORE,
+            SUM(FTF_SALDO_INICIAL) AS FTF_SALDO_INICIAL,
+            SUM(FTF_MONTO_PESOS_LIQUIDADO) AS FTF_MONTO_PESOS_LIQUIDADO,
+            SUM(FTF_ISR) AS FTF_ISR,
+            FTC_TIPO_TRAMITE,
+            FTC_TIPO_PRESTACION,
+            FTC_LEY_PENSION,
+            FTC_CVE_REGIMEN,
+            FTC_CVE_TIPO_SEG,
+            FTC_CVE_TIPO_PEN,
+            FTC_TPSEGURO,
+            FTC_TPPENSION,
+            FTC_REGIMEN,
+            FCN_ID_REGIMEN,
+            FTC_TMC_DESC_ITGY,
+            FCN_ID_PROCESO_DPG,
+            FCN_ID_SUBPROCESO_DPG,
+            FTN_TIPO_PAGO,
+            FTC_CVE_BANCO,
+            FTC_TIPO_BANCO,
+            FTC_MEDIO_PAGO
+        FROM DATASET
+        GROUP BY 1,2,3,4,5, 9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25
+        """)
 
         df.show(10)
 
@@ -529,7 +544,7 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
 
         pandas_df['id'] = pandas_df['id'].astype(int)
         # Dividir el resultado en tablas HTML de 50 en 50
-        batch_size = 1500
+        batch_size = 45500
         for start in range(0, max_id, batch_size):
             end = start + batch_size
             batch_pandas_df = pandas_df[(pandas_df['id'] >= start) & (pandas_df['id'] < end)]
