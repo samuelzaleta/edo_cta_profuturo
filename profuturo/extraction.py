@@ -28,6 +28,7 @@ def extract_terms(conn: Connection, phase: int) -> Dict[str, Any]:
 
         for row in cursor.fetchall():
             term = row[0].split('/')
+            time_period = row[0]
             month = int(term[0])
             year = int(term[1])
 
@@ -38,7 +39,7 @@ def extract_terms(conn: Connection, phase: int) -> Dict[str, Any]:
             valor_accion = date(year, month, month_range[1])
 
             print(f"Extracting period: from {start_month} to {end_month}")
-            return {"id": term_id, "start_month": start_month, "end_month": end_month, "valor_accion": valor_accion, "end_saldos": end_saldos}
+            return {"id": term_id, "start_month": start_month, "end_month": end_month, "valor_accion": valor_accion, "end_saldos": end_saldos, "time_period": time_period}
 
         raise RuntimeError("Can not retrieve the term")
     except Exception as e:

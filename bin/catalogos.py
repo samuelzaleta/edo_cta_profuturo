@@ -4,7 +4,6 @@ from profuturo.extraction import upsert_dataset, extract_terms, _get_spark_sessi
 from pyspark.sql.functions import col
 import sys
 
-
 postgres_pool = get_postgres_pool()
 mit_pool = get_mit_pool()
 phase = int(sys.argv[1])
@@ -12,9 +11,10 @@ area = int(sys.argv[4])
 with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
     term = extract_terms(postgres, phase)
     term_id = term["id"]
+    time_period = term["time_period"]
     spark = _get_spark_session()
 
-    with register_time(postgres_pool, phase,area ,term_id):
+    with register_time(postgres_pool, phase, area, term_id):
 
         upsert_dataset(mit, postgres, """
         SELECT S.FCN_ID_SIEFORE AS id, C.FCC_VALOR AS description
@@ -38,7 +38,8 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
         ON CONFLICT ("FTN_ID_TIPO_SUBCTA") DO UPDATE 
         SET "FCN_ID_REGIMEN" = EXCLUDED."FCN_ID_REGIMEN", "FCN_ID_CAT_SUBCTA" = EXCLUDED."FCN_ID_CAT_SUBCTA", 
             "FCC_VALOR" = EXCLUDED."FCC_VALOR"
-        """, lambda i: [f":id_{i}", f":regime_id_{i}", f":subacc_cat_id_{i}", f":description_{i}"], "TCDATMAE_TIPO_SUBCUENTA")
+        """, lambda i: [f":id_{i}", f":regime_id_{i}", f":subacc_cat_id_{i}", f":description_{i}"],
+                       "TCDATMAE_TIPO_SUBCUENTA")
 
         upsert_dataset(mit, postgres, """
         SELECT FFN_ID_CONCEPTO_MOV AS cod_mov,
@@ -57,7 +58,8 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
         ON CONFLICT ("FTN_ID_MOVIMIENTO_PROFUTURO", "FTN_MONPES") DO UPDATE 
         SET "FCN_ID_TIPO_SUBCUENTA" = EXCLUDED."FCN_ID_TIPO_SUBCUENTA", "FTC_ORIGEN" = EXCLUDED."FTC_ORIGEN",
             "FTC_DESCRIPCION" = EXCLUDED."FTC_DESCRIPCION", "FTB_SWITCH" = EXCLUDED."FTB_SWITCH"
-        """, lambda i: [f":cod_mov_{i}", f":monpes_{i}", f":tipo_subcta_{i}", "'MIT'", f":description_{i}", "false"], "TCGESPRO_MOVIMIENTO_PROFUTURO")
+        """, lambda i: [f":cod_mov_{i}", f":monpes_{i}", f":tipo_subcta_{i}", "'MIT'", f":description_{i}", "false"],
+                       "TCGESPRO_MOVIMIENTO_PROFUTURO")
 
         upsert_dataset(mit, postgres, """
         SELECT FFN_ID_CONCEPTO_MOV AS cod_mov,
@@ -81,9 +83,12 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
         ON CONFLICT ("FTN_ID_MOVIMIENTO_PROFUTURO", "FTN_MONPES") DO UPDATE 
         SET "FCN_ID_TIPO_SUBCUENTA" = EXCLUDED."FCN_ID_TIPO_SUBCUENTA", "FTC_ORIGEN" = EXCLUDED."FTC_ORIGEN",
             "FTC_DESCRIPCION" = EXCLUDED."FTC_DESCRIPCION", "FTB_SWITCH" = EXCLUDED."FTB_SWITCH"
-        """, lambda i: [f":cod_mov_{i}", f":monpes_{i}", f":tipo_subcta_{i}", "'INTEGRITY'", f":description_{i}", "true"], "TCGESPRO_MOVIMIENTO_PROFUTURO")
+        """, lambda i: [f":cod_mov_{i}", f":monpes_{i}", f":tipo_subcta_{i}", "'INTEGRITY'", f":description_{i}",
+                        "true"], "TCGESPRO_MOVIMIENTO_PROFUTURO")
 
         tables = ["TCDATMAE_SIEFORE", "TCDATMAE_TIPO_SUBCUENTA", "TCGESPRO_MOVIMIENTO_PROFUTURO"]
+
+
         def print_html_tables(tables):
             for table in tables:
                 df = spark.sql(f"select * from {table}")
@@ -111,12 +116,13 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
                         control=True,
                     )
 
+
         print_html_tables(tables)
 
         notify(
             postgres,
             "Catálogos ingestados",
-            "Se han ingestado los catálogos de forma exitosa",
+            f"Se han ingestado los catálogos de forma exitosa para el periodo {time_period}",
             term=term_id,
             area=area
         )
