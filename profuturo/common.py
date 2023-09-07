@@ -16,9 +16,9 @@ def define_extraction(phase: int, main_pool: Engine, *pools: Engine):
 
 
 @contextmanager
-def register_time(pool: Engine, phase: int, area: int,term: int = None):
+def register_time(pool: Engine, phase: int, area: int,usuario: int, term: int = None):
     with pool.begin() as conn:
-        binnacle_id = register_start(conn, phase, area ,datetime.now(), term=term)
+        binnacle_id = register_start(conn, phase, area, usuario, datetime.now(), term=term)
 
     yield
 
@@ -26,7 +26,7 @@ def register_time(pool: Engine, phase: int, area: int,term: int = None):
         register_end(conn, binnacle_id, datetime.now())
 
 
-def register_start(conn: Connection, phase: int, area: int,start: datetime, term: int = None) -> int:
+def register_start(conn: Connection, phase: int, area: int, usuario: int ,start: datetime, term: int = None) -> int:
     try:
         cursor = conn.execute(text("""
         INSERT INTO "TTGESPRO_BITACORA_ESTADO_CUENTA" (
@@ -37,7 +37,8 @@ def register_start(conn: Connection, phase: int, area: int,start: datetime, term
             "start": start,
             "term": term,
             "phase": phase,
-            "area": area
+            "area": area,
+            "usuario": usuario
         })
         row = cursor.fetchone()
 

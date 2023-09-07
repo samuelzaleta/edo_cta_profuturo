@@ -12,6 +12,7 @@ postgres_pool = get_postgres_pool()
 buc_pool = get_buc_pool()
 phase = int(sys.argv[1])
 area =int(sys.argv[4])
+usuario = int(sys.argv[3])
 
 with define_extraction(phase, postgres_pool, buc_pool) as (postgres, buc):
     term = extract_terms(postgres, phase)
@@ -21,7 +22,7 @@ with define_extraction(phase, postgres_pool, buc_pool) as (postgres, buc):
     end_month = term["end_month"]
     spark = _get_spark_session()
 
-    with register_time(postgres_pool, phase,area ,term_id):
+    with register_time(postgres_pool, phase,area,usuario,term_id):
         truncate_table(postgres, "TCDATMAE_CLIENTE", term=term_id)
         # Extracción
         query = """
