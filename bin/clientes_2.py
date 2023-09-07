@@ -1,6 +1,6 @@
 from profuturo.common import register_time, define_extraction, notify,truncate_table
 from profuturo.database import get_postgres_pool, get_buc_pool,  configure_mit_spark, configure_postgres_spark
-from profuturo.extraction import extract_dataset_spark, _get_spark_session, _write_spark_dataframe, read_table_insert_temp_view
+from profuturo.extraction import upsert_dataset, _get_spark_session, _write_spark_dataframe, read_table_insert_temp_view
 from profuturo.reporters import HtmlReporter
 from profuturo.extraction import extract_terms
 from pyspark.sql.functions import lit
@@ -22,9 +22,8 @@ with define_extraction(phase, postgres_pool, buc_pool) as (postgres, buc):
     spark = _get_spark_session()
 
     with register_time(postgres_pool, phase,area ,term_id):
-        truncate_table(postgres, "TCDATMAE_CLIENTE", term=term_id)
         # Extracción
-        query = """
+        upsert_dataset(buc, postgres, """
         SELECT C.NUMERO AS id,
                PF.NOMBRE AS name,
                PF.APELLIDOPATERNO AS middle_name,
@@ -60,15 +59,29 @@ with define_extraction(phase, postgres_pool, buc_pool) as (postgres, buc):
           AND D.IDTIPODOM = 818 -- Tipo de domicilio Particular
           -- AND D.IDSTATUSDOM = 761 ACTIVO
           -- AND D.PREFERENTE = 1 Domicilio preferente
-        """
-        extract_dataset_spark(
-            configure_mit_spark,
-            configure_postgres_spark,
-            query,
-            '"MAESTROS"."TCDATMAE_CLIENTE"'
+        """, """
+        INSERT INTO "TCDATMAE_CLIENTE"(
+            "FTN_CUENTA", "FTC_NOMBRE", "FTC_AP_PATERNO", "FTC_AP_MATERNO",
+            "FTC_CALLE", "FTC_NUMERO", "FTC_COLONIA", "FTC_DELEGACION",
+            "FTN_CODIGO_POSTAL", "FTC_ENTIDAD_FEDERATIVA", "FTC_NSS",
+            "FTC_CURP", "FTC_RFC"
         )
+        VALUES (...)
+        ON CONFLICT ("FTN_CUENTA") DO UPDATE 
+        SET "FTC_NOMBRE" = EXCLUDED."FTC_NOMBRE", "FTC_AP_PATERNO" = EXCLUDED."FTC_AP_PATERNO", 
+            "FTC_AP_MATERNO" = EXCLUDED."FTC_AP_MATERNO", "FTC_CALLE" = EXCLUDED."FTC_CALLE", 
+            "FTC_NUMERO" = EXCLUDED."FTC_NUMERO", "FTC_COLONIA" = EXCLUDED."FTC_COLONIA", 
+            "FTC_DELEGACION" = EXCLUDED."FTC_DELEGACION", "FTN_CODIGO_POSTAL" = EXCLUDED."FTN_CODIGO_POSTAL", 
+            "FTC_ENTIDAD_FEDERATIVA" = EXCLUDED."FTC_ENTIDAD_FEDERATIVA", "FTC_NSS" = EXCLUDED."FTC_NSS", 
+            "FTC_CURP" = EXCLUDED."FTC_CURP", "FTC_RFC" = EXCLUDED."FTC_RFC"
+        """, lambda i: [
+            f":id_{i}", f":name_{i}", f":middle_name_{i}", f":last_name_{i}",
+            f":street_{i}", f":street_number_{i}", f":colony_{i}", f":municipality_{i}",
+            f":zip_{i}", f":state_{i}", f":nss_{i}",
+            f":curp_{i}", f":rfc_{i}",
+        ], "TCDATMAE_CLIENTE")
+
         # Extracción
-        truncate_table(postgres, "TCHECHOS_CLIENTE_INDICADOR", term=term_id)
         truncate_table(postgres, "TCHECHOS_CLIENTE", term=term_id)
         read_table_insert_temp_view(configure_mit_spark, """
         SELECT DISTINCT(IND.FTN_NUM_CTA_INVDUAL) AS FCN_CUENTA,
@@ -222,6 +235,5 @@ with define_extraction(phase, postgres_pool, buc_pool) as (postgres, buc):
             f"Se han ingestado los catálogos de forma exitosa para el periodo {time_period}",
             report,
             term=term_id,
-            area=area,
-            fase=phase
+            area=area
         )

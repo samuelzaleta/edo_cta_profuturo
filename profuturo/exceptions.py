@@ -1,5 +1,6 @@
 from psycopg2.errors import UndefinedTable
 from sqlalchemy.exc import ProgrammingError
+from sqlalchemy.exc import DatabaseError
 from typing import Optional
 
 
@@ -40,6 +41,7 @@ class ProfuturoException(Exception):
 
         if isinstance(e, ProgrammingError):
             if isinstance(e.orig, UndefinedTable):
-                message = "TABLE_MISSED"
+                if isinstance(e, DatabaseError):
+                    message = "TABLE_MISSED"
 
         return cls(message, term)

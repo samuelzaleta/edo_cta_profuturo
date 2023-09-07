@@ -112,7 +112,7 @@ def notify_exceptions(pool: Engine, phase: int):
 
 
 def notify(conn: Connection, title: str, message: str = None, details: str = None, term: int = None,
-           control: bool = False, area: int = 0):
+           control: bool = False, area: int = 0, fase: int = None):
     cursor = conn.execute(text(f"""
     select
         DISTINCT "FCN_ID_USUARIO"
@@ -137,16 +137,17 @@ def notify(conn: Connection, title: str, message: str = None, details: str = Non
         conn.execute(text("""
         INSERT INTO "TTGESPRO_NOTIFICACION" (
             "FTC_TITULO", "FTC_DETALLE_TEXTO", "FTC_DETALLE_BLOB", 
-            "FTB_CIFRAS_CONTROL", "FCN_ID_PERIODO", "FCN_ID_USUARIO"
+            "FTB_CIFRAS_CONTROL", "FCN_ID_PERIODO", "FCN_ID_USUARIO", "FCN_ID_FASE"
         )
-        VALUES (:title, :message, :details, :control, :term, :user)
+        VALUES (:title, :message, :details, :control, :term, :user, :fase)
         """), {
             "title": title,
             "message": message,
             "details": details,
             "control": control,
             "term": term,
-            "user": row[0]
+            "user": row[0],
+            "fase": fase
         })
 
 
