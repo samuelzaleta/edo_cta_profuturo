@@ -9,6 +9,8 @@ import sys
 html_reporter = HtmlReporter()
 postgres_pool = get_postgres_pool()
 phase = int(sys.argv[1])
+user = int(sys.argv[3])
+area = int(sys.argv[4])
 
 with define_extraction(phase, postgres_pool, postgres_pool) as (postgres, _):
     term = extract_terms(postgres, phase)
@@ -16,7 +18,7 @@ with define_extraction(phase, postgres_pool, postgres_pool) as (postgres, _):
     start_month = term["start_month"]
     end_month = term["end_month"]
 
-    with register_time(postgres_pool, phase, term_id):
+    with register_time(postgres_pool, phase=phase,area= area, usuario=user, term=term_id):
         # Indicadores dinámicos
         truncate_table(postgres, "TCHECHOS_CLIENTE_INDICADOR", term=term_id)
         indicators = postgres.execute(text("""

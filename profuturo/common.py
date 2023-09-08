@@ -16,7 +16,7 @@ def define_extraction(phase: int, main_pool: Engine, *pools: Engine):
 
 
 @contextmanager
-def register_time(pool: Engine, phase: int, area: int,usuario: int, term: int = None):
+def register_time(pool: Engine, phase: int, area: int, usuario: int, term: int = None):
     with pool.begin() as conn:
         binnacle_id = register_start(conn, phase, area, usuario, datetime.now(), term=term)
 
@@ -158,7 +158,8 @@ def truncate_table(conn: Connection, table: str, term: int = None) -> None:
         if term:
             conn.execute(text(f'DELETE FROM "{table}" WHERE "FCN_ID_PERIODO" = :term'), {"term": term})
         else:
-            conn.execute(text(f'TRUNCATE "{table}"'))
+            conn.execute(text(f'TRUNCATE TABLE "{table}"'))
         print(f"Truncated {table}!")
     except Exception as e:
         raise ProfuturoException.from_exception(e, term) from e
+

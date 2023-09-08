@@ -9,7 +9,7 @@ html_reporter = HtmlReporter()
 postgres_pool = get_postgres_pool()
 phase = int(sys.argv[1])
 area=int(sys.argv[4])
-print("argumento 1",int(sys.argv[1]))
+user = int(sys.argv[3])
 
 with define_extraction(phase, postgres_pool, postgres_pool) as (postgres, _):
     term = extract_terms(postgres, phase)
@@ -19,7 +19,7 @@ with define_extraction(phase, postgres_pool, postgres_pool) as (postgres, _):
     end_saldos = term["end_saldos"]
     valor_accion = term["valor_accion"]
 
-    with register_time(postgres_pool, phase,area ,term_id):
+    with register_time(postgres_pool, phase=phase,area= area, usuario=user, term=term_id):
         # Extracción
         query = """
         SELECT SH.FTN_NUM_CTA_INVDUAL AS FCN_CUENTA,
@@ -28,8 +28,8 @@ with define_extraction(phase, postgres_pool, postgres_pool) as (postgres, _):
                SH.FTD_FEH_LIQUIDACION,
                :type AS FTC_TIPO_SALDO,
                MAX(VA.FCD_FEH_ACCION) AS FCD_FEH_ACCION,
-               SUM(SH.FTN_DIA_ACCIONES) AS FTF_DIA_ACCIONES,
-               SUM(SH.FTN_DIA_ACCIONES * VA.FCN_VALOR_ACCION) AS FTF_SALDO_DIA
+               ROUND(SUM(SH.FTN_DIA_ACCIONES), 6) AS FTF_DIA_ACCIONES,
+               ROUND(SUM(SH.FTN_DIA_ACCIONES * VA.FCN_VALOR_ACCION), 2) AS FTF_SALDO_DIA
         FROM cierren.thafogral_saldo_historico_v2 SH
         INNER JOIN cierren.TCCRXGRAL_TIPO_SUBCTA R ON R.FCN_ID_TIPO_SUBCTA = SH.FCN_ID_TIPO_SUBCTA
         INNER JOIN (
@@ -102,7 +102,7 @@ with define_extraction(phase, postgres_pool, postgres_pool) as (postgres, _):
                    --ROUND(SUM(CASE WHEN SH."FTC_TIPO_SALDO" = 'I' THEN SH."FTF_SALDO_DIA" ELSE 0 END)::numeric,2) AS SALDO_INICIAL_PESOS,
                    ROUND(SUM(CASE WHEN SH."FTC_TIPO_SALDO" = 'F' THEN SH."FTF_SALDO_DIA" ELSE 0 END)::numeric,2)AS SALDO_FINAL_PESOS,
                    --ROUND(SUM(CASE WHEN SH."FTC_TIPO_SALDO" = 'I' THEN SH."FTN_DIA_ACCIONES" ELSE 0 END)::numeric,6) AS SALDO_INICIAL_ACCIONES,
-                   ROUND(SUM(CASE WHEN SH."FTC_TIPO_SALDO" = 'F' THEN SH."FTN_DIA_ACCIONES" ELSE 0 END)::numeric,6) AS SALDO_FINAL_ACCIONES
+                   ROUND(SUM(CASE WHEN SH."FTC_TIPO_SALDO" = 'F' THEN SH."FTF_DIA_ACCIONES" ELSE 0 END)::numeric,6) AS SALDO_FINAL_ACCIONES
             FROM "HECHOS"."THHECHOS_SALDO_HISTORICO" SH
                 INNER JOIN "MAESTROS"."TCDATMAE_TIPO_SUBCUENTA" TS ON SH."FCN_ID_TIPO_SUBCTA" = TS."FTN_ID_TIPO_SUBCTA"
                 INNER JOIN "MAESTROS"."TCDATMAE_SIEFORE" S ON SH."FCN_ID_SIEFORE" = S."FTN_ID_SIEFORE"

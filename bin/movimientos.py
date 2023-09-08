@@ -10,6 +10,7 @@ postgres_pool = get_postgres_pool()
 mit_pool = get_mit_pool()
 phase = int(sys.argv[1])
 area = int(sys.argv[4])
+user = int(sys.argv[3])
 table = '"HECHOS"."TTHECHOS_MOVIMIENTO"'
 
 with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
@@ -19,7 +20,7 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
     start_month = term["start_month"]
     end_month = term["end_month"]
 
-    with register_time(postgres_pool, phase,area ,term_id):
+    with register_time(postgres_pool, phase=phase,area= area, usuario=user, term=term_id):
         # Extracción
         truncate_table(postgres, 'TTHECHOS_MOVIMIENTO', term=term_id)
         extract_dataset_spark(configure_mit_spark, configure_postgres_spark, """
@@ -31,7 +32,7 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
                DT.FTC_FOLIO AS FTC_FOLIO,
                DT.FNN_ID_REFERENCIA AS FTN_REFERENCIA,
                DT.FTF_MONTO_ACCIONES AS FTF_MONTO_ACCIONES,
-               DT.FTF_MONTO_PESOS AS FTF_MONTO_PESOS,
+               ROUND(DT.FTF_MONTO_PESOS, 2) AS FTF_MONTO_PESOS,
                DT.FTD_FEH_LIQUIDACION AS FTD_FEH_LIQUIDACION,
                SUA.FND_FECHA_VALOR_RCV AS FTD_SUA_FECHA_VALOR_RCV,
                SUA.FND_FECHA_PAGO AS FTD_SUA_FECHA_PAGO,
@@ -56,7 +57,7 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
                FCN_ID_SIEFORE,
                FTC_FOLIO,
                FTF_MONTO_ACCIONES,
-               FTF_MONTO_PESOS,
+               ROUND(FTF_MONTO_PESOS, 2),
                FTD_FEH_LIQUIDACION,
                'M' AS FTC_BD_ORIGEN
         FROM TTAFOGRAL_MOV_BONO
@@ -71,7 +72,7 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
                DT.FTC_FOLIO AS FTC_FOLIO,
                DT.FNN_ID_REFERENCIA AS FTN_REFERENCIA,
                DT.FTF_MONTO_ACCIONES AS FTF_MONTO_ACCIONES,
-               DT.FTF_MONTO_PESOS AS FTF_MONTO_PESOS,
+               ROUND(DT.FTF_MONTO_PESOS, 2) AS FTF_MONTO_PESOS,
                DT.FTD_FEH_LIQUIDACION AS FTD_FEH_LIQUIDACION,
                SUA.FND_FECHA_VALOR_RCV AS FTD_SUA_FECHA_VALOR_RCV,
                SUA.FND_FECHA_PAGO AS FTD_SUA_FECHA_PAGO,
@@ -96,7 +97,7 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
                FCN_ID_SIEFORE,
                FTC_FOLIO,
                FTF_MONTO_ACCIONES,
-               FTF_MONTO_PESOS,
+               ROUND(FTF_MONTO_PESOS, 2),
                FTD_FEH_LIQUIDACION,
                'M' AS FTC_BD_ORIGEN
         FROM TTAFOGRAL_MOV_GOB
@@ -111,7 +112,7 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
                DT.FTC_FOLIO AS FTC_FOLIO,
                DT.FNN_ID_REFERENCIA AS FTN_REFERENCIA,
                DT.FTF_MONTO_ACCIONES AS FTF_MONTO_ACCIONES,
-               DT.FTF_MONTO_PESOS AS FTF_MONTO_PESOS,
+               ROUND(DT.FTF_MONTO_PESOS, 2) AS FTF_MONTO_PESOS,
                DT.FTD_FEH_LIQUIDACION AS FTD_FEH_LIQUIDACION,
                SUA.FND_FECHA_VALOR_RCV AS FTD_SUA_FECHA_VALOR_RCV,
                SUA.FND_FECHA_PAGO AS FTD_SUA_FECHA_PAGO,
@@ -136,7 +137,7 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
                FCN_ID_SIEFORE,
                FTC_FOLIO,
                FTF_MONTO_ACCIONES,
-               FTF_MONTO_PESOS,
+               ROUND(FTF_MONTO_PESOS, 2),
                FTD_FEH_LIQUIDACION,
                'M' AS FTC_BD_ORIGEN
         FROM TTAFOGRAL_MOV_SAR
@@ -150,7 +151,7 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
                FCN_ID_SIEFORE,
                FTC_FOLIO,
                FTF_MONTO_ACCIONES,
-               FTF_MONTO_PESOS,
+               ROUND(FTF_MONTO_PESOS, 2),
                FTD_FEH_LIQUIDACION,
                'M' AS FTC_BD_ORIGEN
         FROM TTAFOGRAL_MOV_VIV

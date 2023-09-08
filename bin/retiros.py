@@ -24,7 +24,7 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
     spark = _get_spark_session()
 
     with register_time(postgres_pool, phase,area ,term_id):
-        truncate_table(postgres, 'TEST_RETIROS', term=term_id)
+        truncate_table(postgres, 'TTHECHOS_RETIRO', term=term_id)
         extract_dataset_spark(
         configure_mit_spark,
         configure_postgres_spark, """
@@ -246,8 +246,7 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
                     tmsmni.TMC_DESC_NCI,
                     tmsmni.TMN_CVE_NCI
                 FROM CIERREN.TMSISGRAL_MAP_NCI_ITGY tmsmni
-                WHERE tmsmni.TMN_CVE_ITGY IS NULL
-                    AND tmsmni.TMC_USO = 'TIPO_TRAMITE_ACT'
+                WHERE TMC_DESC_ITGY IN ('T97', 'TRU' ,'TED', 'TNP', 'TPP', 'T73', 'TPR', 'TGF', 'TED', 'TPI', 'TPG', 'TRJ', 'TJU', 'TIV', 'TIX', 'TEI', 'TPP', 'RJP', 'TAI', 'TNI', 'TRE', 'PPI', 'RCI', 'TJI')
             ),
             TTCRXGRAL AS (
                 SELECT
@@ -360,7 +359,7 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
                            SHMAX.FCN_ID_TIPO_SUBCTA,
                            MAX(TRUNC(SHMAX.FTD_FEH_LIQUIDACION)) AS FTD_FEH_LIQUIDACION
                     FROM cierren.thafogral_saldo_historico_v2 SHMAX
-                    WHERE SHMAX.FTD_FEH_LIQUIDACION <= to_date('01/03/2023','dd/MM/yyyy')
+                    WHERE SHMAX.FTD_FEH_LIQUIDACION <= to_date('01/04/2023','dd/MM/yyyy')
                     GROUP BY SHMAX.FTN_NUM_CTA_INVDUAL, SHMAX.FCN_ID_SIEFORE, SHMAX.FCN_ID_TIPO_SUBCTA
                 ) SHMAXIMO ON SH.FTN_NUM_CTA_INVDUAL = SHMAXIMO.FTN_NUM_CTA_INVDUAL
                           AND SH.FCN_ID_TIPO_SUBCTA = SHMAXIMO.FCN_ID_TIPO_SUBCTA AND SH.FCN_ID_SIEFORE = SHMAXIMO.FCN_ID_SIEFORE
@@ -369,7 +368,7 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
                     SELECT ROW_NUMBER() OVER(PARTITION BY FCN_ID_SIEFORE, FCN_ID_REGIMEN ORDER BY FCD_FEH_ACCION DESC) AS ROW_NUM,
                            FCN_ID_SIEFORE, FCN_ID_REGIMEN, FCN_VALOR_ACCION, FCD_FEH_ACCION
                     FROM cierren.TCAFOGRAL_VALOR_ACCION
-                    WHERE FCD_FEH_ACCION <= to_date('01/03/2023','dd/MM/yyyy')
+                    WHERE FCD_FEH_ACCION <= to_date('31/03/2023','dd/MM/yyyy')
                 ) VA ON SH.FCN_ID_SIEFORE = VA.FCN_ID_SIEFORE
                     AND R.FCN_ID_REGIMEN = VA.FCN_ID_REGIMEN
                     AND VA.ROW_NUM = 1
@@ -436,7 +435,8 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
             ON ldttp.FTC_FOLIO = dpg.FTC_FOLIO
             INNER JOIN SALDOS s 
             on ldttp.FTN_NUM_CTA_INVDUAL = s.FCN_CUENTA and ldttp.FCN_ID_TIPO_SUBCTA = s.FCN_ID_TIPO_SUBCTA
-            """, '"HECHOS"."TEST_RETIROS"',
+            WHERE ldttp.TMC_DESC_ITGY IN ('T97', 'TED', 'TNP', 'TPP', 'T73', 'TPR', 'TGF', 'TED', 'TPI', 'TPG', 'TRJ', 'TJU', 'TIV', 'TIX', 'TEI', 'TPP', 'RJP', 'TAI', 'TNI', 'TRE', 'PPI', 'RCI', 'TJI')
+            """, '"HECHOS"."TTHECHOS_RETIRO"',
         term = term_id,
         params = {"start": start_month, "end": end_month})
 
@@ -445,7 +445,7 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
             """
             SELECT ROW_NUMBER() over (ORDER BY "FCN_CUENTA") id,
             * 
-            FROM "HECHOS"."TEST_RETIROS"
+            FROM "HECHOS"."TTHECHOS_RETIRO"
             """,
             "retiros")
 
@@ -474,7 +474,8 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
                 "FTN_TIPO_PAGO",
                 "FTC_CVE_BANCO",
                 "FTC_TIPO_BANCO",
-                "FTC_MEDIO_PAGO"
+                "FTC_MEDIO_PAGO",
+                "FTD_FEH_CRE"
         ]
 
         # Cifras de control
@@ -504,17 +505,19 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
             FTN_TIPO_PAGO,
             FTC_CVE_BANCO,
             FTC_TIPO_BANCO,
-            FTC_MEDIO_PAGO
+            FTC_MEDIO_PAGO,
+            FTD_FEH_CRE
         from retiros)
         SELECT 
             id,
             FCN_CUENTA,
             FCN_ID_TIPO_SUBCTA,
-            IF(FTN_TIPO_AHORRO == 1, 'VOL', 'VIV') AS FTN_TIPO_AHORRO ,
+            IF(FTN_TIPO_AHORRO == 1, 'RET', 'VIV') AS FTN_TIPO_AHORRO ,
             FCN_ID_SIEFORE,
-            SUM(FTF_SALDO_INICIAL) AS FTF_SALDO_INICIAL,
-            SUM(FTF_MONTO_PESOS_LIQUIDADO) AS FTF_MONTO_PESOS_LIQUIDADO,
-            SUM(FTF_ISR) AS FTF_ISR,
+            ROUND(SUM(FTF_SALDO_INICIAL),2) + ( ROUND(SUM(FTF_MONTO_PESOS_LIQUIDADO),2) + ROUND(SUM(FTF_ISR),2)) AS FTF_SALDO_INICIAL,
+            ROUND(SUM(FTF_MONTO_PESOS_LIQUIDADO),2) AS FTF_MONTO_PESOS_LIQUIDADO,
+            ROUND(SUM(FTF_ISR),2) AS FTF_ISR,
+            ROUND(SUM(FTF_SALDO_INICIAL),2) AS SALDO_REMANENTE,
             FTC_TIPO_TRAMITE,
             FTC_TIPO_PRESTACION,
             FTC_LEY_PENSION,
@@ -531,9 +534,33 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
             FTN_TIPO_PAGO,
             FTC_CVE_BANCO,
             FTC_TIPO_BANCO,
-            FTC_MEDIO_PAGO
+            FTC_MEDIO_PAGO,
+            FTD_FEH_CRE
         FROM DATASET
-        GROUP BY 1,2,3,4,5, 9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25
+        GROUP BY 
+        id,
+         FCN_CUENTA,
+            FCN_ID_TIPO_SUBCTA,
+            FTN_TIPO_AHORRO,
+            FCN_ID_SIEFORE,
+            FTC_TIPO_TRAMITE,
+            FTC_TIPO_PRESTACION,
+            FTC_LEY_PENSION,
+            FTC_CVE_REGIMEN,
+            FTC_CVE_TIPO_SEG,
+            FTC_CVE_TIPO_PEN,
+            FTC_TPSEGURO,
+            FTC_TPPENSION,
+            FTC_REGIMEN,
+            FCN_ID_REGIMEN,
+            FTC_TMC_DESC_ITGY,
+            FCN_ID_PROCESO_DPG,
+            FCN_ID_SUBPROCESO_DPG,
+            FTN_TIPO_PAGO,
+            FTC_CVE_BANCO,
+            FTC_TIPO_BANCO,
+            FTC_MEDIO_PAGO,
+            FTD_FEH_CRE
         """)
 
         df.show(10)
@@ -545,7 +572,7 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
 
         pandas_df['id'] = pandas_df['id'].astype(int)
         # Dividir el resultado en tablas HTML de 50 en 50
-        batch_size = 45500
+        batch_size = 10000
         for start in range(0, max_id, batch_size):
             end = start + batch_size
             batch_pandas_df = pandas_df[(pandas_df['id'] >= start) & (pandas_df['id'] < end)]

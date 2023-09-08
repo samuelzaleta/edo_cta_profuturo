@@ -1,5 +1,5 @@
 from profuturo.common import register_time, define_extraction, notify,truncate_table
-from profuturo.database import get_postgres_pool, get_buc_pool,  configure_mit_spark, configure_postgres_spark
+from profuturo.database import get_postgres_pool, get_buc_pool,  configure_buc_spark, configure_mit_spark, configure_postgres_spark
 from profuturo.extraction import extract_dataset_spark, _get_spark_session, _write_spark_dataframe, read_table_insert_temp_view
 from profuturo.reporters import HtmlReporter
 from profuturo.extraction import extract_terms
@@ -11,8 +11,8 @@ html_reporter = HtmlReporter()
 postgres_pool = get_postgres_pool()
 buc_pool = get_buc_pool()
 phase = int(sys.argv[1])
-area =int(sys.argv[4])
-usuario = int(sys.argv[3])
+area = int(sys.argv[4])
+user = int(sys.argv[3])
 
 with define_extraction(phase, postgres_pool, buc_pool) as (postgres, buc):
     term = extract_terms(postgres, phase)
@@ -22,24 +22,40 @@ with define_extraction(phase, postgres_pool, buc_pool) as (postgres, buc):
     end_month = term["end_month"]
     spark = _get_spark_session()
 
-    with register_time(postgres_pool, phase,area,usuario,term_id):
-        truncate_table(postgres, "TCDATMAE_CLIENTE", term=term_id)
+    with register_time(postgres_pool, phase=phase,area= area, usuario=user, term=term_id):
+        truncate_table(postgres, "TCDATMAE_CLIENTE")
         # Extracción
         query = """
-        SELECT C.NUMERO AS id,
-               PF.NOMBRE AS name,
-               PF.APELLIDOPATERNO AS middle_name,
-               PF.APELIDOMATERNO AS last_name,
-               DI.CALLE AS street,
-               DI.NUMEROEXTERIOR AS street_number,
-               ASE.NOMBRE AS colony,
-               CD.NOMBRE AS municipality,
-               M.NOMBRE AS delegacion,
-               CP.CODIGOPOSTAL AS zip,
-               E.NOMBRE AS state,
-               NSS.VALOR_IDENTIFICADOR AS nss,
-               CURP.VALOR_IDENTIFICADOR AS curp,
-               RFC.VALOR_IDENTIFICADOR AS rfc
+        SELECT 
+        FTN_CUENTA,
+        FTC_NOMBRE,
+        FTC_AP_PATERNO,
+        FTC_AP_MATERNO,
+        FTC_CALLE,
+        FTC_NUMERO,
+        FTC_COLONIA,
+        FTC_DELEGACION,
+        FTN_CODIGO_POSTAL,
+        FTC_ENTIDAD_FEDERATIVA,
+        FTC_NSS,
+        FTC_CURP,
+        FTC_RFC 
+        FROM (
+            SELECT
+               ROW_NUMBER() over (partition by TO_NUMBER(REGEXP_REPLACE(TO_CHAR(C.NUMERO), '[^0-9]', '')) order by C.NUMERO) AS id,
+               TO_NUMBER(REGEXP_REPLACE(TO_CHAR(C.NUMERO), '[^0-9]', '')) AS FTN_CUENTA,
+               PF.NOMBRE AS FTC_NOMBRE,
+               PF.APELLIDOPATERNO AS FTC_AP_PATERNO,
+               PF.APELIDOMATERNO AS FTC_AP_MATERNO,
+               DI.CALLE AS FTC_CALLE,
+               DI.NUMEROEXTERIOR AS FTC_NUMERO,
+               ASE.NOMBRE AS FTC_COLONIA,
+               CD.NOMBRE AS FTC_DELEGACION,
+               CAST(CP.CODIGOPOSTAL AS INTEGER) AS FTN_CODIGO_POSTAL,
+               E.NOMBRE AS FTC_ENTIDAD_FEDERATIVA,
+               NSS.VALOR_IDENTIFICADOR AS FTC_NSS,
+               CURP.VALOR_IDENTIFICADOR AS FTC_CURP,
+               RFC.VALOR_IDENTIFICADOR AS FTC_RFC
         FROM CONTRATO C
             INNER JOIN PERSONA_CONT_ROL PCR ON C.IDCONTRATO = PCR.IDCONTRATO
             INNER JOIN PERSONA_FISICA PF ON PCR.IDPERSONA = PF.IDPERSONA
@@ -61,9 +77,10 @@ with define_extraction(phase, postgres_pool, buc_pool) as (postgres, buc):
           AND D.IDTIPODOM = 818 -- Tipo de domicilio Particular
           -- AND D.IDSTATUSDOM = 761 ACTIVO
           -- AND D.PREFERENTE = 1 Domicilio preferente
+            ) where id = 1
         """
         extract_dataset_spark(
-            configure_mit_spark,
+            configure_buc_spark,
             configure_postgres_spark,
             query,
             '"MAESTROS"."TCDATMAE_CLIENTE"'
@@ -209,7 +226,7 @@ with define_extraction(phase, postgres_pool, buc_pool) as (postgres, buc):
                I."FTC_ORIGEN" AS ORIGEN,
                COUNT(DISTINCT I."FCN_CUENTA") AS CLIENTES
         FROM "HECHOS"."TCHECHOS_CLIENTE" I
-         WHERE I."FCN_ID_PERIODO" = 27
+         WHERE I."FCN_ID_PERIODO" = :term
         GROUP BY I."FTC_GENERACION", I."FTC_VIGENCIA", I."FTC_TIPO_CLIENTE", I."FTC_ORIGEN"
              """,
             ["Tipo Generación", "Vigencia", "Tipo Cliente", "Indicador Afiliación"],
