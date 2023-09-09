@@ -11,6 +11,7 @@ postgres_pool = get_postgres_pool()
 mit_pool = get_mit_pool()
 buc_pool = get_buc_pool()
 phase = int(sys.argv[1])
+user = int(sys.argv[3])
 
 with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
     term = extract_terms(postgres, phase)
@@ -18,7 +19,7 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
     start_month = term["start_month"]
     end_month = term["end_month"]
 
-    with register_time(postgres_pool, phase, term_id):
+    with register_time(postgres_pool, phase, usuario=user, term=term_id):
         # Extracción
         truncate_table(postgres, "TCHECHOS_CLIENTE", term=term_id)
 

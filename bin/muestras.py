@@ -37,6 +37,7 @@ html_reporter = HtmlReporter()
 postgres_pool = get_postgres_pool()
 phase = int(sys.argv[1])
 area = int(sys.argv[4])
+user = int(sys.argv[3])
 
 with define_extraction(phase, postgres_pool, postgres_pool) as (postgres, _):
     postgres: Connection
@@ -46,7 +47,7 @@ with define_extraction(phase, postgres_pool, postgres_pool) as (postgres, _):
     start_month = term["start_month"]
     end_month = term["end_month"]
 
-    with register_time(postgres_pool, phase, area, term=term_id):
+    with register_time(postgres_pool, phase, area, usuario=user, term=term_id):
         # Extracción
         cursor = postgres.execute(text("""
         SELECT "FCN_ID_MOVIMIENTO_CONSAR", "FCN_NUM_MUESTRAS"

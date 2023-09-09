@@ -6,14 +6,14 @@ from pyspark.sql.functions import col
 from warnings import filterwarnings
 import sys
 
-
 filterwarnings(action='ignore', category=DeprecationWarning, message='`np.bool` is a deprecated alias')
 html_reporter = HtmlReporter()
 postgres_pool = get_postgres_pool()
 mit_pool = get_mit_pool()
 phase = int(sys.argv[1])
 area = int(sys.argv[4])
-print(int(sys.argv[1]),int(sys.argv[2]),int(sys.argv[3]),int(sys.argv[4]))
+user = int(sys.argv[3])
+print(int(sys.argv[1]), int(sys.argv[2]), int(sys.argv[3]), int(sys.argv[4]))
 
 with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
     term = extract_terms(postgres, phase)
@@ -23,11 +23,11 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
     end_month = term["end_month"]
     spark = _get_spark_session()
 
-    with register_time(postgres_pool, phase,area ,term_id):
+    with register_time(postgres_pool, phase, area, usuario=user, term=term_id):
         truncate_table(postgres, 'TTHECHOS_RETIRO', term=term_id)
         extract_dataset_spark(
-        configure_mit_spark,
-        configure_postgres_spark, """
+            configure_mit_spark,
+            configure_postgres_spark, """
             WITH LIQ_SOLICITUDES AS (
                 SELECT
                 FTC_FOLIO,
@@ -437,8 +437,8 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
             on ldttp.FTN_NUM_CTA_INVDUAL = s.FCN_CUENTA and ldttp.FCN_ID_TIPO_SUBCTA = s.FCN_ID_TIPO_SUBCTA
             WHERE ldttp.TMC_DESC_ITGY IN ('T97', 'TED', 'TNP', 'TPP', 'T73', 'TPR', 'TGF', 'TED', 'TPI', 'TPG', 'TRJ', 'TJU', 'TIV', 'TIX', 'TEI', 'TPP', 'RJP', 'TAI', 'TNI', 'TRE', 'PPI', 'RCI', 'TJI')
             """, '"HECHOS"."TTHECHOS_RETIRO"',
-        term = term_id,
-        params = {"start": start_month, "end": end_month})
+            term=term_id,
+            params={"start": start_month, "end": end_month})
 
         read_table_insert_temp_view(
             configure_postgres_spark,
@@ -450,32 +450,32 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
             "retiros")
 
         columnas = [
-                "id",
-                "FCN_CUENTA",
-                "FCN_ID_TIPO_SUBCTA",
-                "FTN_TIPO_AHORRO",
-                "FCN_ID_SIEFORE",
-                "FTF_SALDO_INICIAL",
-                "FTF_ISR",
-                "FTF_MONTO_PESOS_LIQUIDADO",
-                "FTC_TIPO_TRAMITE",
-                "FTC_TIPO_PRESTACION",
-                "FTC_LEY_PENSION",
-                "FTC_CVE_REGIMEN",
-                "FTC_CVE_TIPO_SEG",
-                "FTC_CVE_TIPO_PEN",
-                "FTC_TPSEGURO",
-                "FTC_TPPENSION",
-                "FTC_REGIMEN",
-                "FCN_ID_REGIMEN",
-                "FTC_TMC_DESC_ITGY",
-                "FCN_ID_PROCESO_DPG",
-                "FCN_ID_SUBPROCESO_DPG",
-                "FTN_TIPO_PAGO",
-                "FTC_CVE_BANCO",
-                "FTC_TIPO_BANCO",
-                "FTC_MEDIO_PAGO",
-                "FTD_FEH_CRE"
+            "id",
+            "FCN_CUENTA",
+            "FCN_ID_TIPO_SUBCTA",
+            "FTN_TIPO_AHORRO",
+            "FCN_ID_SIEFORE",
+            "FTF_SALDO_INICIAL",
+            "FTF_ISR",
+            "FTF_MONTO_PESOS_LIQUIDADO",
+            "FTC_TIPO_TRAMITE",
+            "FTC_TIPO_PRESTACION",
+            "FTC_LEY_PENSION",
+            "FTC_CVE_REGIMEN",
+            "FTC_CVE_TIPO_SEG",
+            "FTC_CVE_TIPO_PEN",
+            "FTC_TPSEGURO",
+            "FTC_TPPENSION",
+            "FTC_REGIMEN",
+            "FCN_ID_REGIMEN",
+            "FTC_TMC_DESC_ITGY",
+            "FCN_ID_PROCESO_DPG",
+            "FCN_ID_SUBPROCESO_DPG",
+            "FTN_TIPO_PAGO",
+            "FTC_CVE_BANCO",
+            "FTC_TIPO_BANCO",
+            "FTC_MEDIO_PAGO",
+            "FTD_FEH_CRE"
         ]
 
         # Cifras de control
@@ -586,6 +586,5 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
                 batch_html_table,
                 term=term_id,
                 control=True,
-                area = area
+                area=area
             )
-

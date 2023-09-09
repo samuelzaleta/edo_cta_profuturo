@@ -4,7 +4,6 @@ from profuturo.extraction import extract_terms, extract_dataset_spark
 from profuturo.reporters import HtmlReporter
 import sys
 
-
 html_reporter = HtmlReporter()
 postgres_pool = get_postgres_pool()
 mit_pool = get_mit_pool()
@@ -20,7 +19,7 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
     start_month = term["start_month"]
     end_month = term["end_month"]
 
-    with register_time(postgres_pool, phase=phase,area= area, usuario=user, term=term_id):
+    with register_time(postgres_pool, phase=phase, area=area, usuario=user, term=term_id):
         # Extracción
         truncate_table(postgres, 'TTHECHOS_MOVIMIENTO', term=term_id)
         extract_dataset_spark(configure_mit_spark, configure_postgres_spark, """
@@ -223,4 +222,3 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
             control=True,
             area=area
         )
-

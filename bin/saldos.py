@@ -4,11 +4,10 @@ from profuturo.extraction import extract_terms, extract_dataset_spark
 from profuturo.reporters import HtmlReporter
 import sys
 
-
 html_reporter = HtmlReporter()
 postgres_pool = get_postgres_pool()
 phase = int(sys.argv[1])
-area=int(sys.argv[4])
+area = int(sys.argv[4])
 user = int(sys.argv[3])
 
 with define_extraction(phase, postgres_pool, postgres_pool) as (postgres, _):
@@ -19,7 +18,7 @@ with define_extraction(phase, postgres_pool, postgres_pool) as (postgres, _):
     end_saldos = term["end_saldos"]
     valor_accion = term["valor_accion"]
 
-    with register_time(postgres_pool, phase=phase,area= area, usuario=user, term=term_id):
+    with register_time(postgres_pool, phase=phase, area=area, usuario=user, term=term_id):
         # Extracción
         query = """
         SELECT SH.FTN_NUM_CTA_INVDUAL AS FCN_CUENTA,
@@ -109,7 +108,7 @@ with define_extraction(phase, postgres_pool, postgres_pool) as (postgres, _):
             WHERE "FCN_ID_PERIODO" = :term
             GROUP BY TS."FCC_VALOR", S."FTC_DESCRIPCION_CORTA"
             """,
-            ["TIPO_SUBCUENTA","SIEFORE"],
+            ["TIPO_SUBCUENTA", "SIEFORE"],
             ["Saldo final en pesos", "Saldo final en acciones"],
             params={"term": term_id},
         )

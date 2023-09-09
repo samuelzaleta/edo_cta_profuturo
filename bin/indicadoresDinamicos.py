@@ -1,6 +1,7 @@
 from sqlalchemy import text
 from profuturo.common import register_time, define_extraction, truncate_table
-from profuturo.database import SparkConnectionConfigurator, get_postgres_pool, configure_mit_spark, configure_postgres_spark, configure_buc_spark, configure_integrity_spark
+from profuturo.database import SparkConnectionConfigurator, get_postgres_pool, configure_mit_spark, \
+    configure_postgres_spark, configure_buc_spark, configure_integrity_spark
 from profuturo.extraction import update_indicator_spark, extract_dataset_spark
 from profuturo.reporters import HtmlReporter
 from profuturo.extraction import extract_terms
@@ -18,7 +19,7 @@ with define_extraction(phase, postgres_pool, postgres_pool) as (postgres, _):
     start_month = term["start_month"]
     end_month = term["end_month"]
 
-    with register_time(postgres_pool, phase=phase,area= area, usuario=user, term=term_id):
+    with register_time(postgres_pool, phase=phase, area=area, usuario=user, term=term_id):
         # Indicadores dinámicos
         truncate_table(postgres, "TCHECHOS_CLIENTE_INDICADOR", term=term_id)
         indicators = postgres.execute(text("""
@@ -50,7 +51,8 @@ with define_extraction(phase, postgres_pool, postgres_pool) as (postgres, _):
                 else:
                     origin_configurator = configure_postgres_spark
 
-                update_indicator_spark(origin_configurator, configure_postgres_spark, query, indicator._mapping, term=term_id)
+                update_indicator_spark(origin_configurator, configure_postgres_spark, query, indicator._mapping,
+                                       term=term_id)
 
             print(f"Done extracting {indicator[1]}!")
 

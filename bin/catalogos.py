@@ -8,13 +8,15 @@ postgres_pool = get_postgres_pool()
 mit_pool = get_mit_pool()
 phase = int(sys.argv[1])
 area = int(sys.argv[4])
+user = int(sys.argv[3])
+
 with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
     term = extract_terms(postgres, phase)
     term_id = term["id"]
     time_period = term["time_period"]
     spark = _get_spark_session()
 
-    with register_time(postgres_pool, phase, area, term_id):
+    with register_time(postgres_pool, phase, area, user, term_id):
 
         upsert_dataset(mit, postgres, """
         SELECT S.FCN_ID_SIEFORE AS id, C.FCC_VALOR AS description

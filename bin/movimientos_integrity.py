@@ -66,6 +66,7 @@ postgres_pool = get_postgres_pool()
 integrity_pool = get_integrity_pool("cierren")
 
 phase = int(sys.argv[1])
+user = int(sys.argv[3])
 
 with define_extraction(phase, postgres_pool, integrity_pool) as (postgres, integrity):
     term = extract_terms(postgres, phase)
@@ -91,7 +92,7 @@ with define_extraction(phase, postgres_pool, integrity_pool) as (postgres, integ
     """))
     switches = cursor2.fetchall()
 
-    with register_time(postgres_pool, phase, term=term_id):
+    with register_time(postgres_pool, phase, usuario=user, term=term_id):
         #truncate_table(postgres, "TEST_MOVIMIENTOS", term=term_id)
         extract_dataset(integrity, postgres, f"""
         SELECT CSIE1_NUMCUE, --AS FCN_CUENTA, 

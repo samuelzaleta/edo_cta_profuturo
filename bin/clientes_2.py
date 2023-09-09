@@ -1,17 +1,17 @@
-from profuturo.common import register_time, define_extraction, notify,truncate_table
-from profuturo.database import get_postgres_pool, get_buc_pool,  configure_mit_spark, configure_postgres_spark
+from profuturo.common import register_time, define_extraction, notify, truncate_table
+from profuturo.database import get_postgres_pool, get_buc_pool, configure_mit_spark, configure_postgres_spark
 from profuturo.extraction import upsert_dataset, _get_spark_session, _write_spark_dataframe, read_table_insert_temp_view
 from profuturo.reporters import HtmlReporter
 from profuturo.extraction import extract_terms
 from pyspark.sql.functions import lit
 import sys
 
-
 html_reporter = HtmlReporter()
 postgres_pool = get_postgres_pool()
 buc_pool = get_buc_pool()
 phase = int(sys.argv[1])
-area =int(sys.argv[4])
+area = int(sys.argv[4])
+user = int(sys.argv[3])
 
 with define_extraction(phase, postgres_pool, buc_pool) as (postgres, buc):
     term = extract_terms(postgres, phase)
@@ -21,7 +21,7 @@ with define_extraction(phase, postgres_pool, buc_pool) as (postgres, buc):
     end_month = term["end_month"]
     spark = _get_spark_session()
 
-    with register_time(postgres_pool, phase,area ,term_id):
+    with register_time(postgres_pool, phase, area, user, term_id):
         # Extracción
         upsert_dataset(buc, postgres, """
         SELECT C.NUMERO AS id,
@@ -206,7 +206,7 @@ with define_extraction(phase, postgres_pool, buc_pool) as (postgres, buc):
             LEFT JOIN indicador_vigencia v ON o.FCN_CUENTA = v.FCN_CUENTA
             LEFT JOIN indicador_bono b ON o.FCN_CUENTA = b.FCN_CUENTA
         """)
-        #df = df.withColumn("FTO_INDICADORES", to_json(struct(lit('{}'))))
+        # df = df.withColumn("FTO_INDICADORES", to_json(struct(lit('{}'))))
         df.show(2)
         df = df.dropDuplicates(["FCN_CUENTA"])
         _write_spark_dataframe(df, configure_postgres_spark, '"HECHOS"."TCHECHOS_CLIENTE"')
