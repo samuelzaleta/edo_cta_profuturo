@@ -30,8 +30,8 @@ def register_start(conn: Connection, phase: int, area: int, usuario: int ,start:
     try:
         cursor = conn.execute(text("""
         INSERT INTO "TTGESPRO_BITACORA_ESTADO_CUENTA" (
-           "FTD_FECHA_HORA_INICIO", "FCN_ID_PERIODO", "FCN_ID_FASE", "FCN_ID_AREA")
-        VALUES (:start, :term, :phase, :area)
+           "FTD_FECHA_HORA_INICIO", "FCN_ID_PERIODO", "FCN_ID_FASE", "FCN_ID_AREA", "FCN_ID_USUARIO")
+        VALUES (:start, :term, :phase, :area, :usuario)
         RETURNING "FTN_ID_BITACORA_ESTADO_CUENTA"
         """), {
             "start": start,
