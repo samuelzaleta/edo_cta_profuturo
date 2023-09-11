@@ -152,6 +152,25 @@ with define_extraction(phase, postgres_pool, buc_pool) as (postgres, buc):
         spark.sql("select count(*) as count_indicador_bono from indicador_bono").show()
 
         read_table_insert_temp_view(configure_mit_spark, """
+        SELECT pg.FTN_NUM_CTA_INVDUAL, S.FCC_VALOR
+        FROM BENEFICIOS.TTCRXGRAL_PAGO PG
+            INNER JOIN CIERREN.TCCRXGRAL_CAT_CATALOGO S ON PG.FCN_ID_SUBPROCESO = S.FCN_ID_CAT_CATALOGO
+            INNER JOIN BENEFICIOS.TTCRXGRAL_PAGO_SUBCTA PGS ON PGS.FTC_FOLIO = PG.FTC_FOLIO AND PGS.FTC_FOLIO_LIQUIDACION = PG.FTC_FOLIO_LIQUIDACION
+        WHERE PG.FCN_ID_PROCESO IN (4050, 4051)
+          AND PG.FCN_ID_SUBPROCESO IN (309, 310)
+          AND PGS.FCN_ID_TIPO_SUBCTA NOT IN (15, 16, 17, 18)
+          AND PG.FTD_FEH_LIQUIDACION BETWEEN :start AND :end
+        """, "indicador_tipo_pension", {'start': start_month, 'end': end_month})
+        spark.sql("select count(*) as count_tipo_pension from indicador_tipo_pension").show()
+
+        read_table_insert_temp_view(configure_mit_spark, """
+        SELECT P.FTN_NUM_CTA_INVDUAL AS FCN_CUENTA, C.FCC_DESC AS FCC_VALOR
+        FROM TTAFOGRAL_OSS P
+        INNER JOIN CIERREN.TCCRXGRAL_CAT_CATALOGO C ON P.FCN_ID_GRUPO = C.FCN_ID_CAT_CATALOGO
+        """, "indicador_perfil_inversion")
+        spark.sql("select count(*) as count_perfil_inversion from indicador_perfil_inversion").show()
+
+        read_table_insert_temp_view(configure_mit_spark, """
         WITH TIPO_SUBCUENTA AS (
             SELECT DISTINCT TS.FCN_ID_TIPO_SUBCTA, C.FCC_VALOR
             FROM TCCRXGRAL_TIPO_SUBCTA TS
@@ -202,7 +221,9 @@ with define_extraction(phase, postgres_pool, buc_pool) as (postgres, buc):
                o.FCC_VALOR AS FTC_ORIGEN,
                v.FCC_VALOR AS FTC_VIGENCIA,
                g.FCC_VALOR AS FTC_GENERACION,
-               coalesce(cast(p.FCC_VALOR AS BOOLEAN), cast('FALSE' as BOOLEAN))  AS FTB_BONO
+               coalesce(cast(p.FCC_VALOR AS BOOLEAN), cast('FALSE' as BOOLEAN))  AS FTB_BONO,
+               p.FCC_VALOR AS FTC_TIPO_PENSION,
+               i.FCC_VALOR AS FTC_PERFIL_INVERSION
                --JSON_OBJECT('Vigencia', v.FCC_VALOR, 'Generacion', g.FCC_VALOR) AS FTO_INDICADORES
         FROM indicador_origen o
             LEFT JOIN indicador_generacion g ON o.FCN_CUENTA = g.FCN_CUENTA
@@ -210,6 +231,8 @@ with define_extraction(phase, postgres_pool, buc_pool) as (postgres, buc):
             LEFT JOIN indicador_pension p ON o.FCN_CUENTA = p.FCN_CUENTA
             LEFT JOIN indicador_vigencia v ON o.FCN_CUENTA = v.FCN_CUENTA
             LEFT JOIN indicador_bono b ON o.FCN_CUENTA = b.FCN_CUENTA
+            LEFT JOIN indicador_tipo_pension p ON o.FCN_CUENTA = p.FCN_CUENTA
+            LEFT JOIN indicador_perfil_inversion i ON o.FCN_CUENTA = i.FCN_CUENTA
         """)
         #df = df.withColumn("FTO_INDICADORES", to_json(struct(lit('{}'))))
         df.show(2)
