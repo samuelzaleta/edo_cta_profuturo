@@ -52,13 +52,13 @@ with define_extraction(phase, postgres_pool, postgres_pool) as (postgres, _):
                    S."FTC_DESCRIPCION_CORTA" AS SIEFORE,
                    SUM(C."FTF_MONTO_PESOS") AS COMISIONES
             FROM "HECHOS"."TTHECHOS_COMISION" C
-                INNER JOIN "TCHECHOS_CLIENTE" I ON C."FCN_CUENTA" = I."FCN_CUENTA" AND C."FCN_ID_PERIODO" = I."FCN_ID_PERIODO"
-                INNER JOIN "TCDATMAE_SIEFORE" S ON C."FCN_ID_SIEFORE" = S."FTN_ID_SIEFORE"
+                INNER JOIN "HECHOS"."TCHECHOS_CLIENTE" I ON C."FCN_CUENTA" = I."FCN_CUENTA" AND C."FCN_ID_PERIODO" = I."FCN_ID_PERIODO"
+                INNER JOIN "MAESTROS"."TCDATMAE_SIEFORE" S ON C."FCN_ID_SIEFORE" = S."FTN_ID_SIEFORE"
             WHERE C."FCN_ID_PERIODO" = :term
             GROUP BY  I."FTC_GENERACION", I."FTC_VIGENCIA", I."FTC_TIPO_CLIENTE", I."FTC_ORIGEN", S."FTC_DESCRIPCION_CORTA"
             """,
-            ["Tipo Generación", "Vigencia", "Tipo Formato", "Indicador Afiliación", "SIEFORE"],
             ["Comisiones"],
+            ["Tipo Generación", "Vigencia", "Tipo Formato", "Indicador Afiliación", "SIEFORE"],
             params={"term": term_id},
         )
 
