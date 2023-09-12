@@ -207,18 +207,16 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
         notify(
             postgres,
             "Cifras de control movimientos generadas",
-            f"Se han generado las cifras de control para comisiones exitosamente para el periodo {time_period}",
+            f"Se han generado las cifras de control para movimientos exitosamente para el periodo {time_period}",
             report1,
             term=term_id,
-            control=True,
             area=area
         )
         notify(
             postgres,
             "Cifras de control movimientos generadas",
-            f"Se han generado las cifras de control para comisiones exitosamente para el periodo {time_period}",
+            f"Se han generado las cifras de control para movimientos exitosamente para el periodo {time_period}",
             report2,
             term=term_id,
-            control=True,
             area=area
         )

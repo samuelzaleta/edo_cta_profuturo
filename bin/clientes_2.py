@@ -232,7 +232,7 @@ with define_extraction(phase, postgres_pool, buc_pool) as (postgres, buc):
         notify(
             postgres,
             "Clientes ingestados",
-            f"Se han ingestado los catálogos de forma exitosa para el periodo {time_period}",
+            f"Se han ingestado los clientes de forma exitosa para el periodo {time_period}",
             report,
             term=term_id,
             area=area

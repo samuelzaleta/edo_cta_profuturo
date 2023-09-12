@@ -119,7 +119,6 @@ with define_extraction(phase, postgres_pool, postgres_pool) as (postgres, _):
             f"Se han generado las cifras de control para saldos exitosamente para el periodo {time_period}",
             report1,
             term=term_id,
-            control=True,
             area=area
         )
 
@@ -129,6 +128,5 @@ with define_extraction(phase, postgres_pool, postgres_pool) as (postgres, _):
             f"Se han generado las cifras de control para saldos exitosamente para el periodo {time_period}",
             report2,
             term=term_id,
-            control=True,
             area=area
         )

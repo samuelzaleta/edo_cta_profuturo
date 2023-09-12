@@ -1,5 +1,5 @@
 from sqlalchemy import text
-from profuturo.common import register_time, define_extraction, truncate_table
+from profuturo.common import register_time, define_extraction, truncate_table, notify
 from profuturo.database import SparkConnectionConfigurator, get_postgres_pool, configure_mit_spark, \
     configure_postgres_spark, configure_buc_spark, configure_integrity_spark
 from profuturo.extraction import update_indicator_spark, extract_dataset_spark
@@ -16,6 +16,7 @@ area = int(sys.argv[4])
 with define_extraction(phase, postgres_pool, postgres_pool) as (postgres, _):
     term = extract_terms(postgres, phase)
     term_id = term["id"]
+    time_period = term["time_period"]
     start_month = term["start_month"]
     end_month = term["end_month"]
 
@@ -63,3 +64,13 @@ with define_extraction(phase, postgres_pool, postgres_pool) as (postgres, _):
             INNER JOIN "GESTOR"."TCGESPRO_INDICADOR" I ON CA."FTC_TRAMITE" = I."FTC_TRAMITE"
         WHERE "FCN_ID_PERIODO" = :term
         """, '"HECHOS"."TCHECHOS_CLIENTE_INDICADOR"', term=term_id, params={'term': term_id})
+
+
+        notify(
+            postgres,
+            "Indicadores ingestados",
+            f"Se han ingestado los indicadores de forma exitosa para el periodo {time_period}",
+            report,
+            term=term_id,
+            area=area
+        )

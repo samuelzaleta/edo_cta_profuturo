@@ -65,9 +65,8 @@ with define_extraction(phase, postgres_pool, postgres_pool) as (postgres, _):
         notify(
             postgres,
             "Cifras de control Comisiones generadas",
-            f"Se han ingestado los catálogos de forma exitosa para el periodo {time_period}",
+            f"Se han ingestado las comisiones de forma exitosa para el periodo {time_period}",
             report,
             term=term_id,
-            control=True,
             area=area
         )

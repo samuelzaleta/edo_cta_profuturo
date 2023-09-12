@@ -582,9 +582,8 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
             notify(
                 postgres,
                 f"Cifras de control Retiros generadas - Parte {start}-{end - 1}",
-                f"Se han generado las cifras de control para retiros exitosamente para el periodo",
+                f"Se han generado las cifras de control para retiros exitosamente para el periodo {time_period}",
                 batch_html_table,
                 term=term_id,
-                control=True,
                 area=area
             )
