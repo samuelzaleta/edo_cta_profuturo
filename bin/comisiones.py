@@ -17,20 +17,24 @@ with define_extraction(phase, postgres_pool, postgres_pool) as (postgres, _):
     start_month = term["start_month"]
     end_month = term["end_month"]
 
-    with register_time(postgres_pool, phase, area, user, term_id):
+    with register_time(postgres_pool, phase=phase, area=area, usuario=user, term=term_id):
         # Extracción
         query = """
         SELECT FTN_NUM_CTA_INVDUAL AS FCN_CUENTA,
-               FCN_ID_CONCEPTO_MOV AS FCN_ID_CONCEPTO_MOVIMIENTO,
-               FTN_ID_MOV AS FCN_ID_MOVIMIENTO,
-               FCN_ID_TIPO_MOV AS FCN_ID_TIPO_MOVIMIENTO,
-               FCN_ID_SIEFORE,
-               FTC_FOLIO,
-               FTF_MONTO_ACCIONES,
-               FTD_FEH_LIQUIDACION,
-               FTF_MONTO_PESOS
-        FROM CIERREN.TTAFOGRAL_MOV_CMS
-        WHERE FTD_FEH_LIQUIDACION BETWEEN :start AND :end
+               C.FCN_ID_CONCEPTO_MOV AS FCN_ID_CONCEPTO_MOVIMIENTO,
+               C.FTN_ID_MOV AS FCN_ID_MOVIMIENTO,
+               C.FCN_ID_TIPO_MOV AS FCN_ID_TIPO_MOVIMIENTO,
+               C.FCN_ID_SIEFORE,
+               C.FTC_FOLIO,
+               C.FTF_MONTO_ACCIONES,
+               C.FTD_FEH_LIQUIDACION,
+               C.FTF_MONTO_PESOS,
+               S.FCN_ID_TIPO_SUBCTA as FTN_TIPO_SUBCTA
+        FROM CIERREN.TTAFOGRAL_MOV_CMS C
+        INNER JOIN CIERREN.TFCRXGRAL_CONFIG_MOV_ITGY M
+        ON C.FCN_ID_CONCEPTO_MOV =M.FFN_ID_CONCEPTO_MOV
+        INNER JOIN TRAFOGRAL_MOV_SUBCTA S ON M.FRN_ID_MOV_SUBCTA = S.FRN_ID_MOV_SUBCTA
+        WHERE C.FTD_FEH_LIQUIDACION BETWEEN :start AND :end
         """
         truncate_table(postgres, "TTHECHOS_COMISION", term=term_id)
         extract_dataset_spark(
@@ -39,7 +43,7 @@ with define_extraction(phase, postgres_pool, postgres_pool) as (postgres, _):
             query,
             '"HECHOS"."TTHECHOS_COMISION"',
             term=term_id,
-            params={"start": start_month, "end": end_month},
+            params={"start": start_month, "end": end_month}
         )
         # Cifras de control
         report = html_reporter.generate(
@@ -49,16 +53,16 @@ with define_extraction(phase, postgres_pool, postgres_pool) as (postgres, _):
                    I."FTC_VIGENCIA" AS VIGENCIA,
                    I."FTC_TIPO_CLIENTE" AS TIPO_CLIENTE,
                    I."FTC_ORIGEN" AS ORIGEN,
-                   S."FTC_DESCRIPCION_CORTA" AS SIEFORE,
-                   SUM(C."FTF_MONTO_PESOS") AS COMISIONES
+                   S."FCC_VALOR" AS SUBCUENTA,
+                   ROUND(SUM(C."FTF_MONTO_PESOS")::numeric, 2) AS COMISIONES
             FROM "HECHOS"."TTHECHOS_COMISION" C
-                INNER JOIN "TCHECHOS_CLIENTE" I ON C."FCN_CUENTA" = I."FCN_CUENTA" AND C."FCN_ID_PERIODO" = I."FCN_ID_PERIODO"
-                INNER JOIN "TCDATMAE_SIEFORE" S ON C."FCN_ID_SIEFORE" = S."FTN_ID_SIEFORE"
+                INNER JOIN "HECHOS"."TCHECHOS_CLIENTE" I ON C."FCN_CUENTA" = I."FCN_CUENTA" AND C."FCN_ID_PERIODO" = I."FCN_ID_PERIODO"
+                INNER JOIN "MAESTROS"."TCDATMAE_TIPO_SUBCUENTA" S ON C."FTN_TIPO_SUBCTA" = S."FTN_ID_TIPO_SUBCTA"
             WHERE C."FCN_ID_PERIODO" = :term
-            GROUP BY  I."FTC_GENERACION", I."FTC_VIGENCIA", I."FTC_TIPO_CLIENTE", I."FTC_ORIGEN", S."FTC_DESCRIPCION_CORTA"
+            GROUP BY  I."FTC_GENERACION", I."FTC_VIGENCIA", I."FTC_TIPO_CLIENTE", I."FTC_ORIGEN", S."FCC_VALOR"
             """,
-            ["Tipo Generación", "Vigencia", "Tipo Formato", "Indicador Afiliación", "SIEFORE"],
-            ["Comisiones"],
+            ["Tipo Generación", "Vigencia", "Tipo Formato", "Indicador Afiliación", "SUBCUENTA"],
+            ["Monto_Comisiones"],
             params={"term": term_id},
         )
 
