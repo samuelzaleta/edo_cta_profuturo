@@ -10,6 +10,7 @@ html_reporter = HtmlReporter()
 postgres_pool = get_postgres_pool()
 buc_pool = get_buc_pool()
 phase = int(sys.argv[1])
+periodo = int(sys.argv[2])
 area = int(sys.argv[4])
 user = int(sys.argv[3])
 
@@ -20,6 +21,7 @@ with define_extraction(phase, postgres_pool, buc_pool) as (postgres, buc):
     end_month = term["end_month"]
     spark = _get_spark_session()
 
+    print('phase',phase,'area', area, 'usuario',user, 'periodo', periodo)
     with register_time(postgres_pool, phase=phase,area= area, usuario=user, term=term_id):
         saldo_inicial_query = f"""
         SELECT
@@ -186,8 +188,8 @@ with define_extraction(phase, postgres_pool, buc_pool) as (postgres, buc):
                    I."FTC_TIPO_CLIENTE" AS TIPO_CLIENTE,
                    I."FTC_ORIGEN" AS ORIGEN,
                    COUNT(DISTINCT I."FCN_CUENTA") AS CLIENTES,
-                   ROUND(cast(SUM(R."FTF_SALDO_INICIAL") AS numeric(16,2)) ,2) AS SALDO_INICIAL,
-                   ROUND(cast(SUM(R."FTF_SALDO_FINAL") AS numeric(16,2)) ,2) AS SALDO_FINAL,
+                   coalesce(ROUND(cast(SUM(R."FTF_SALDO_INICIAL") AS numeric(16,2)) ,2),0) AS SALDO_INICIAL,
+                   coalesce(ROUND(cast(SUM(R."FTF_SALDO_FINAL") AS numeric(16,2)) ,2),0) AS SALDO_FINAL,
                    ROUND(cast(SUM(R."FTF_ABONO") AS numeric(16,2)) ,2) AS ABONO,
                    ROUND(cast(SUM(R."FTF_CARGO") AS numeric(16,2)) ,2) AS CARGO,
                    ROUND(cast(SUM(R."FTF_COMISION") AS numeric(16,2)) ,2) AS COMISION,

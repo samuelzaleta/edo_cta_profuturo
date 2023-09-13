@@ -45,9 +45,9 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
 
         upsert_dataset(mit, postgres, """
         SELECT FFN_ID_CONCEPTO_MOV AS cod_mov,
-               COALESCE(FFN_POSICION_ITGY, 0) AS monpes,
+               0 AS monpes,
                S.FCN_ID_TIPO_SUBCTA AS tipo_subcta,
-               FFC_DESCRIPCION_MIT AS description
+               M.FFC_DESCRIPCION_MIT AS description
         FROM CIERREN.TFCRXGRAL_CONFIG_MOV_ITGY M
         INNER JOIN TRAFOGRAL_MOV_SUBCTA S ON M.FRN_ID_MOV_SUBCTA = S.FRN_ID_MOV_SUBCTA
         --WHERE FFN_COD_MOV_ITGY IS NOT NULL AND FFN_POSICION_ITGY IS NOT NULL
@@ -67,7 +67,7 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
         SELECT FFN_ID_CONCEPTO_MOV AS cod_mov,
                COALESCE(FFN_POSICION_ITGY, 0) AS monpes,
                S.FCN_ID_TIPO_SUBCTA AS tipo_subcta,
-               FFC_DESCRIPCION_MIT AS description
+               M.FFC_DESC_ITGY AS description
         FROM CIERREN.TFCRXGRAL_CONFIG_MOV_ITGY M
         INNER JOIN TRAFOGRAL_MOV_SUBCTA S ON M.FRN_ID_MOV_SUBCTA = S.FRN_ID_MOV_SUBCTA
         --WHERE FFN_COD_MOV_ITGY IS NOT NULL AND FFN_POSICION_ITGY IS NOT NULL
