@@ -47,7 +47,7 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
                 WHERE tthls.FTB_IND_FOLIO_AGRUP = '1'
                 AND tthls.FCN_ID_ESTATUS = 6649
                 AND tthls.FCN_ID_PROCESO IN (4045, 4046, 4047, 4048, 4049, 4050, 4051)
-                AND tthls.FTD_FEH_CRE BETWEEN to_date('01/03/2023','dd/MM/yyyy') AND to_date('30/03/2023','dd/MM/yyyy') --:start AND :end
+                AND tthls.FTD_FEH_CRE BETWEEN to_date('01/03/2023','dd/MM/yyyy') AND to_date('31/03/2023','dd/MM/yyyy') --:start AND :end
                 union all
                 select
                 FTC_FOLIO,
@@ -67,7 +67,7 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
                 WHERE ttls.FTB_IND_FOLIO_AGRUP = '1'
                 AND ttls.FCN_ID_ESTATUS = 6649
                 AND ttls.FCN_ID_PROCESO IN (4045, 4046, 4047, 4048, 4049, 4050, 4051)
-                AND ttls.FTD_FEH_CRE BETWEEN to_date('01/03/2023','dd/MM/yyyy') AND to_date('30/03/2023','dd/MM/yyyy') --:start AND :end
+                AND ttls.FTD_FEH_CRE BETWEEN to_date('01/03/2023','dd/MM/yyyy') AND to_date('31/03/2023','dd/MM/yyyy') --:start AND :end
             ),
             MOVIMIENTOS AS (
                 SELECT
@@ -112,7 +112,7 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
                     ttat.FTC_CVE_TIPO_PEN,
                     ttat.FTD_FEH_CRE
                 FROM BENEFICIOS.TTAFORETI_TRAMITE ttat
-                WHERE ttat.FTD_FEH_CRE BETWEEN  to_date('01/03/2023','dd/MM/yyyy') AND to_date('30/03/2023','dd/MM/yyyy') --:start AND :end
+                WHERE ttat.FTD_FEH_CRE BETWEEN  to_date('01/03/2023','dd/MM/yyyy') AND to_date('31/03/2023','dd/MM/yyyy') --:start AND :end
                     AND ttat.FTC_TIPO_TRAMITE NOT IN (314, 324, 341, 9542)
             ),
             LIQ_DIS AS (
@@ -153,7 +153,7 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
                     ttatr.FTC_REGIMEN,
                     ttatr.FTD_FEH_CRE
                 FROM BENEFICIOS.TTAFORETI_TRANS_RETI ttatr
-                WHERE ttatr.FTD_FEH_CRE BETWEEN to_date('01/03/2023','dd/MM/yyyy') AND to_date('30/03/2023','dd/MM/yyyy') --:start AND :end
+                WHERE ttatr.FTD_FEH_CRE BETWEEN to_date('01/03/2023','dd/MM/yyyy') AND to_date('31/03/2023','dd/MM/yyyy') --:start AND :end
              ),
             LIQ_DIS_TRA AS (
                 SELECT
@@ -323,7 +323,7 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
                 FROM BENEFICIOS.TTCRXGRAL_PAGO ttcp
                 LEFT JOIN CIERREN.TCCRXGRAL_CAT_CATALOGO thccc
                 ON ttcp.FCC_CVE_BANCO = thccc.FCN_ID_CAT_CATALOGO
-                WHERE ttcp.FTD_FEH_CRE BETWEEN to_date('01/03/2023','dd/MM/yyyy') AND to_date('30/03/2023','dd/MM/yyyy') --:start AND :end
+                WHERE ttcp.FTD_FEH_CRE BETWEEN to_date('01/03/2023','dd/MM/yyyy') AND to_date('31/03/2023','dd/MM/yyyy') --:start AND :end
             ),
             DATOS_PAGO AS (
                 SELECT
@@ -418,7 +418,7 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
                 dpg.FTC_FOLIO_LIQUIDACION,
                 -- dpg.FTD_FEH_CRE,
                 dpg.FTN_ISR as FTF_ISR,
-                dpg.FCC_CVE_BANCO as FTN_CLAVE_BANCO,
+                cast(dpg.FCC_CVE_BANCO as integer) as FTN_CLAVE_BANCO,
                 --dpg.FCN_ID_CAT_CATALOGO AS FCN_ID_CAT_CATALOGO_DPG,
                 dpg.FCC_TIPO_BANCO FTC_TIPO_BANCO,
                 dpg.FCC_MEDIO_PAGO as FTC_MEDIO_PAGO,
@@ -429,13 +429,12 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
                     WHEN ldttp.FCN_ID_TIPO_SUBCTA = 16 THEN 2
                     ELSE 1
                 END AS "FTN_TIPO_AHORRO",
-                ldttp.FTD_FEH_CRE, -- CONDICION
+                ldttp.FTD_FEH_CRE -- CONDICION
             FROM LIQ_DIS_TRA_TSU_PTR ldttp
             LEFT JOIN DATOS_PAGO dpg
             ON ldttp.FTC_FOLIO = dpg.FTC_FOLIO
             INNER JOIN SALDOS s 
             on ldttp.FTN_NUM_CTA_INVDUAL = s.FCN_CUENTA and ldttp.FCN_ID_TIPO_SUBCTA = s.FCN_ID_TIPO_SUBCTA
-            WHERE ldttp.TMC_DESC_ITGY IN ('T97', 'TED', 'TNP', 'TPP', 'T73', 'TPR', 'TGF', 'TED', 'TPI', 'TPG', 'TRJ', 'TJU', 'TIV', 'TIX', 'TEI', 'TPP', 'RJP', 'TAI', 'TNI', 'TRE', 'PPI', 'RCI', 'TJI')
             """, '"HECHOS"."TTHECHOS_RETIRO"',
             term=term_id,
             params={"start": start_month, "end": end_month})

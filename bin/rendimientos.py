@@ -24,21 +24,39 @@ with define_extraction(phase, postgres_pool, buc_pool) as (postgres, buc):
     print('phase',phase,'area', area, 'usuario',user, 'periodo', periodo)
     with register_time(postgres_pool, phase=phase,area= area, usuario=user, term=term_id):
         saldo_inicial_query = f"""
-        SELECT
-            tsh."FCN_CUENTA"
-            , tsh."FCN_ID_TIPO_SUBCTA" 
-            , SUM(tsh."FTF_SALDO_DIA"::double precision) AS "FTF_SALDO_INICIAL"
-        FROM
-            "HECHOS"."THHECHOS_SALDO_HISTORICO" tsh
-        WHERE
-            1=1
-            AND tsh."FTC_TIPO_SALDO" = 'F'
-            AND tsh."FTD_FEH_LIQUIDACION" BETWEEN :start_month AND :end_month
-            AND tsh."FCN_ID_PERIODO" = :term_id
-        GROUP BY
-            1=1
-            , tsh."FCN_CUENTA"
-            , tsh."FCN_ID_TIPO_SUBCTA" 
+        SELECT SH.FTN_NUM_CTA_INVDUAL AS FCN_CUENTA,
+               SH.FCN_ID_SIEFORE,
+               SH.FCN_ID_TIPO_SUBCTA,
+               SH.FTD_FEH_LIQUIDACION,
+               :type AS FTC_TIPO_SALDO,
+               MAX(VA.FCD_FEH_ACCION) AS FCD_FEH_ACCION,
+               ROUND(SUM(SH.FTN_DIA_ACCIONES), 6) AS FTF_DIA_ACCIONES,
+               ROUND(SUM(SH.FTN_DIA_ACCIONES * VA.FCN_VALOR_ACCION), 2) AS FTF_SALDO_DIA
+        FROM cierren.thafogral_saldo_historico_v2 SH
+        INNER JOIN cierren.TCCRXGRAL_TIPO_SUBCTA R ON R.FCN_ID_TIPO_SUBCTA = SH.FCN_ID_TIPO_SUBCTA
+        INNER JOIN (
+            SELECT SHMAX.FTN_NUM_CTA_INVDUAL,
+                   SHMAX.FCN_ID_SIEFORE,
+                   SHMAX.FCN_ID_TIPO_SUBCTA,
+                   MAX(TRUNC(SHMAX.FTD_FEH_LIQUIDACION)) AS FTD_FEH_LIQUIDACION
+            FROM cierren.thafogral_saldo_historico_v2 SHMAX
+            WHERE SHMAX.FTD_FEH_LIQUIDACION <= :date
+              -- AND SHMAX.FTN_NUM_CTA_INVDUAL = 10044531
+              -- AND SHMAX.FCN_ID_TIPO_SUBCTA = 22
+              -- AND SHMAX.FCN_ID_SIEFORE = 83
+            GROUP BY SHMAX.FTN_NUM_CTA_INVDUAL, SHMAX.FCN_ID_SIEFORE, SHMAX.FCN_ID_TIPO_SUBCTA
+        ) SHMAXIMO ON SH.FTN_NUM_CTA_INVDUAL = SHMAXIMO.FTN_NUM_CTA_INVDUAL
+                  AND SH.FCN_ID_TIPO_SUBCTA = SHMAXIMO.FCN_ID_TIPO_SUBCTA AND SH.FCN_ID_SIEFORE = SHMAXIMO.FCN_ID_SIEFORE
+                  AND SH.FTD_FEH_LIQUIDACION = SHMAXIMO.FTD_FEH_LIQUIDACION
+        INNER JOIN (
+            SELECT ROW_NUMBER() OVER(PARTITION BY FCN_ID_SIEFORE, FCN_ID_REGIMEN ORDER BY FCD_FEH_ACCION DESC) AS ROW_NUM,
+                   FCN_ID_SIEFORE, FCN_ID_REGIMEN, FCN_VALOR_ACCION, FCD_FEH_ACCION
+            FROM cierren.TCAFOGRAL_VALOR_ACCION
+            WHERE FCD_FEH_ACCION <= :accion
+        ) VA ON SH.FCN_ID_SIEFORE = VA.FCN_ID_SIEFORE
+            AND R.FCN_ID_REGIMEN = VA.FCN_ID_REGIMEN
+            AND VA.ROW_NUM = 1
+        GROUP BY SH.FTN_NUM_CTA_INVDUAL, SH.FCN_ID_SIEFORE, SH.FCN_ID_TIPO_SUBCTA, SH.FTD_FEH_LIQUIDACION
         """
         saldo_final_query = f"""
         SELECT
