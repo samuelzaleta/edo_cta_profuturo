@@ -142,7 +142,7 @@ def notify(conn: Connection, title: str, message: str = None, details: str = Non
             "FTB_CIFRAS_CONTROL", "FCN_ID_PERIODO", "FCN_ID_USUARIO", "FCN_ID_FASE",
             "FTB_CIFRAS_CONTROL_VALIDADAS"
         )
-        VALUES (:title, :message, :details, :control, :term, :user, :fase)
+        VALUES (:title, :message, :details, :control, :term, :user, :fase, :control_validadas)
         """), {
             "title": title,
             "message": message,

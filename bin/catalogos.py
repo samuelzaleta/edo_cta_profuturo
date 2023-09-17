@@ -73,7 +73,7 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
         --WHERE FFN_COD_MOV_ITGY IS NOT NULL AND FFN_POSICION_ITGY IS NOT NULL
         WHERE FFN_COD_MOV_ITGY IN (
             106, 109, 129, 210, 260, 405, 406, 410, 412, 413, 414, 416, 420, 421, 423, 424, 426, 430, 433, 436, 440, 
-            440, 441, 442, 443, 444, 446, 450, 452, 453, 453, 454, 454, 456, 470, 472, 474, 476, 610, 630, 710, 760, 
+            440, 441, 442, 443, 444, 446, 450, 452, 453, 454, 456, 470, 472, 474, 476, 610, 630, 710, 760, 
             805, 806, 841
         )
         """, """

@@ -7,6 +7,7 @@ from datetime import datetime, date, time
 from numbers import Number
 from .database import SparkConnectionConfigurator
 from .exceptions import ProfuturoException
+from dateutil.relativedelta import relativedelta
 import calendar
 import sys
 import pandas as pd
@@ -36,9 +37,19 @@ def extract_terms(conn: Connection, phase: int) -> Dict[str, Any]:
             end_month = date(year, month, month_range[1])
             end_saldos = date(year, month + 1,1)
             valor_accion = date(year, month, month_range[1])
-
+            #MENOS UN MES#
+            end_saldos_anterior = start_month
+            valor_accion_anterior = valor_accion - relativedelta(months=1)
             print(f"Extracting period: from {start_month} to {end_month}")
-            return {"id": term_id, "start_month": start_month, "end_month": end_month, "valor_accion": valor_accion, "end_saldos": end_saldos, "time_period": time_period}
+            return {"id": term_id,
+                    "start_month": start_month,
+                    "end_month": end_month,
+                    "valor_accion": valor_accion,
+                    "end_saldos": end_saldos,
+                    "time_period": time_period,
+                    "end_saldos_anterior": end_saldos_anterior,
+                    "valor_accion_anterior": valor_accion_anterior
+                    }
 
         raise RuntimeError("Can not retrieve the term")
     except Exception as e:

@@ -14,15 +14,37 @@ periodo = int(sys.argv[2])
 area = int(sys.argv[4])
 user = int(sys.argv[3])
 
+
 with define_extraction(phase, postgres_pool, buc_pool) as (postgres, buc):
     term = extract_terms(postgres, phase)
     term_id = term["id"]
     start_month = term["start_month"]
     end_month = term["end_month"]
+    end_month_anterior = term["end_saldos_anterior"]
+    valor_accion_anterior = term["valor_accion_anterior"]
+    print(end_month_anterior,valor_accion_anterior, )
     spark = _get_spark_session()
 
     print('phase',phase,'area', area, 'usuario',user, 'periodo', periodo)
     with register_time(postgres_pool, phase=phase,area= area, usuario=user, term=term_id):
+        saldo_inicial_query_1 = f"""
+                SELECT
+                    tsh."FCN_CUENTA"
+                    , tsh."FCN_ID_TIPO_SUBCTA" 
+                    , SUM(tsh."FTF_SALDO_DIA"::double precision) AS "FTF_SALDO_FINAL"
+                FROM
+                    "HECHOS"."THHECHOS_SALDO_HISTORICO" tsh
+                WHERE
+                    1=1
+                    AND tsh."FTC_TIPO_SALDO" = 'F'
+                    AND tsh."FTD_FEH_LIQUIDACION" BETWEEN :start_month AND :end_month_anterior
+                    --AND tsh."FCN_ID_PERIODO" = :term_id
+                GROUP BY
+                    1=1
+                    , tsh."FCN_CUENTA"
+                    , tsh."FCN_ID_TIPO_SUBCTA"
+                """
+
         saldo_inicial_query = f"""
         SELECT SH.FTN_NUM_CTA_INVDUAL AS FCN_CUENTA,
                SH.FCN_ID_SIEFORE,
@@ -31,7 +53,7 @@ with define_extraction(phase, postgres_pool, buc_pool) as (postgres, buc):
                :type AS FTC_TIPO_SALDO,
                MAX(VA.FCD_FEH_ACCION) AS FCD_FEH_ACCION,
                ROUND(SUM(SH.FTN_DIA_ACCIONES), 6) AS FTF_DIA_ACCIONES,
-               ROUND(SUM(SH.FTN_DIA_ACCIONES * VA.FCN_VALOR_ACCION), 2) AS FTF_SALDO_DIA
+               ROUND(SUM(SH.FTN_DIA_ACCIONES * VA.FCN_VALOR_ACCION), 2) AS FTF_SALDO_INICIAL
         FROM cierren.thafogral_saldo_historico_v2 SH
         INNER JOIN cierren.TCCRXGRAL_TIPO_SUBCTA R ON R.FCN_ID_TIPO_SUBCTA = SH.FCN_ID_TIPO_SUBCTA
         INNER JOIN (
@@ -121,16 +143,25 @@ with define_extraction(phase, postgres_pool, buc_pool) as (postgres, buc):
         WHERE C."FTD_FEH_LIQUIDACION" BETWEEN :start_month AND :end_month
         GROUP BY C."FTN_NUM_CTA_INVDUAL", S."FCN_ID_TIPO_SUBCTA"
         """
-
+        """
+                read_table_insert_temp_view(
+                    configure_postgres_spark,
+                    saldo_inicial_query_1,
+                    "saldoinicial",
+                    params={"start_month ": start_month,
+                            "end_month": end_month,
+                            "term_id": term_id}
+                )
+        """
         truncate_table(postgres, "TTCALCUL_RENDIMIENTO", term=term_id)
+
         read_table_insert_temp_view(
-            configure_postgres_spark,
+            configure_mit_spark,
             saldo_inicial_query,
             "saldoinicial",
-            params={"start_month ": start_month,
-                    "end_month": end_month,
-                    "term_id": term_id}
+            params={"date": end_month_anterior, "type": "F", "accion": valor_accion_anterior}
         )
+
         read_table_insert_temp_view(
             configure_postgres_spark,
             saldo_final_query,
@@ -167,20 +198,23 @@ with define_extraction(phase, postgres_pool, buc_pool) as (postgres, buc):
             WITH tablon as (SELECT
                 COALESCE(si.FCN_CUENTA, sf.FCN_CUENTA, ca.FCN_CUENTA, ab.FCN_CUENTA, cm.FCN_CUENTA) AS FCN_CUENTA
                 , COALESCE(si.FCN_ID_TIPO_SUBCTA, sf.FCN_ID_TIPO_SUBCTA, ca.FCN_ID_TIPO_SUBCTA, ab.FCN_ID_TIPO_SUBCTA) AS FCN_ID_TIPO_SUBCTA
-                , COALESCE(si.FTF_SALDO_INICIAL, 0) AS FTF_SALDO_INICIAL
-                , COALESCE(sf.FTF_SALDO_FINAL, 0) AS FTF_SALDO_FINAL
-                , COALESCE(ca.FTF_CARGO, 0) AS FTF_CARGO
-                , COALESCE(ab.FTF_ABONO, 0) AS FTF_ABONO
-                , COALESCE(cm.FTF_COMISION, 0) AS FTF_COMISION
+                , SUM(COALESCE(si.FTF_SALDO_INICIAL, 0)) AS FTF_SALDO_INICIAL
+                , SUM(COALESCE(sf.FTF_SALDO_FINAL, 0)) AS FTF_SALDO_FINAL
+                , SUM(COALESCE(ca.FTF_CARGO, 0)) AS FTF_CARGO
+                , SUM(COALESCE(ab.FTF_ABONO, 0)) AS FTF_ABONO
+                , SUM(COALESCE(cm.FTF_COMISION, 0)) AS FTF_COMISION
 			FROM saldoinicial AS si
-			FULL OUTER JOIN saldofinal AS sf
+			INNER JOIN saldofinal AS sf
 			ON si.FCN_CUENTA = sf.FCN_CUENTA AND si.FCN_ID_TIPO_SUBCTA = sf.FCN_ID_TIPO_SUBCTA
-			FULL OUTER JOIN cargo AS ca
+			INNER JOIN cargo AS ca
 			ON sf.FCN_CUENTA = ca.FCN_CUENTA AND sf.FCN_ID_TIPO_SUBCTA = ca.FCN_ID_TIPO_SUBCTA
-			FULL OUTER JOIN abono AS ab
+			INNER JOIN abono AS ab
 			ON ca.FCN_CUENTA = ab.FCN_CUENTA AND ca.FCN_ID_TIPO_SUBCTA = ab.FCN_ID_TIPO_SUBCTA
-			FULL OUTER JOIN comision AS cm
+			INNER JOIN comision AS cm
 			ON ca.FCN_CUENTA = cm.FCN_CUENTA AND ca.FCN_ID_TIPO_SUBCTA = cm.FCN_ID_TIPO_SUBCTA
+			GROUP BY 
+			si.FCN_CUENTA, sf.FCN_CUENTA, ca.FCN_CUENTA, ab.FCN_CUENTA, cm.FCN_CUENTA,
+			si.FCN_ID_TIPO_SUBCTA, sf.FCN_ID_TIPO_SUBCTA, ca.FCN_ID_TIPO_SUBCTA, ab.FCN_ID_TIPO_SUBCTA
 			)
 			select
 			ta.FCN_CUENTA
@@ -258,7 +292,6 @@ with define_extraction(phase, postgres_pool, buc_pool) as (postgres, buc):
             "Se han generado las cifras de control para Rendimientos exitosamente",
             report,
             term=term_id,
-            control=True,
             area=area
         )
 
