@@ -12,7 +12,7 @@ import os
 
 
 SparkConnection = Union[DataFrameReader, DataFrameWriter]
-SparkConnectionConfigurator = Callable[[SparkConnection], SparkConnection]
+SparkConnectionConfigurator = Callable[[SparkConnection, str, bool], SparkConnection]
 
 
 @contextmanager
@@ -107,14 +107,14 @@ def get_postgres_pool():
     )
 
 
-def configure_mit_spark(connection: SparkConnection) -> SparkConnection:
+def configure_mit_spark(connection: SparkConnection, table: str, reading: bool) -> SparkConnection:
     host = os.getenv("MIT_HOST")
     port = int(os.getenv("MIT_PORT"))
     service_name = os.getenv("MIT_DATABASE")
     user = os.getenv("MIT_USER")
     password = os.getenv("MIT_PASSWORD")
 
-    return connection \
+    return configure_jdbc_spark(connection, table, reading) \
         .option("url", f"jdbc:oracle:thin:@//{host}:{port}/{service_name}") \
         .option("driver", "oracle.jdbc.driver.OracleDriver") \
         .option("oracle.jdbc.timezoneAsRegion", False) \
@@ -122,14 +122,14 @@ def configure_mit_spark(connection: SparkConnection) -> SparkConnection:
         .option("password", password)
 
 
-def configure_buc_spark(connection: SparkConnection) -> SparkConnection:
+def configure_buc_spark(connection: SparkConnection, table: str, reading: bool) -> SparkConnection:
     host = os.getenv("BUC_HOST")
     port = int(os.getenv("BUC_PORT"))
     service_name = os.getenv("BUC_DATABASE")
     user = os.getenv("BUC_USER")
     password = os.getenv("BUC_PASSWORD")
 
-    return connection \
+    return configure_jdbc_spark(connection, table, reading) \
         .option("url", f"jdbc:oracle:thin:@//{host}:{port}/{service_name}") \
         .option("driver", "oracle.jdbc.driver.OracleDriver") \
         .option("oracle.jdbc.timezoneAsRegion", False) \
@@ -143,7 +143,7 @@ def configure_integrity_spark(database: str) -> SparkConnectionConfigurator:
     user = 'SIEFORE'
     password = 'SIEFORE2019'
 
-    return lambda connection: connection \
+    return lambda connection, table, reading: configure_jdbc_spark(connection, table, reading) \
         .option("url", f"jdbc:rdbThin://{host}:{port}/mexico$base:{database}") \
         .option("driver", "oracle.rdb.jdbc.rdbThin.Driver") \
         .option("oracle.jdbc.timezoneAsRegion", False) \
@@ -151,19 +151,41 @@ def configure_integrity_spark(database: str) -> SparkConnectionConfigurator:
         .option("password", password)
 
 
-def configure_postgres_spark(connection: SparkConnection) -> SparkConnection:
+def configure_postgres_spark(connection: SparkConnection, table: str, reading: bool) -> SparkConnection:
     host = os.getenv("POSTGRES_HOST")
     port = int(os.getenv("POSTGRES_PORT"))
     database = os.getenv("POSTGRES_DATABASE")
     user = os.getenv("POSTGRES_USER")
     password = os.getenv("POSTGRES_PASSWORD")
 
-    return connection \
+    return configure_jdbc_spark(connection, table, reading) \
         .option("url", f"jdbc:postgresql://{host}:{port}/{database}") \
         .option("driver", "org.postgresql.Driver") \
         .option("search_path", '"MAESTROS","GESTOR","HECHOS","RESULTADOS"') \
         .option("user", user) \
         .option("password", password)
+
+
+def configure_bigquery_spark(connection: SparkConnection, table: str) -> SparkConnection:
+    return connection \
+        .format("bigquery") \
+        .option("table", table)
+
+
+def configure_jdbc_spark(connection: SparkConnection, table: str, reading: bool) -> SparkConnection:
+    if reading:
+        connection = connection \
+            .option("numPartitions", 80) \
+            .option("fetchsize", 100000)
+    else:
+        connection = connection \
+            .option("numPartitions", 20) \
+            .option("fetchsize", 100000) \
+            .option("batchsize", 100000)
+
+    return connection \
+        .format("jdbc") \
+        .option("dbtable", table)
 
 
 def get_mit_url():

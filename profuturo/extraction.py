@@ -343,25 +343,14 @@ def _get_spark_session() -> SparkSession:
 
 
 def _create_spark_dataframe(spark: SparkSession, connection_configurator, query: str, params: Dict[str, Any]) -> SparkDataFrame:
-    return connection_configurator(spark.read) \
-        .format("jdbc") \
-        .option("dbtable", f"({_replace_query_params(query, params)}) dataset") \
-        .option("numPartitions", 80) \
-        .option("fetchsize", 100000) \
+    return connection_configurator(spark.read, f"({_replace_query_params(query, params)}) dataset", True) \
         .load()
 
 
 def _write_spark_dataframe(df: SparkDataFrame, connection_configurator, table: str) -> None:
-    connection_configurator(df.write) \
-        .format("jdbc") \
+    connection_configurator(df.write, table, False) \
         .mode("append") \
-        .option("numPartitions", "20") \
-        .option("fetchsize", "100000") \
-        .option("batchsize", "100000") \
-        .option("dbtable", f'{table}') \
         .save()
-    spark = _get_spark_session()
-
 
 
 def _deduplicate_records(records: Sequence[Row]):
