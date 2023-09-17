@@ -104,12 +104,9 @@ with define_extraction(phase, postgres_pool, postgres_pool) as (postgres, _):
         records_as_dicts.extend(samples)
         print(records_as_dicts)
 
-        schema = StructType([
-            StructField("FCN_CUENTA", LongType(), False),
-            # Define other columns here
-        ])
+        filas = [{"FCN_CUENTA": records_as_dict} for records_as_dict in records_as_dicts]
 
-        df = spark.createDataFrame(data =records_as_dicts , schema = schema)
+        df = spark.createDataFrame(filas)
         df = df.withColumn("FCN_ID_PERIODO", lit(periodo))
         df = df.withColumn("FCN_ID_USUARIO", lit(user))
         df = df.withColumn("FCN_ID_AREA", lit(area))
