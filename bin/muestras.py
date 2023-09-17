@@ -5,7 +5,7 @@ from profuturo.common import register_time, define_extraction,truncate_table
 from profuturo.database import get_postgres_pool
 from profuturo.reporters import HtmlReporter
 from profuturo.extraction import extract_terms
-from pyspark.sql.types import StructType, StructField, StringType, LongType
+from pyspark.sql.types import StructType, StructField, LongType
 from pyspark.sql.functions import lit, col, current_timestamp, concat
 import sys
 
@@ -54,6 +54,7 @@ with define_extraction(phase, postgres_pool, postgres_pool) as (postgres, _):
     spark = _get_spark_session()
 
     with register_time(postgres_pool, phase, area, usuario=user, term=term_id):
+        truncate_table(postgres, "TCGESPRO_MUESTRA_SOL_RE_CONSAR")
         truncate_table(postgres, "TCGESPRO_MUESTRA", term=term_id)
         # Extracción
         read_table_insert_temp_view(
@@ -62,7 +63,7 @@ with define_extraction(phase, postgres_pool, postgres_pool) as (postgres, _):
             SELECT 
             "FCN_CUENTA"
             FROM "HECHOS"."TTHECHOS_CARGA_ARCHIVO"
-            WHERE "FTC_TRAMITE" = :tramite
+            WHERE "FTC_TRAMITE" = :tramite AND "FCN_ID_AREA" = 1
             """,
             "muestrasManuales",
             params={"tramite":'MM'}
@@ -102,9 +103,13 @@ with define_extraction(phase, postgres_pool, postgres_pool) as (postgres, _):
         records_as_dicts = [record.FCN_CUENTA for record in record_list]
         records_as_dicts.extend(samples)
         print(records_as_dicts)
-        filas = [{"FCN_CUENTA": records_as_dict} for records_as_dict in records_as_dicts]
 
-        df = spark.createDataFrame(filas)
+        schema = StructType([
+            StructField("FCN_CUENTA", LongType(), False),
+            # Define other columns here
+        ])
+
+        df = spark.createDataFrame(data =records_as_dicts , schema = schema)
         df = df.withColumn("FCN_ID_PERIODO", lit(periodo))
         df = df.withColumn("FCN_ID_USUARIO", lit(user))
         df = df.withColumn("FCN_ID_AREA", lit(area))
