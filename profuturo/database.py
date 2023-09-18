@@ -166,9 +166,10 @@ def configure_postgres_spark(connection: SparkConnection, table: str, reading: b
         .option("password", password)
 
 
-def configure_bigquery_spark(connection: SparkConnection, table: str) -> SparkConnection:
+def configure_bigquery_spark(connection: SparkConnection, table: str, _: bool) -> SparkConnection:
     return connection \
         .format("bigquery") \
+        .option("temporaryGcsBucket", "dataproc-staging-us-central1-313676594114-h7pphtkf") \
         .option("table", table)
 
 
