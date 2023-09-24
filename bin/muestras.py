@@ -110,7 +110,7 @@ with define_extraction(phase, postgres_pool, postgres_pool) as (postgres, _):
         df = df.withColumn("FTC_ESTATUS", lit("Pendiente"))
         df = df.withColumn("FTD_FECHAHORA_ALTA", lit(current_timestamp()))
         df = df.withColumn("FTC_URL_PDF_ORIGEN", concat(
-            lit("https://storage.cloud.google.com/gestor-edo-cuenta/estados_cuenta_archivos/"),
+            lit("https://storage.googleapis.com/gestor-edo-cuenta/estados_cuenta_archivos/"),
             col("FCN_CUENTA"),
             lit("_"),
             col("FCN_ID_PERIODO"),

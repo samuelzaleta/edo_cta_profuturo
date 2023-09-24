@@ -70,7 +70,7 @@ with define_extraction(phase, postgres_pool, postgres_pool) as (postgres, _):
             postgres,
             "Indicadores ingestados",
             f"Se han ingestado los indicadores de forma exitosa para el periodo {time_period}",
-            report,
+            #report,
             term=term_id,
             area=area
         )

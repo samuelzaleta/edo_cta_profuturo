@@ -204,14 +204,14 @@ with define_extraction(phase, postgres_pool, buc_pool) as (postgres, buc):
                 , SUM(COALESCE(ab.FTF_ABONO, 0)) AS FTF_ABONO
                 , SUM(COALESCE(cm.FTF_COMISION, 0)) AS FTF_COMISION
 			FROM saldoinicial AS si
-			INNER JOIN saldofinal AS sf
-			ON si.FCN_CUENTA = sf.FCN_CUENTA AND si.FCN_ID_TIPO_SUBCTA = sf.FCN_ID_TIPO_SUBCTA
-			INNER JOIN cargo AS ca
-			ON sf.FCN_CUENTA = ca.FCN_CUENTA AND sf.FCN_ID_TIPO_SUBCTA = ca.FCN_ID_TIPO_SUBCTA
-			INNER JOIN abono AS ab
-			ON ca.FCN_CUENTA = ab.FCN_CUENTA AND ca.FCN_ID_TIPO_SUBCTA = ab.FCN_ID_TIPO_SUBCTA
-			INNER JOIN comision AS cm
-			ON ca.FCN_CUENTA = cm.FCN_CUENTA AND ca.FCN_ID_TIPO_SUBCTA = cm.FCN_ID_TIPO_SUBCTA
+			FULL JOIN saldofinal AS sf
+			ON si.FCN_CUENTA = sf.FCN_CUENTA 
+			FULL JOIN cargo AS ca
+			ON sf.FCN_CUENTA = ca.FCN_CUENTA 
+			FULL JOIN abono AS ab
+			ON ca.FCN_CUENTA = ab.FCN_CUENTA
+			FULL JOIN comision AS cm
+			ON ca.FCN_CUENTA = cm.FCN_CUENTA
 			GROUP BY 
 			si.FCN_CUENTA, sf.FCN_CUENTA, ca.FCN_CUENTA, ab.FCN_CUENTA, cm.FCN_CUENTA,
 			si.FCN_ID_TIPO_SUBCTA, sf.FCN_ID_TIPO_SUBCTA, ca.FCN_ID_TIPO_SUBCTA, ab.FCN_ID_TIPO_SUBCTA
