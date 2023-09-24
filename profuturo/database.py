@@ -66,9 +66,11 @@ def get_integrity_conn(database: str):
     user = 'SIEFORE'
     password = 'SIEFORE2019'
 
+    print(host, port, user, password, database)
+
     return lambda: jaydebeapi.connect(
         "oracle.rdb.jdbc.rdbThin.Driver",
-        f"jdbc:rdbThin://{host}:{port}/mexico$base:{database}",
+        f"jdbc:rdbThin://{host}:{port}/mexico$base:cierren",
         {"user": user, "password": password},
         "/opt/profuturo/libs/RDBTHIN.JAR"
     )

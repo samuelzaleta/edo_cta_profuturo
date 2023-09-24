@@ -111,6 +111,7 @@ def extract_dataset(
     try:
         df_pd = pd.read_sql_query(text(query), origin, params=params)
         df_pd = df_pd.rename(columns=str.upper)
+        print("count",df_pd.count())
 
         if term:
             df_pd = df_pd.assign(FCN_ID_PERIODO=term)
