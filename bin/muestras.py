@@ -118,4 +118,5 @@ with define_extraction(phase, postgres_pool, postgres_pool) as (postgres, _):
             col("FCN_ID_USUARIO"),
             lit(".pdf"),
         ))
-        _write_spark_dataframe(df, configure_postgres_spark, '"GESTOR"."TCGESPRO_MUESTRA"')
+        _write_spark_dataframe(df, configure_postgres_spark, '"GESTOR"."TCGESPRO_MUESTRA_TEST"')
+        df.printSchema()

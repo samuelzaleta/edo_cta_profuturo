@@ -353,6 +353,10 @@ def _write_spark_dataframe(df: SparkDataFrame, connection_configurator, table: s
         .mode("append") \
         .save()
 
+def _write_spark_dataframe_overwrite(df: SparkDataFrame, connection_configurator, table: str) -> None:
+    connection_configurator(df.write, table, False) \
+        .mode("overwrite") \
+        .save()
 
 def _deduplicate_records(records: Sequence[Row]):
     ids = set()

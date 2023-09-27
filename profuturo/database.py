@@ -62,7 +62,7 @@ def get_postgres_conn():
 
 def get_integrity_conn(database: str):
     host = '130.40.30.144'
-    port = int(1714)
+    port = int(1730)
     user = 'SIEFORE'
     password = 'SIEFORE2019'
 
@@ -125,11 +125,11 @@ def configure_mit_spark(connection: SparkConnection, table: str, reading: bool) 
 
 
 def configure_buc_spark(connection: SparkConnection, table: str, reading: bool) -> SparkConnection:
-    host = os.getenv("BUC_HOST")
-    port = int(os.getenv("BUC_PORT"))
-    service_name = os.getenv("BUC_DATABASE")
-    user = os.getenv("BUC_USER")
-    password = os.getenv("BUC_PASSWORD")
+    host = '172.22.164.19'#os.getenv("BUC_HOST")
+    port = 16161 #int(os.getenv("BUC_PORT"))
+    service_name =  'QA34' #os.getenv("BUC_DATABASE")
+    user = 'CLUNICO' #os.getenv("BUC_USER")
+    password = 'temp4now13' #os.getenv("BUC_PASSWORD")
 
     return configure_jdbc_spark(connection, table, reading) \
         .option("url", f"jdbc:oracle:thin:@//{host}:{port}/{service_name}") \

@@ -112,7 +112,6 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
                 tmsmni.TMC_DESC_NCI,
                 tmsmni.TMN_CVE_NCI
                 FROM CIERREN.TMSISGRAL_MAP_NCI_ITGY tmsmni
-                --WHERE TMC_DESC_ITGY IN ('T97', 'TRU' ,'TED', 'TNP', 'TPP', 'T73', 'TPR', 'TGF', 'TED', 'TPI', 'TPG', 'TRJ', 'TJU', 'TIV', 'TIX', 'TEI', 'TPP', 'RJP', 'TAI', 'TNI', 'TRE', 'PPI', 'RCI', 'TJI')
                 ),
                 TTCRXGRAL AS (
                 SELECT
@@ -428,6 +427,7 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
                 INNER JOIN SALDOS S
                 on L.FCN_CUENTA = S.FCN_CUENTA and L.FCN_ID_TIPO_SUBCTA = S.FCN_ID_TIPO_SUBCTA
                 WHERE ID = 1
+                --AND FTC_TMC_DESC_ITGY IN ('T97', 'TRU' ,'TED', 'TNP', 'TPP', 'T73', 'TPR', 'TGF', 'TED', 'TPI', 'TPG', 'TRJ', 'TJU', 'TIV', 'TIX', 'TEI', 'TPP', 'RJP', 'TAI', 'TNI', 'TRE', 'PPI', 'RCI', 'TJI')
             """, '"HECHOS"."TTHECHOS_RETIRO"',
             term=term_id,
             params={"start": start_month, "end": end_month})
@@ -564,7 +564,7 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
 
         pandas_df['id'] = pandas_df['id'].astype(int)
         # Dividir el resultado en tablas HTML de 50 en 50
-        batch_size = 10000
+        batch_size = 15000
         for start in range(0, max_id, batch_size):
             end = start + batch_size
             batch_pandas_df = pandas_df[(pandas_df['id'] >= start) & (pandas_df['id'] < end)]

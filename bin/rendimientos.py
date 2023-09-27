@@ -204,7 +204,7 @@ with define_extraction(phase, postgres_pool, buc_pool) as (postgres, buc):
                 , SUM(COALESCE(ab.FTF_ABONO, 0)) AS FTF_ABONO
                 , SUM(COALESCE(cm.FTF_COMISION, 0)) AS FTF_COMISION
 			FROM saldoinicial AS si
-			FULL JOIN saldofinal AS sf
+			l JOIN saldofinal AS sf
 			ON si.FCN_CUENTA = sf.FCN_CUENTA 
 			FULL JOIN cargo AS ca
 			ON sf.FCN_CUENTA = ca.FCN_CUENTA 
