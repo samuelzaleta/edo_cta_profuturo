@@ -1,8 +1,8 @@
-from profuturo.common import define_extraction, register_time
+from profuturo.common import define_extraction, register_time, truncate_table
 from profuturo.database import get_postgres_pool, configure_postgres_spark, configure_bigquery_spark
-from profuturo.extraction import _write_spark_dataframe, extract_terms, extract_dataset_spark, _get_spark_session, read_table_insert_temp_view
+from profuturo.extraction import _write_spark_dataframe_overwrite, _write_spark_dataframe, extract_terms, extract_dataset_spark, _get_spark_session, read_table_insert_temp_view
 from pyspark.sql.types import StructType, StringType
-from pyspark.sql.functions import udf, concat, col, current_date
+from pyspark.sql.functions import udf, concat, col, current_timestamp,lit
 import uuid
 import sys
 
@@ -24,6 +24,7 @@ with define_extraction(phase, postgres_pool, postgres_pool) as (postgres, _):
        DISTINCT
        --M."FTC_URL_PDF_ORIGEN" as "FTC_URL_EDOCTA",
        F."FCN_ID_GENERACION" AS "FTN_ID_GRUPO_SEGMENTACION",
+       F."FCN_ID_GENERACION",
        'CANDADO' AS "FTC_CANDADO_APERTURA",
        F."FCN_ID_FORMATO_ESTADO_CUENTA" AS "FTN_ID_FORMATO",
        M."FCN_ID_PERIODO",
@@ -65,28 +66,33 @@ with define_extraction(phase, postgres_pool, postgres_pool) as (postgres, _):
        ON C."FTN_CUENTA" = M."FCN_CUENTA"
        INNER JOIN "GESTOR"."TCGESPRO_PERIODO" PR
        ON PR."FTN_ID_PERIODO" = 1 --:term
+       WHERE  C."FTN_CUENTA"= 30982
    """, "edoCtaGenerales",
     params={"term": term_id, "user": str(user)}
     )
 
     uuidUdf = udf(lambda: str(uuid.uuid4()), StringType())
-    df = spark.sql("""
+
+    print(uuidUdf())
+
+
+    general_df = spark.sql("""
                                select  * from edoCtaGenerales
                                """)
 
-    df = df.withColumn("FCN_ID_EDOCTA", concat(
+    general_df = general_df.withColumn("FCN_ID_EDOCTA", concat(
         col("FCN_NUMERO_CUENTA"),
         col("PERIODO"),
         col("FTN_ID_FORMATO"),
     ).cast("bigint"))
-    df.select("FCN_ID_EDOCTA").show()
 
-    df = df.withColumn("FCN_FOLIO", uuidUdf())
-    df = df.drop(col("PERIODO"))
+    general_df = general_df.withColumn("FCN_FOLIO", uuidUdf())
 
-    _write_spark_dataframe(df, configure_bigquery_spark, 'ESTADO_CUENTA.TTMUESTR_GENERAL')
+    general_df.select("FCN_FOLIO").show()
 
-    df.createOrReplaceTempView("general")
+    general_df = general_df.drop(col("PERIODO"))
+
+    #general_df.createOrReplaceTempView("general")
 
     read_table_insert_temp_view(configure_postgres_spark,
     f"""
@@ -94,28 +100,46 @@ with define_extraction(phase, postgres_pool, postgres_pool) as (postgres, _):
             "FTN_ID_MUESTRA",
             "FCN_CUENTA",
             "FCN_ID_PERIODO",
-            "FTC_URL_PDF_ORIGEN",
+            --"FTC_URL_PDF_ORIGEN",
             "FTC_ESTATUS",
             "FCN_ID_USUARIO",
             "FCN_ID_AREA",
             "FTD_FECHAHORA_ALTA"
             FROM "GESTOR"."TCGESPRO_MUESTRA"
+            WHERE "FCN_ID_PERIODO" = :term
           """, "muestras",
           params={"term": term_id, "user": str(user)}
-        )
+    )
+
     df = spark.sql("""
     select
-    "FTN_ID_MUESTRA",
-    "FCN_CUENTA",
-    "FCN_ID_PERIODO",
-    Concat("https://storage.cloud.google.com/profuturo-archivos/",e.FCN_FOLIO) as "FTC_URL_PDF_ORIGEN",
-    "FTC_ESTATUS",
-    "FCN_ID_USUARIO",
-    "FCN_ID_AREA",
-    "FTD_FECHAHORA_ALTA"
+    --m.FTN_ID_MUESTRA,
+    m.FCN_CUENTA,
+    m.FCN_ID_PERIODO,
+    m.FTC_ESTATUS,
+    34 as FCN_ID_USUARIO,
+    Cast(m.FCN_ID_AREA as INTEGER) as FCN_ID_AREA
     from muestras m
-    right join general e
-    on m.FCN_CUENTA = e.FCN_NUMERO_CUENTA  
     """)
 
-    df.show(1)
+    df = df.withColumn("FTD_FECHAHORA_ALTA", lit(current_timestamp()))
+    #Considera inner join del periodo
+    df = df.join(general_df, df.FCN_CUENTA == general_df.FCN_NUMERO_CUENTA, "right") \
+         .select(df.FCN_CUENTA, df.FCN_ID_PERIODO, df.FTC_ESTATUS, df.FCN_ID_USUARIO,
+                 df.FCN_ID_AREA,df.FTD_FECHAHORA_ALTA, general_df.FCN_FOLIO)
+
+    df = df.withColumn("FTC_URL_PDF_ORIGEN", concat(
+            lit("https://storage.googleapis.com/profuturo-archivos/"),
+            col("FCN_FOLIO"),
+            lit(".pdf")
+    ))
+
+    #df = df.drop(col("FCN_FOLIO"))
+
+
+    truncate_table(postgres, "TCGESPRO_MUESTRA_SOL_RE_CONSAR")
+    #truncate_table(postgres, "TCGESPRO_MUESTRA", term=term_id)
+
+    #_write_spark_dataframe(df, configure_postgres_spark, '"GESTOR"."TCGESPRO_MUESTRA"')
+    #_write_spark_dataframe(general_df, configure_bigquery_spark, 'ESTADO_CUENTA.TTMUESTR_GENERAL')
+
