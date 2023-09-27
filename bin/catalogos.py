@@ -3,6 +3,7 @@ from profuturo.database import get_postgres_pool, get_mit_pool
 from profuturo.extraction import upsert_dataset, extract_terms, _get_spark_session
 from pyspark.sql.functions import col
 import sys
+from datetime import datetime
 
 postgres_pool = get_postgres_pool()
 mit_pool = get_mit_pool()
@@ -124,7 +125,7 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
 """
         notify(
             postgres,
-            "Catálogos ingestados",
+            f"Catálogos ingestados - {datetime.now()}",
             f"Se han ingestado los catálogos de forma exitosa para el periodo {time_period}",
             term=term_id,
             area=area,
