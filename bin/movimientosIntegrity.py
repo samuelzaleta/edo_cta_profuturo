@@ -7,6 +7,7 @@ from pandas import DataFrame
 from sqlalchemy import text, CursorResult
 import numpy as np
 import sys
+from datetime import datetime
 
 
 def transform_rcv(df: DataFrame) -> DataFrame:
@@ -240,10 +241,11 @@ with define_extraction(phase, postgres_pool, integrity_pool) as (postgres, integ
     )
     notify(
         postgres,
-        "Cifras de control movimientos integrity generadas ",
+        f"Cifras de control movimientos integrity generadas - {datetime.now()}",
         "Se han generado las cifras de control para movimientos integrity exitosamente",
         report2,
         term=term_id,
         control=True,
-        area=area
+        area=area,
+        fase=phase
     )

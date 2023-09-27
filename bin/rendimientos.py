@@ -4,6 +4,7 @@ from profuturo.extraction import _get_spark_session, _write_spark_dataframe, rea
 from profuturo.reporters import HtmlReporter
 from profuturo.extraction import extract_terms
 import sys
+from datetime import datetime
 
 
 html_reporter = HtmlReporter()
@@ -258,10 +259,12 @@ with define_extraction(phase, postgres_pool, buc_pool) as (postgres, buc):
 
         notify(
             postgres,
-            "Clientes Cifras de control Generales (Rendimientos 1 of 2)",
+            f"Clientes Cifras de control Generales (Rendimientos 1 of 2) - {datetime.now()}",
             "Se han generado las cifras de control para Rendimientos exitosamente",
             report,
             term=term_id,
+            fase=phase
+
         )
         # Cifras de control
         report = html_reporter.generate(
@@ -288,11 +291,12 @@ with define_extraction(phase, postgres_pool, buc_pool) as (postgres, buc):
 
         notify(
             postgres,
-            "Clientes Cifras de control Generales (Rendimientos 2 of 2)",
+            f"Clientes Cifras de control Generales (Rendimientos 2 of 2) - {datetime.now()}",
             "Se han generado las cifras de control para Rendimientos exitosamente",
             report,
             term=term_id,
-            area=area
+            area=area,
+            fase=phase
         )
 
 

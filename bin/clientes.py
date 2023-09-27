@@ -5,6 +5,7 @@ from profuturo.reporters import HtmlReporter
 from profuturo.extraction import extract_terms
 from pyspark.sql.functions import lit
 import sys
+from datetime import datetime
 
 
 html_reporter = HtmlReporter()
@@ -259,7 +260,7 @@ with define_extraction(phase, postgres_pool, buc_pool) as (postgres, buc):
 
         notify(
             postgres,
-            "Clientes ingestados",
+            f"Clientes ingestados - {datetime.now()}",
             f"Se han ingestado los clientes de forma exitosa para el periodo {time_period}",
             report,
             term=term_id,

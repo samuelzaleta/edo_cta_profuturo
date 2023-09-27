@@ -3,6 +3,7 @@ from profuturo.database import get_postgres_pool, configure_mit_spark, configure
 from profuturo.extraction import extract_terms, extract_dataset_spark
 from profuturo.reporters import HtmlReporter
 import sys
+from datetime import datetime
 
 html_reporter = HtmlReporter()
 postgres_pool = get_postgres_pool()
@@ -68,9 +69,10 @@ with define_extraction(phase, postgres_pool, postgres_pool) as (postgres, _):
 
         notify(
             postgres,
-            "Cifras de control Comisiones generadas",
+            f"Cifras de control Comisiones generadas - {datetime.now()}",
             f"Se han ingestado las comisiones de forma exitosa para el periodo {time_period}",
             report,
             term=term_id,
-            area=area
+            area=area,
+            fase=phase
         )

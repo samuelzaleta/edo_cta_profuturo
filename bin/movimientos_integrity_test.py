@@ -5,8 +5,9 @@ from profuturo.reporters import HtmlReporter
 from dotenv import load_dotenv
 from pandas import DataFrame
 from sqlalchemy import text, CursorResult
-import numpy as  np
+import numpy as np
 import sys
+from datetime import datetime
 
 
 def transform_rcv(df: DataFrame) -> DataFrame:
@@ -239,10 +240,11 @@ with define_extraction(phase, postgres_pool, integrity_pool) as (postgres, integ
         )
         notify(
             postgres,
-            "Cifras de control movimientos integrity generadas ",
+            f"Cifras de control Movimientos Integrity generadas - {datetime.now()}",
             "Se han generado las cifras de control para movimientos integrity exitosamente",
             report2,
             term=term_id,
             control=True,
-            area=int(sys.argv[4])
+            area=int(sys.argv[4]),
+            fase=phase
         )

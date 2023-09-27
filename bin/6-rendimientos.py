@@ -2,6 +2,7 @@ from profuturo.common import truncate_table, notify, register_time, define_extra
 from profuturo.database import get_postgres_pool, get_mit_pool, get_postgres_url
 from profuturo.extraction import extract_terms, extract_dataset_polars
 from profuturo.reporters import HtmlReporter
+from datetime import datetime
 
 import sys
 
@@ -62,9 +63,10 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
 
         notify(
             postgres,
-            "Cifras de control Rendimiento generadas",
+            f"Cifras de control Rendimiento generadas - {datetime.now()}",
             "Se han generado las cifras de control para rendimientos exitosamente",
             report,
             term=term_id,
             control=True,
+            fase=phase
         )
