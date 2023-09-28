@@ -4,6 +4,7 @@ from profuturo.extraction import _get_spark_session, _write_spark_dataframe, rea
 from profuturo.reporters import HtmlReporter
 from profuturo.extraction import extract_terms
 import sys
+from datetime import datetime
 
 
 html_reporter = HtmlReporter()
@@ -204,14 +205,18 @@ with define_extraction(phase, postgres_pool, buc_pool) as (postgres, buc):
                 , SUM(COALESCE(ab.FTF_ABONO, 0)) AS FTF_ABONO
                 , SUM(COALESCE(cm.FTF_COMISION, 0)) AS FTF_COMISION
 			FROM saldoinicial AS si
-			l JOIN saldofinal AS sf
-			ON si.FCN_CUENTA = sf.FCN_CUENTA 
-			FULL JOIN cargo AS ca
-			ON sf.FCN_CUENTA = ca.FCN_CUENTA 
 			FULL JOIN abono AS ab
-			ON ca.FCN_CUENTA = ab.FCN_CUENTA
-			FULL JOIN comision AS cm
-			ON ca.FCN_CUENTA = cm.FCN_CUENTA
+			ON si.FCN_CUENTA = ab.FCN_CUENTA
+			AND si.FCN_ID_TIPO_SUBCTA = ab.FCN_ID_TIPO_SUBCTA
+			LEFT JOIN comision AS cm
+			ON si.FCN_CUENTA = cm.FCN_CUENTA
+			AND si.FCN_ID_TIPO_SUBCTA = cm.FCN_ID_TIPO_SUBCTA
+			FULL JOIN cargo AS ca
+			ON si.FCN_CUENTA = ca.FCN_CUENTA 
+			AND si.FCN_ID_TIPO_SUBCTA = ca.FCN_ID_TIPO_SUBCTA
+			FULL JOIN saldofinal AS sf
+			ON si.FCN_CUENTA = sf.FCN_CUENTA 
+			AND si.FCN_ID_TIPO_SUBCTA = ca.FCN_ID_TIPO_SUBCTA			
 			GROUP BY 
 			si.FCN_CUENTA, sf.FCN_CUENTA, ca.FCN_CUENTA, ab.FCN_CUENTA, cm.FCN_CUENTA,
 			si.FCN_ID_TIPO_SUBCTA, sf.FCN_ID_TIPO_SUBCTA, ca.FCN_ID_TIPO_SUBCTA, ab.FCN_ID_TIPO_SUBCTA
@@ -258,10 +263,12 @@ with define_extraction(phase, postgres_pool, buc_pool) as (postgres, buc):
 
         notify(
             postgres,
-            "Clientes Cifras de control Generales (Rendimientos 1 of 2)",
+            f"Clientes Cifras de control Generales (Rendimientos 1 of 2) - {datetime.now()}",
             "Se han generado las cifras de control para Rendimientos exitosamente",
             report,
             term=term_id,
+            fase=phase
+
         )
         # Cifras de control
         report = html_reporter.generate(
@@ -288,11 +295,12 @@ with define_extraction(phase, postgres_pool, buc_pool) as (postgres, buc):
 
         notify(
             postgres,
-            "Clientes Cifras de control Generales (Rendimientos 2 of 2)",
+            f"Clientes Cifras de control Generales (Rendimientos 2 of 2) - {datetime.now()}",
             "Se han generado las cifras de control para Rendimientos exitosamente",
             report,
             term=term_id,
-            area=area
+            area=area,
+            fase=phase
         )
 
 
