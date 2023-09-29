@@ -140,9 +140,9 @@ def notify(conn: Connection, title: str, message: str = None, details: str = Non
         INSERT INTO "TTGESPRO_NOTIFICACION" (
             "FTC_TITULO", "FTC_DETALLE_TEXTO", "FTC_DETALLE_BLOB", 
             "FTB_CIFRAS_CONTROL", "FCN_ID_PERIODO", "FCN_ID_USUARIO", "FCN_ID_FASE",
-            "FTB_CIFRAS_CONTROL_VALIDADAS"
+            "FTB_CIFRAS_CONTROL_VALIDADAS", "FTD_FECHA_CREACION"
         )
-        VALUES (:title, :message, :details, :control, :term, :user, :fase, :control_validadas)
+        VALUES (:title, :message, :details, :control, :term, :user, :fase, :control_validadas, now())
         """), {
             "title": title,
             "message": message,
