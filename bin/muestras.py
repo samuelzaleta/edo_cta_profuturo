@@ -85,6 +85,7 @@ with define_extraction(phase, postgres_pool, postgres_pool) as (postgres, _):
             GROUP BY M."FCN_CUENTA", PC."FCN_ID_MOVIMIENTO_CONSAR"
         ) AS CC
         INNER JOIN "GESTOR"."TTGESPRO_CONFIGURACION_MUESTRA_AUTOMATICA" MC ON CC."FCN_ID_MOVIMIENTO_CONSAR" = MC."FCN_ID_MOVIMIENTO_CONSAR"
+        WHERE "FCN_CUENTA" IN (SELECT "FCN_CUENTA" FROM "MAESTROS"."TCDATMAE_CLIENTE")
         GROUP BY "FCN_CUENTA"
         ORDER BY sum(1.0 / "FTN_CANTIDAD") DESC
         """), {'term': term_id})
