@@ -28,7 +28,8 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
         truncate_table(postgres, 'TTHECHOS_RETIRO', term=term_id)
         extract_dataset_spark(
             configure_mit_spark,
-            configure_postgres_spark, """
+            configure_postgres_spark,
+            """
             WITH MOV AS (
             SELECT
             DT.FCN_ID_TIPO_SUBCTA AS FCN_ID_TIPO_SUBCTA,
@@ -244,7 +245,7 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
             FROM cierren.thafogral_saldo_historico_v2 SHMAX
             INNER JOIN LIQUIDACIONES L ON L.FTN_NUM_CTA_INVDUAL = SHMAX.FTN_NUM_CTA_INVDUAL and L.FCN_ID_TIPO_SUBCTA = SHMAX.FCN_ID_TIPO_SUBCTA
             WHERE SHMAX.FTD_FEH_LIQUIDACION<= (SELECT MIN(SHMIN.FTD_FEH_LIQUIDACION) FROM cierren.thafogral_saldo_historico_v2 SHMIN
-                              WHERE  SHMIN.FTD_FEH_LIQUIDACION > to_date('31/03/2022', 'dd/MM/yyyy')) ---- FECHA A CONSULTAR
+            WHERE  SHMIN.FTD_FEH_LIQUIDACION > to_date('31/03/2022', 'dd/MM/yyyy')) ---- FECHA A CONSULTAR
             GROUP BY SHMAX.FTN_NUM_CTA_INVDUAL, SHMAX.FCN_ID_SIEFORE, SHMAX.FCN_ID_TIPO_SUBCTA
             ) SHMAXIMO ON SH.FTN_NUM_CTA_INVDUAL = SHMAXIMO.FTN_NUM_CTA_INVDUAL
             AND SH.FCN_ID_TIPO_SUBCTA = SHMAXIMO.FCN_ID_TIPO_SUBCTA AND SH.FCN_ID_SIEFORE = SHMAXIMO.FCN_ID_SIEFORE
@@ -258,8 +259,8 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
             AND R.FCN_ID_REGIMEN = VA.FCN_ID_REGIMEN
             AND VA.ROW_NUM = 1
             GROUP BY SH.FTN_NUM_CTA_INVDUAL, SH.FCN_ID_SIEFORE, SH.FCN_ID_TIPO_SUBCTA, SH.FTD_FEH_LIQUIDACION
-            )
-            , DISPOSICIONES AS (
+            ),
+            DISPOSICIONES AS (
             SELECT
             L.FTN_NUM_CTA_INVDUAL AS FCN_CUENTA,
             L.FTC_FOLIO AS FTC_FOLIO_LDTTP,
@@ -284,6 +285,8 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
             WHEN L.FCN_ID_TIPO_SUBCTA = 16 THEN 2
             ELSE 1
             END AS "FTN_TIPO_AHORRO",
+            FTC_FEH_INI_PEN AS FTN_FEH_INI_PEN,
+            FTC_FEH_RES_PEN AS FTN_FEH_RES_PEN,
             L.FTD_FEH_CRE
             FROM LIQUIDACIONES L
             LEFT JOIN BENEFICIOS.TTAFORETI_TRAMITE TT
@@ -375,6 +378,8 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
             "FTC_TMC_DESC_NCI",
             "FTN_TMN_CVE_NCI",
             "FTN_TIPO_AHORRO",
+            "FTN_FEH_INI_PEN",
+            "FTN_FEH_RES_PEN",
             "FTD_FEH_CRE"
             FROM (
             SELECT
@@ -399,6 +404,8 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
             "FTC_TMC_DESC_NCI",
             "FTN_TMN_CVE_NCI",
             "FTN_TIPO_AHORRO",
+            FTN_FEH_INI_PEN,
+            FTN_FEH_RES_PEN,
             "FTD_FEH_CRE"
             FROM DISPOSICIONES
             UNION ALL
@@ -424,6 +431,8 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
             "FTC_TMC_DESC_NCI",
             "FTN_TMN_CVE_NCI",
             "FTN_TIPO_AHORRO",
+            NULL AS "FTN_FEH_INI_PEN",
+            NULL AS "FTN_FEH_RES_PEN",
             "FTD_FEH_CRE"
             FROM TRANSFERENCIA
             UNION ALL
@@ -449,9 +458,11 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
             "FTC_TMC_DESC_NCI",
             "FTN_TMN_CVE_NCI",
             "FTN_TIPO_AHORRO",
+            NULL AS "FTN_FEH_INI_PEN",
+            NULL AS "FTN_FEH_RES_PEN",
             "FTD_FEH_CRE"
-            FROM TRANSFERENCIAS_HISTORICAS
-            ) LDTTP
+            FROM TRANSFERENCIAS_HISTORICAS)
+            LDTTP
             )
             SELECT
             L."FCN_CUENTA",
@@ -483,6 +494,8 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
             DPG.FCC_MEDIO_PAGO as FTC_MEDIO_PAGO,
             S.FTF_SALDO_DIA AS FTF_SALDO_INICIAL,
             L."FTN_TIPO_AHORRO",
+            L."FTN_FEH_INI_PEN",
+            L."FTN_FEH_RES_PEN",
             L."FTD_FEH_CRE"
             FROM LIQ L
             LEFT JOIN TIPO_SUB_CUENTA TSC
@@ -492,7 +505,7 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
             LEFT JOIN SALDOS S
             on L.FCN_CUENTA = S.FCN_CUENTA and L.FCN_ID_TIPO_SUBCTA = S.FCN_ID_TIPO_SUBCTA
             WHERE ID = 1
-            --AND FTC_TMC_DESC_ITGY IN ('T97', 'TRU' ,'TED', 'TNP', 'TPP', 'T73', 'TPR', 'TGF', 'TED', 'TPI', 'TPG', 'TRJ', 'TJU', 'TIV', 'TIX', 'TEI', 'TPP', 'RJP', 'TAI', 'TNI', 'TRE', 'PPI', 'RCI', 'TJI')            
+            AND FTC_TMC_DESC_ITGY IN ('T97', 'TRU' ,'TED', 'TNP', 'TPP', 'T73', 'TPR', 'TGF', 'TED', 'TPI', 'TPG', 'TRJ', 'TJU', 'TIV', 'TIX', 'TEI', 'TPP', 'RJP', 'TAI', 'TNI', 'TRE', 'PPI', 'RCI', 'TJI')
             """, '"HECHOS"."TTHECHOS_RETIRO"',
             term=term_id,
             params={"start": start_month, "end": end_month})
@@ -532,6 +545,8 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
             "FTN_CLAVE_BANCO",
             "FTC_TIPO_BANCO",
             "FTC_MEDIO_PAGO",
+            "FTN_FEH_INI_PEN",
+            "FTN_FEH_RES_PEN",
             "FTD_FEH_CRE"
         ]
 
@@ -563,14 +578,16 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
             FTN_CLAVE_BANCO,
             FTC_TIPO_BANCO,
             FTC_MEDIO_PAGO,
+            FTN_FEH_INI_PEN, 
+            FTN_FEH_RES_PEN,
             FTD_FEH_CRE
         from retiros)
         SELECT 
             id,
             FCN_CUENTA,
-            FCN_ID_TIPO_SUBCTA,
+            --FCN_ID_TIPO_SUBCTA,
             IF(FTN_TIPO_AHORRO == 1, 'RET', 'VIV') AS FTN_TIPO_AHORRO ,
-            FCN_ID_SIEFORE,
+            --FCN_ID_SIEFORE,
             ROUND(SUM(FTF_SALDO_INICIAL),2) + ( ROUND(SUM(FTF_MONTO_PESOS_LIQUIDADO),2) + ROUND(SUM(FTF_ISR),2)) AS FTF_SALDO_INICIAL,
             ROUND(SUM(FTF_MONTO_PESOS_LIQUIDADO),2) AS FTF_MONTO_PESOS_LIQUIDADO,
             ROUND(SUM(FTF_ISR),2) AS FTF_ISR,
@@ -592,14 +609,16 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
             FTN_CLAVE_BANCO,
             FTC_TIPO_BANCO,
             FTC_MEDIO_PAGO,
+            FTN_FEH_INI_PEN, 
+            FTN_FEH_RES_PEN,
             FTD_FEH_CRE
         FROM DATASET
         GROUP BY 
         id,
          FCN_CUENTA,
-            FCN_ID_TIPO_SUBCTA,
+            --FCN_ID_TIPO_SUBCTA,
             FTN_TIPO_AHORRO,
-            FCN_ID_SIEFORE,
+            --FCN_ID_SIEFORE,
             FTC_TIPO_TRAMITE,
             FTC_TIPO_PRESTACION,
             FTC_LEY_PENSION,
@@ -617,6 +636,8 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
             FTN_CLAVE_BANCO,
             FTC_TIPO_BANCO,
             FTC_MEDIO_PAGO,
+            FTN_FEH_INI_PEN , 
+            FTN_FEH_RES_PEN,
             FTD_FEH_CRE
         """)
 
@@ -629,7 +650,7 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
 
         pandas_df['id'] = pandas_df['id'].astype(int)
         # Dividir el resultado en tablas HTML de 50 en 50
-        batch_size = 15000
+        batch_size = 150000
         for start in range(0, max_id, batch_size):
             end = start + batch_size
             batch_pandas_df = pandas_df[(pandas_df['id'] >= start) & (pandas_df['id'] < end)]
