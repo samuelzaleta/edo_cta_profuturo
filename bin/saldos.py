@@ -17,7 +17,6 @@ with define_extraction(phase, postgres_pool, postgres_pool) as (postgres, _):
     time_period = term["time_period"]
     print(term_id)
     end_saldos = term["end_saldos"]
-    valor_accion = term["valor_accion"]
 
     with register_time(postgres_pool, phase=phase, area=area, usuario=user, term=term_id):
         # Extracción
@@ -38,7 +37,11 @@ with define_extraction(phase, postgres_pool, postgres_pool) as (postgres, _):
                    SHMAX.FCN_ID_TIPO_SUBCTA,
                    MAX(TRUNC(SHMAX.FTD_FEH_LIQUIDACION)) AS FTD_FEH_LIQUIDACION
             FROM cierren.thafogral_saldo_historico_v2 SHMAX
-            WHERE SHMAX.FTD_FEH_LIQUIDACION <= :date
+            WHERE SHMAX.FTD_FEH_LIQUIDACION <= (
+                  SELECT MIN(SHMIN.FTD_FEH_LIQUIDACION)
+                  FROM cierren.thafogral_saldo_historico_v2 SHMIN
+                  WHERE SHMIN.FTD_FEH_LIQUIDACION > :date
+              )
               -- AND SHMAX.FTN_NUM_CTA_INVDUAL = 10044531
               -- AND SHMAX.FCN_ID_TIPO_SUBCTA = 22
               -- AND SHMAX.FCN_ID_SIEFORE = 83
@@ -64,11 +67,11 @@ with define_extraction(phase, postgres_pool, postgres_pool) as (postgres, _):
             query,
             '"HECHOS"."THHECHOS_SALDO_HISTORICO"',
             term=term_id,
-            params={"date": end_saldos, "type": "F", "accion": valor_accion},
+            params={"date": end_saldos, "type": "F"},
         )
 
         # Cifras de control
-        report1 = html_reporter.generate(
+        report = html_reporter.generate(
             postgres,
             """
             SELECT
@@ -93,8 +96,17 @@ with define_extraction(phase, postgres_pool, postgres_pool) as (postgres, _):
             ["Saldo final en pesos", "Saldo final en acciones"],
             params={"term": term_id},
         )
+        notify(
+            postgres,
+            f"Cifras de control Saldos generadas 1 de 2 - {datetime.now()}",
+            f"Se han generado las cifras de control para saldos exitosamente para el periodo {time_period}",
+            report,
+            term=term_id,
+            area=area,
+            fase=phase
+        )
 
-        report2 = html_reporter.generate(
+        report = html_reporter.generate(
             postgres,
             """
             SELECT TS."FCC_VALOR" AS TIPO_SUBCUENTA,
@@ -113,22 +125,11 @@ with define_extraction(phase, postgres_pool, postgres_pool) as (postgres, _):
             ["Saldo final en pesos", "Saldo final en acciones"],
             params={"term": term_id},
         )
-
-        notify(
-            postgres,
-            f"Cifras de control Saldos generadas 1 de 2 - {datetime.now()}",
-            f"Se han generado las cifras de control para saldos exitosamente para el periodo {time_period}",
-            report1,
-            term=term_id,
-            area=area,
-            fase=phase
-        )
-
         notify(
             postgres,
             f"Cifras de control Saldos generadas 2 de 2 - {datetime.now()}",
             f"Se han generado las cifras de control para saldos exitosamente para el periodo {time_period}",
-            report2,
+            report,
             term=term_id,
             area=area,
             fase=phase
