@@ -135,23 +135,32 @@ def notify(conn: Connection, title: str, message: str = None, details: str = Non
     """))
     if cursor.rowcount == 0:
         raise ValueError("The area does not exist")
+    conn.execute(text("""
+    INSERT INTO "TTGESPRO_NOTIFICACION" (
+        "FTC_TITULO", "FTC_DETALLE_TEXTO", "FTC_DETALLE_BLOB", 
+        "FTB_CIFRAS_CONTROL", "FCN_ID_PERIODO", "FCN_ID_FASE",
+        "FTB_CIFRAS_CONTROL_VALIDADAS", "FTD_FECHA_CREACION"
+    )
+    VALUES (:title, :message, :details, :control, :term, :fase, :control_validadas, now())
+    """), {
+        "title": title,
+        "message": message,
+        "details": details,
+        "control": control,
+        "term": term,
+        "fase": fase,
+        "control_validadas": control_validadas
+    })
+
     for row in cursor.fetchall():
         conn.execute(text("""
-        INSERT INTO "TTGESPRO_NOTIFICACION" (
-            "FTC_TITULO", "FTC_DETALLE_TEXTO", "FTC_DETALLE_BLOB", 
-            "FTB_CIFRAS_CONTROL", "FCN_ID_PERIODO", "FCN_ID_USUARIO", "FCN_ID_FASE",
-            "FTB_CIFRAS_CONTROL_VALIDADAS", "FTD_FECHA_CREACION"
+        INSERT INTO "TTGESPRO_NOTIFICACION_USUARIO" (
+            "FCN_ID_NOTIFICATION", "FCN_ID_USUARIO",
+            "FTB_LEIDA", "FTD_FECHA_LECTURA"
         )
-        VALUES (:title, :message, :details, :control, :term, :user, :fase, :control_validadas, now())
+        VALUES (:user,  now())
         """), {
-            "title": title,
-            "message": message,
-            "details": details,
-            "control": control,
-            "term": term,
-            "user": row[0],
-            "fase": fase,
-            "control_validadas": control_validadas
+            "user": row[0]
         })
 
 
