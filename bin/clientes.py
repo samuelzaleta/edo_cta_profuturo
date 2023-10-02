@@ -27,20 +27,20 @@ with define_extraction(phase, postgres_pool, buc_pool) as (postgres, buc):
         truncate_table(postgres, "TCDATMAE_CLIENTE")
         # Extracción
         query = """
-        SELECT 
-        FTN_CUENTA,
-        FTC_NOMBRE,
-        FTC_AP_PATERNO,
-        FTC_AP_MATERNO,
-        FTC_CALLE,
-        FTC_NUMERO,
-        FTC_COLONIA,
-        FTC_DELEGACION,
-        FTN_CODIGO_POSTAL,
-        FTC_ENTIDAD_FEDERATIVA,
-        FTC_NSS,
-        FTC_CURP,
-        FTC_RFC 
+        SELECT
+            FTN_CUENTA,
+            FTC_NOMBRE,
+            FTC_AP_PATERNO,
+            FTC_AP_MATERNO,
+            FTC_CALLE,
+            FTC_NUMERO,
+            FTC_COLONIA,
+            FTC_DELEGACION,
+            FTN_CODIGO_POSTAL,
+            FTC_ENTIDAD_FEDERATIVA,
+            FTC_NSS,
+            FTC_CURP,
+            FTC_RFC 
         FROM (
             SELECT
                ROW_NUMBER() over (partition by TO_NUMBER(REGEXP_REPLACE(TO_CHAR(C.NUMERO), '[^0-9]', '')) order by C.NUMERO) AS id,
@@ -57,35 +57,35 @@ with define_extraction(phase, postgres_pool, buc_pool) as (postgres, buc):
                NSS.VALOR_IDENTIFICADOR AS FTC_NSS,
                CURP.VALOR_IDENTIFICADOR AS FTC_CURP,
                RFC.VALOR_IDENTIFICADOR AS FTC_RFC
-        FROM CONTRATO C
-            INNER JOIN PERSONA_CONT_ROL PCR ON C.IDCONTRATO = PCR.IDCONTRATO
-            INNER JOIN PERSONA_FISICA PF ON PCR.IDPERSONA = PF.IDPERSONA
-            INNER JOIN DOMICILIO D ON PF.IDPERSONA = D.IDPERSONA
-            INNER JOIN DIRECCION DI ON D.IDDIRECCION = DI.IDDIRECCION
-            LEFT JOIN CODIGO_POSTAL CP ON DI.IDCODIGOPOSTAL = CP.IDCODIGOPOSTAL
-            LEFT JOIN ESTADO E ON CP.IDESTADO = E.IDESTADO
-            LEFT JOIN MUNICIPIO M ON CP.IDMUNICIPIO = M.IDMUNICIPIO
-            LEFT JOIN CIUDAD CD ON CP.IDCIUDAD = CD.IDCIUDAD
-            LEFT JOIN ASENTAMIENTO ASE ON DI.IDASENTAMIENTO = ASE.IDASENTAMIENTO
-            LEFT JOIN IDENTIFICADOR NSS ON PF.IDPERSONA = NSS.IDPERSONA AND NSS.IDTIPOIDENTIFICADOR = 3 
-            AND NSS.VALIDO = 1 AND NSS.ACTIVO = 1
-            LEFT JOIN IDENTIFICADOR CURP ON PF.IDPERSONA = CURP.IDPERSONA AND CURP.IDTIPOIDENTIFICADOR = 2 
-            AND CURP.VALIDO = 1 AND CURP.ACTIVO = 1
-            LEFT JOIN IDENTIFICADOR RFC ON PF.IDPERSONA = RFC.IDPERSONA AND RFC.IDTIPOIDENTIFICADOR = 1 
-            AND RFC.VALIDO = 1 AND RFC.ACTIVO = 1
-        WHERE PCR.IDROL = 787 -- Rol cliente
-          AND C.IDLINEANEGOCIO = 763 -- Linea de negocio
-          AND D.IDTIPODOM = 818 -- Tipo de domicilio Particular
-          -- AND D.IDSTATUSDOM = 761 ACTIVO
-          -- AND D.PREFERENTE = 1 Domicilio preferente
-            ) where id = 1
+            FROM CONTRATO C
+                INNER JOIN PERSONA_CONT_ROL PCR ON C.IDCONTRATO = PCR.IDCONTRATO
+                INNER JOIN PERSONA_FISICA PF ON PCR.IDPERSONA = PF.IDPERSONA
+                INNER JOIN DOMICILIO D ON PF.IDPERSONA = D.IDPERSONA
+                INNER JOIN DIRECCION DI ON D.IDDIRECCION = DI.IDDIRECCION
+                LEFT JOIN CODIGO_POSTAL CP ON DI.IDCODIGOPOSTAL = CP.IDCODIGOPOSTAL
+                LEFT JOIN ESTADO E ON CP.IDESTADO = E.IDESTADO
+                LEFT JOIN MUNICIPIO M ON CP.IDMUNICIPIO = M.IDMUNICIPIO
+                LEFT JOIN CIUDAD CD ON CP.IDCIUDAD = CD.IDCIUDAD
+                LEFT JOIN ASENTAMIENTO ASE ON DI.IDASENTAMIENTO = ASE.IDASENTAMIENTO
+                LEFT JOIN IDENTIFICADOR NSS ON PF.IDPERSONA = NSS.IDPERSONA AND NSS.IDTIPOIDENTIFICADOR = 3 
+                                           AND NSS.VALIDO = 1 AND NSS.ACTIVO = 1
+                LEFT JOIN IDENTIFICADOR CURP ON PF.IDPERSONA = CURP.IDPERSONA AND CURP.IDTIPOIDENTIFICADOR = 2 
+                                            AND CURP.VALIDO = 1 AND CURP.ACTIVO = 1
+                LEFT JOIN IDENTIFICADOR RFC ON PF.IDPERSONA = RFC.IDPERSONA AND RFC.IDTIPOIDENTIFICADOR = 1 
+                                           AND RFC.VALIDO = 1 AND RFC.ACTIVO = 1
+            WHERE PCR.IDROL = 787 -- Rol cliente
+              AND C.IDLINEANEGOCIO = 763 -- Linea de negocio
+              AND D.IDTIPODOM = 818 -- Tipo de domicilio Particular
+              -- AND D.IDSTATUSDOM = 761 ACTIVO
+              -- AND D.PREFERENTE = 1 Domicilio preferente
+        ) where id = 1
         """
-        extract_dataset_spark(
+        read_table_insert_temp_view(
             configure_buc_spark,
-            configure_postgres_spark,
             query,
-            '"MAESTROS"."TCDATMAE_CLIENTE"'
+            'cliente',
         )
+
         # Extracción
         truncate_table(postgres, "TCHECHOS_CLIENTE_INDICADOR", term=term_id)
         truncate_table(postgres, "TCHECHOS_CLIENTE", term=term_id)
@@ -199,6 +199,13 @@ with define_extraction(phase, postgres_pool, buc_pool) as (postgres, buc):
         """, "generacion_transicion")
         spark.sql("select count(*) as count_generacion_transicion from generacion_transicion").show()
 
+        df = spark.sql("""
+        SELECT *
+        FROM cliente
+        """)
+        df.show()
+        _write_spark_dataframe(df, configure_postgres_spark, '"MAESTROS"."TCDATMAE_CLIENTE"')
+
         df = spark.sql(f"""
         WITH indicador_generacion AS (
             SELECT FCN_CUENTA, FCC_VALOR 
@@ -234,6 +241,7 @@ with define_extraction(phase, postgres_pool, buc_pool) as (postgres, buc):
             LEFT JOIN indicador_bono b ON o.FCN_CUENTA = b.FCN_CUENTA
             LEFT JOIN indicador_tipo_pension p ON o.FCN_CUENTA = p.FCN_CUENTA
             LEFT JOIN indicador_perfil_inversion i ON o.FCN_CUENTA = i.FCN_CUENTA
+        WHERE o.FCN_CUENTA IN (SELECT FCN_CUENTA FROM cliente)
         """)
         #df = df.withColumn("FTO_INDICADORES", to_json(struct(lit('{}'))))
         df.show(2)
