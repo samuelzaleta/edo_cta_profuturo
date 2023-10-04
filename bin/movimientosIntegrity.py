@@ -71,6 +71,7 @@ area = int(sys.argv[4])
 user = int(sys.argv[3])
 
 with define_extraction(phase, postgres_pool, integrity_pool) as (postgres, integrity):
+    print(1)
     term = extract_terms(postgres, phase)
     term_id = term["id"]
     start_month = term["start_month"]
@@ -85,167 +86,174 @@ with define_extraction(phase, postgres_pool, integrity_pool) as (postgres, integ
     """))
     switches = cursor2.fetchall()
 
-    #with register_time(postgres_pool, phase, area, usuario=user, term=term_id):
-    #truncate_table(postgres, '"HECHOS"."TTHECHOS_MOVIMIENTOS_INTEGRITY"', term=term_id)
-    extract_dataset(integrity, postgres, """
-    SELECT CSIE1_NUMCUE, 
-           CSIE1_CODMOV,
-           CSIE1_FECCON,
-           CVE_SIEFORE,
-           CVE_SERVICIO, CSIE1_MONPES_1, CSIE1_MONPES_3, 
-           CSIE1_MONPES_5, CSIE1_MONPES_8, CSIE1_MONPES_9, 
-           CSIE1_NSSEMP, CSIE1_FECHA_2,
-           CSIE1_FECTRA, CSIE1_SECLOT, CSIE1_CORREL,
-           CSIE1_PERPAG, CSIE1_FOLSUA, CSIE1_FECPAG, CSIE1_FECPRO
-    FROM MOV_GOBIERNO
-    WHERE CSIE1_FECCON >= 20230101
-      AND CSIE1_FECCON <= 20230131
-      AND CSIE1_CODMOV  IN (
-          106, 109, 129, 129, 210, 210, 260, 260, 405, 406, 410, 410, 412, 413, 414, 416, 420, 420, 421, 423, 424, 
-          426, 430, 430, 430, 433, 436, 440, 440, 441,442, 443, 444, 446, 450, 450, 450, 450, 450, 450,452, 453, 
-          453, 454, 454, 456, 470, 472, 474, 476, 610, 630, 710, 710, 760, 760, 805, 806, 841
-      )
-    """, "TTHECHOS_MOVIMIENTOS_INTEGRITY", term=term_id, params={
-        "start": start_month.strftime("%Y%m%d"),
-        "end": end_month.strftime("%Y%m%d"),
-    }, transform=transform)
-    extract_dataset(integrity, postgres, """
-    SELECT CSIE1_NUMCUE, CSIE1_CODMOV, CSIE1_FECCON, CVE_SIEFORE,
-           CVE_SERVICIO, CSIE1_MONPES_1,
-           CSIE1_MONPES_2, CSIE1_MONPES_3, CSIE1_MONPES_4,
-           CSIE1_MONPES_7, CSIE1_MONPES_8,
-           CSIE1_NSSEMP, CSIE1_FECHA_2,
-           CSIE1_FECTRA, CSIE1_SECLOT, CSIE1_CORREL,
-           CSIE1_PERPAG, CSIE1_FOLSUA, CSIE1_FECPAG, CSIE1_FECPRO
-    FROM MOV_RCV
-    WHERE CSIE1_FECCON >= 20230101
-      AND CSIE1_FECCON <= 20230131
-      AND CSIE1_CODMOV IN (
-          106, 109, 129, 129, 210, 210, 260, 260, 405, 406, 410, 410, 412, 413, 414, 416, 420, 420, 421, 423, 424, 
-          426, 430, 430, 430, 433, 436, 440, 440, 441,442, 443, 444, 446, 450, 450, 450, 450, 450, 450,452, 453, 
-          453, 454, 454, 456, 470, 472, 474, 476, 610, 630, 710, 710, 760, 760, 805, 806, 841
-      )
-    """, "TTHECHOS_MOVIMIENTOS_INTEGRITY", term=term_id, params={
-        "start": start_month.strftime("%Y%m%d"),
-        "end": end_month.strftime("%Y%m%d"),
-    }, transform=transform_rcv)
-    extract_dataset(integrity, postgres, """
-    SELECT CSIE1_NUMCUE, CSIE1_CODMOV, CSIE1_FECCON, 
-           CVE_SIEFORE, CVE_SERVICIO, CSIE1_MONPES_1,
-           CSIE1_NSSEMP, CSIE1_FECHA_2,
-           CSIE1_FECTRA, CSIE1_SECLOT, CSIE1_CORREL,
-           CSIE1_PERPAG, CSIE1_FOLSUA, CSIE1_FECPAG, CSIE1_FECPRO
-    FROM MOV_VIV97
-    WHERE CSIE1_FECCON >= 20230101
-      AND CSIE1_FECCON <= 20230131
-      AND CSIE1_CODMOV IN (
-          106, 109, 129, 129, 210, 210, 260, 260, 405, 406, 410, 410, 412, 413, 414, 416, 420, 420, 421, 423, 424, 
-          426, 430, 430, 430, 433, 436, 440, 440, 441,442, 443, 444, 446, 450, 450, 450, 450, 450, 450,452, 453, 
-          453, 454, 454, 456, 470, 472, 474, 476, 610, 630, 710, 710, 760, 760, 805, 806, 841
-      )
-    """, "TTHECHOS_MOVIMIENTOS_INTEGRITY", term=term_id, params={
-        "start": start_month.strftime("%Y%m%d"),
-        "end": end_month.strftime("%Y%m%d"),
-    }, transform=transform)
-    extract_dataset(integrity, postgres, """
-    SELECT CSIE1_NUMCUE, CSIE1_CODMOV, CSIE1_FECCON, CVE_SIEFORE,
-           CVE_SERVICIO, CSIE1_MONPES_1, CSIE1_MONPES_3, CSIE1_NSSEMP, 
-           CSIE1_FECHA_2, CSIE1_FECTRA, CSIE1_CORREL,
-           CSIE1_PERPAG, CSIE1_FOLSUA, CSIE1_FECPAG, CSIE1_FECPRO
-    FROM MOV_COMRET
-    WHERE CSIE1_FECCON >= 20230101
-      AND CSIE1_FECCON <= 20230131
-      AND CSIE1_CODMOV IN (
-          106, 109, 129, 129, 210, 210, 260, 260, 405, 406, 410, 410, 412, 413, 414, 416, 420, 420, 421, 423, 424, 
-          426, 430, 430, 430, 433, 436, 440, 440, 441,442, 443, 444, 446, 450, 450, 450, 450, 450, 450,452, 453, 
-          453, 454, 454, 456, 470, 472, 474, 476, 610, 630, 710, 710, 760, 760, 805, 806, 841
-      )
-    """, "TTHECHOS_MOVIMIENTOS_INTEGRITY", term=term_id, params={
-        "start": start_month.strftime("%Y%m%d"),
-        "end": end_month.strftime("%Y%m%d"),
-    }, transform=transform)
-    extract_dataset(integrity, postgres, """
-    SELECT CSIE1_NUMCUE, CSIE1_CODMOV, CSIE1_FECCON, CVE_SIEFORE,
-           CVE_SERVICIO, CSIE1_MONPES_1, CSIE1_MONPES_2, CSIE1_NSSEMP, 
-           CSIE1_FECHA_2, CSIE1_FECTRA, CSIE1_SECLOT, CSIE1_CORREL,
-           CSIE1_PERPAG, CSIE1_FOLSUA, CSIE1_FECPAG, CSIE1_FECPRO
-    FROM MOV_SAR92
-    WHERE CSIE1_FECCON >= 20230101
-      AND CSIE1_FECCON <= 20230131
-      AND CSIE1_CODMOV IN (
-          106, 109, 129, 129, 210, 210, 260, 260, 405, 406, 410, 410, 412, 413, 414, 416, 420, 420, 421, 423, 424, 
-          426, 430, 430, 430, 433, 436, 440, 440, 441,442, 443, 444, 446, 450, 450, 450, 450, 450, 450,452, 453, 
-          453, 454, 454, 456, 470, 472, 474, 476, 610, 630, 710, 710, 760, 760, 805, 806, 841
-      )
-    """, "TTHECHOS_MOVIMIENTOS_INTEGRITY", term=term_id, params={
-        "start": start_month.strftime("%Y%m%d"),
-        "end": end_month.strftime("%Y%m%d"),
-    }, transform=transform)
-    extract_dataset(integrity, postgres, """
-    SELECT CSIE1_NUMCUE, CSIE1_CODMOV, CSIE1_FECCON, CVE_SIEFORE,
-           CVE_SERVICIO, CSIE1_MONPES_3, CSIE1_NSSEMP, CSIE1_FECHA_2,
-           CSIE1_FECTRA, CSIE1_SECLOT, CSIE1_CORREL, CSIE1_PERPAG,
-           CSIE1_FOLSUA, CSIE1_FECPAG, CSIE1_FECPRO
-    FROM MOV_VIV92
-    WHERE CSIE1_FECCON >= 20230101
-      AND CSIE1_FECCON <= 20230131
-      AND CSIE1_CODMOV IN (
-          106, 109, 129, 129, 210, 210, 260, 260, 405, 406, 410, 410, 412, 413, 414, 416, 420, 420, 421, 423, 424, 
-          426, 430, 430, 430, 433, 436, 440, 440, 441,442, 443, 444, 446, 450, 450, 450, 450, 450, 450,452, 453, 
-          453, 454, 454, 456, 470, 472, 474, 476, 610, 630, 710, 710, 760, 760, 805, 806, 841
-      )
-    """, "TTHECHOS_MOVIMIENTOS_INTEGRITY", term=term_id, params={
-        "start": start_month.strftime("%Y%m%d"),
-        "end": end_month.strftime("%Y%m%d"),
-    }, transform=transform)
-    extract_dataset(integrity, postgres, """
-    SELECT CSIE1_NUMCUE, CSIE1_CODMOV, CSIE1_FECCON, CVE_SIEFORE,
-           CVE_SERVICIO, CSIE1_MONPES_1, CSIE1_MONPES_3, CSIE1_NSSEMP, 
-           CSIE1_FECHA_2, CSIE1_FECTRA, CSIE1_SECLOT, CSIE1_CORREL, 
-           CSIE1_PERPAG, CSIE1_FOLSUA, CSIE1_FECPAG, CSIE1_FECPRO
-    FROM MOV_BONO_UDI
-    WHERE CSIE1_FECCON >= 20230101
-      AND CSIE1_FECCON <= 20230131
-      AND CSIE1_CODMOV IN (
-          106, 109, 129, 129, 210, 210, 260, 260, 405, 406, 410, 410, 412, 413, 414, 416, 420, 420, 421, 423, 424, 
-          426, 430, 430, 430, 433, 436, 440, 440, 441,442, 443, 444, 446, 450, 450, 450, 450, 450, 450,452, 453, 
-          453, 454, 454, 456, 470, 472, 474, 476, 610, 630, 710, 710, 760, 760, 805, 806, 841
-      )
-    """, "TTHECHOS_MOVIMIENTOS_INTEGRITY", term=term_id, params={
-        "start": start_month.strftime("%Y%m%d"),
-        "end": end_month.strftime("%Y%m%d"),
-    }, transform=transform)
+    with register_time(postgres_pool, phase, area, usuario=user, term=term_id):
+        truncate_table(postgres, "TTHECHOS_MOVIMIENTOS_INTEGRITY", term=term_id)
+        extract_dataset(integrity, postgres, """
+        SELECT CSIE1_NUMCUE, 
+               CSIE1_CODMOV,
+               CSIE1_FECCON,
+               CVE_SIEFORE,
+               CVE_SERVICIO, CSIE1_MONPES_1, CSIE1_MONPES_3, 
+               CSIE1_MONPES_5, CSIE1_MONPES_8, CSIE1_MONPES_9, 
+               CSIE1_NSSEMP, CSIE1_FECHA_2,
+               CSIE1_FECTRA, CSIE1_SECLOT, CSIE1_CORREL,
+               CSIE1_PERPAG, CSIE1_FOLSUA, CSIE1_FECPAG, CSIE1_FECPRO
+        FROM MOV_GOBIERNO
+        WHERE CSIE1_FECCON >= :start
+          AND CSIE1_FECCON <= :end
+          --AND CSIE1_NUMCUE = 17000044823
+          AND CSIE1_CODMOV  IN (
+              106, 109, 129, 129, 210, 210, 260, 260, 405, 406, 410, 410, 412, 413, 414, 416, 420, 420, 421, 423, 424, 
+              426, 430, 430, 430, 433, 436, 440, 440, 441,442, 443, 444, 446, 450, 450, 450, 450, 450, 450,452, 453, 
+              453, 454, 454, 456, 470, 472, 474, 476, 610, 630, 710, 710, 760, 760, 805, 806, 841
+          )
+        """, "TTHECHOS_MOVIMIENTOS_INTEGRITY", term=term_id, params={
+            "start": start_month.strftime("%Y%m%d"),
+            "end": end_month.strftime("%Y%m%d"),
+        }, transform=transform)
+        extract_dataset(integrity, postgres, """
+        SELECT CSIE1_NUMCUE, CSIE1_CODMOV, CSIE1_FECCON, CVE_SIEFORE,
+               CVE_SERVICIO, CSIE1_MONPES_1,
+               CSIE1_MONPES_2, CSIE1_MONPES_3, CSIE1_MONPES_4,
+               CSIE1_MONPES_7, CSIE1_MONPES_8,
+               CSIE1_NSSEMP, CSIE1_FECHA_2,
+               CSIE1_FECTRA, CSIE1_SECLOT, CSIE1_CORREL,
+               CSIE1_PERPAG, CSIE1_FOLSUA, CSIE1_FECPAG, CSIE1_FECPRO
+        FROM MOV_RCV
+        WHERE CSIE1_FECCON >= :start
+          AND CSIE1_FECCON <= :end
+          --AND CSIE1_NUMCUE = 17000044823
+          AND CSIE1_CODMOV IN (
+              106, 109, 129, 129, 210, 210, 260, 260, 405, 406, 410, 410, 412, 413, 414, 416, 420, 420, 421, 423, 424, 
+              426, 430, 430, 430, 433, 436, 440, 440, 441,442, 443, 444, 446, 450, 450, 450, 450, 450, 450,452, 453, 
+              453, 454, 454, 456, 470, 472, 474, 476, 610, 630, 710, 710, 760, 760, 805, 806, 841
+          )
+        """, "TTHECHOS_MOVIMIENTOS_INTEGRITY", term=term_id, params={
+            "start": start_month.strftime("%Y%m%d"),
+            "end": end_month.strftime("%Y%m%d"),
+        }, transform=transform_rcv)
+        extract_dataset(integrity, postgres, """
+        SELECT CSIE1_NUMCUE, CSIE1_CODMOV, CSIE1_FECCON, 
+               CVE_SIEFORE, CVE_SERVICIO, CSIE1_MONPES_1,
+               CSIE1_NSSEMP, CSIE1_FECHA_2,
+               CSIE1_FECTRA, CSIE1_SECLOT, CSIE1_CORREL,
+               CSIE1_PERPAG, CSIE1_FOLSUA, CSIE1_FECPAG, CSIE1_FECPRO
+        FROM MOV_VIV97
+        WHERE CSIE1_FECCON >= :start
+          AND CSIE1_FECCON <= :end
+          --AND CSIE1_NUMCUE = 17000044823
+          AND CSIE1_CODMOV IN (
+              106, 109, 129, 129, 210, 210, 260, 260, 405, 406, 410, 410, 412, 413, 414, 416, 420, 420, 421, 423, 424, 
+              426, 430, 430, 430, 433, 436, 440, 440, 441,442, 443, 444, 446, 450, 450, 450, 450, 450, 450,452, 453, 
+              453, 454, 454, 456, 470, 472, 474, 476, 610, 630, 710, 710, 760, 760, 805, 806, 841
+          )
+        """, "TTHECHOS_MOVIMIENTOS_INTEGRITY", term=term_id, params={
+            "start": start_month.strftime("%Y%m%d"),
+            "end": end_month.strftime("%Y%m%d"),
+        }, transform=transform)
+        extract_dataset(integrity, postgres, """
+        SELECT CSIE1_NUMCUE, CSIE1_CODMOV, CSIE1_FECCON, CVE_SIEFORE,
+               CVE_SERVICIO, CSIE1_MONPES_1, CSIE1_MONPES_3, CSIE1_NSSEMP, 
+               CSIE1_FECHA_2, CSIE1_FECTRA, CSIE1_CORREL,
+               CSIE1_PERPAG, CSIE1_FOLSUA, CSIE1_FECPAG, CSIE1_FECPRO
+        FROM MOV_COMRET
+        WHERE CSIE1_FECCON >= :start
+          AND CSIE1_FECCON <= :end
+          --AND CSIE1_NUMCUE = 17000044823
+          AND CSIE1_CODMOV IN (
+              106, 109, 129, 129, 210, 210, 260, 260, 405, 406, 410, 410, 412, 413, 414, 416, 420, 420, 421, 423, 424, 
+              426, 430, 430, 430, 433, 436, 440, 440, 441,442, 443, 444, 446, 450, 450, 450, 450, 450, 450,452, 453, 
+              453, 454, 454, 456, 470, 472, 474, 476, 610, 630, 710, 710, 760, 760, 805, 806, 841
+          )
+        """, "TTHECHOS_MOVIMIENTOS_INTEGRITY", term=term_id, params={
+            "start": start_month.strftime("%Y%m%d"),
+            "end": end_month.strftime("%Y%m%d"),
+        }, transform=transform)
+        extract_dataset(integrity, postgres, """
+        SELECT CSIE1_NUMCUE, CSIE1_CODMOV, CSIE1_FECCON, CVE_SIEFORE,
+               CVE_SERVICIO, CSIE1_MONPES_1, CSIE1_MONPES_2, CSIE1_NSSEMP, 
+               CSIE1_FECHA_2, CSIE1_FECTRA, CSIE1_SECLOT, CSIE1_CORREL,
+               CSIE1_PERPAG, CSIE1_FOLSUA, CSIE1_FECPAG, CSIE1_FECPRO
+        FROM MOV_SAR92
+        WHERE CSIE1_FECCON >= :start
+          AND CSIE1_FECCON <= :end
+          --AND CSIE1_NUMCUE = 17000044823
+          AND CSIE1_CODMOV IN (
+              106, 109, 129, 129, 210, 210, 260, 260, 405, 406, 410, 410, 412, 413, 414, 416, 420, 420, 421, 423, 424, 
+              426, 430, 430, 430, 433, 436, 440, 440, 441,442, 443, 444, 446, 450, 450, 450, 450, 450, 450,452, 453, 
+              453, 454, 454, 456, 470, 472, 474, 476, 610, 630, 710, 710, 760, 760, 805, 806, 841
+          )
+        """, "TTHECHOS_MOVIMIENTOS_INTEGRITY", term=term_id, params={
+            "start": start_month.strftime("%Y%m%d"),
+            "end": end_month.strftime("%Y%m%d"),
+        }, transform=transform)
+        extract_dataset(integrity, postgres, """
+        SELECT CSIE1_NUMCUE, CSIE1_CODMOV, CSIE1_FECCON, CVE_SIEFORE,
+               CVE_SERVICIO, CSIE1_MONPES_3, CSIE1_NSSEMP, CSIE1_FECHA_2,
+               CSIE1_FECTRA, CSIE1_SECLOT, CSIE1_CORREL, CSIE1_PERPAG,
+               CSIE1_FOLSUA, CSIE1_FECPAG, CSIE1_FECPRO
+        FROM MOV_VIV92
+        WHERE CSIE1_FECCON >= :start
+          AND CSIE1_FECCON <= :end
+          --AND CSIE1_NUMCUE = 17000044823
+          AND CSIE1_CODMOV IN (
+              106, 109, 129, 129, 210, 210, 260, 260, 405, 406, 410, 410, 412, 413, 414, 416, 420, 420, 421, 423, 424, 
+              426, 430, 430, 430, 433, 436, 440, 440, 441,442, 443, 444, 446, 450, 450, 450, 450, 450, 450,452, 453, 
+              453, 454, 454, 456, 470, 472, 474, 476, 610, 630, 710, 710, 760, 760, 805, 806, 841
+          )
+        """, "TTHECHOS_MOVIMIENTOS_INTEGRITY", term=term_id, params={
+            "start": start_month.strftime("%Y%m%d"),
+            "end": end_month.strftime("%Y%m%d"),
+        }, transform=transform)
+        extract_dataset(integrity, postgres, """
+        SELECT CSIE1_NUMCUE, CSIE1_CODMOV, CSIE1_FECCON, CVE_SIEFORE,
+               CVE_SERVICIO, CSIE1_MONPES_1, CSIE1_MONPES_3, CSIE1_NSSEMP, 
+               CSIE1_FECHA_2, CSIE1_FECTRA, CSIE1_SECLOT, CSIE1_CORREL, 
+               CSIE1_PERPAG, CSIE1_FOLSUA, CSIE1_FECPAG, CSIE1_FECPRO
+        FROM MOV_BONO_UDI
+        WHERE CSIE1_FECCON >= :start
+          AND CSIE1_FECCON <= :end
+          --AND CSIE1_NUMCUE = 17000044823
+          AND CSIE1_CODMOV IN (
+              106, 109, 129, 129, 210, 210, 260, 260, 405, 406, 410, 410, 412, 413, 414, 416, 420, 420, 421, 423, 424, 
+              426, 430, 430, 430, 433, 436, 440, 440, 441,442, 443, 444, 446, 450, 450, 450, 450, 450, 450,452, 453, 
+              453, 454, 454, 456, 470, 472, 474, 476, 610, 630, 710, 710, 760, 760, 805, 806, 841
+          )
+        """, "TTHECHOS_MOVIMIENTOS_INTEGRITY", term=term_id, params={
+            "start": start_month.strftime("%Y%m%d"),
+            "end": end_month.strftime("%Y%m%d"),
+        }, transform=transform)
 
-    # Cifras de control
-    report2 = html_reporter.generate(
-        postgres,
-        """
-        --movimientos postgres
-        SELECT
-        g."FTC_PERIODO" AS PERIODO,
-        m."CVE_SIEFORE" AS SIEFORE_INTEGRITY,
-        m."SUBCUENTA" AS SUBCUENTA,
-        ROUND(cast(SUM (m."MONTO") as numeric(16,2)),2) as MONTO_PESOS
-        FROM "HECHOS"."TTHECHOS_MOVIMIENTOS_INTEGRITY" m
-        --LEFT JOIN "MAESTROS"."TCDATMAE_SIEFORE" s ON m."FCN_ID_SIEFORE" = s."FTN_ID_SIEFORE"
-        --INNER JOIN "GESTOR"."TCGESPRO_MOVIMIENTO_PROFUTURO" mp ON mp."FTN_ID_MOVIMIENTO_PROFUTURO" = m."FCN_ID_CONCEPTO_MOVIMIENTO"
-        LEFT JOIN "MAESTROS"."TCDATMAE_TIPO_SUBCUENTA" sb ON m."SUBCUENTA" = sb."FTN_ID_TIPO_SUBCTA"
-        INNER JOIN "GESTOR"."TCGESPRO_PERIODO" g ON g."FTN_ID_PERIODO" = m."FCN_ID_PERIODO"
-        WHERE "FCN_ID_PERIODO" = :term
-        GROUP BY
-        g."FTC_PERIODO", m."CVE_SIEFORE", m."SUBCUENTA"
-        """,
-        ["PERIODO", "SIEFORE", "SUBCUENTA"],
-        ["MONTO_PESOS"],
-        params={"term": term_id},
-    )
-    notify(
-        postgres,
-        f"Cifras de control movimientos integrity generadas - {datetime.now()}",
-        "Se han generado las cifras de control para movimientos integrity exitosamente",
-        report2,
-        term=term_id,
-        control=True,
-        area=area,
-        fase=phase
-    )
+        # Cifras de control
+        report2 = html_reporter.generate(
+            postgres,
+            """
+            --movimientos postgres
+            SELECT
+            g."FTC_PERIODO" AS PERIODO,
+            m."CVE_SIEFORE" AS SIEFORE_INTEGRITY,
+            m."SUBCUENTA" AS SUBCUENTA,
+            ROUND(cast(SUM (m."MONTO") as numeric(16,2)),2) as MONTO_PESOS
+            FROM "HECHOS"."TTHECHOS_MOVIMIENTOS_INTEGRITY" m
+            --LEFT JOIN "MAESTROS"."TCDATMAE_SIEFORE" s ON m."FCN_ID_SIEFORE" = s."FTN_ID_SIEFORE"
+            --INNER JOIN "GESTOR"."TCGESPRO_MOVIMIENTO_PROFUTURO" mp ON mp."FTN_ID_MOVIMIENTO_PROFUTURO" = m."FCN_ID_CONCEPTO_MOVIMIENTO"
+            LEFT JOIN "MAESTROS"."TCDATMAE_TIPO_SUBCUENTA" sb ON m."SUBCUENTA" = sb."FTN_ID_TIPO_SUBCTA"
+            INNER JOIN "GESTOR"."TCGESPRO_PERIODO" g ON g."FTN_ID_PERIODO" = m."FCN_ID_PERIODO"
+            WHERE "FCN_ID_PERIODO" = :term
+            GROUP BY
+            g."FTC_PERIODO", m."CVE_SIEFORE", m."SUBCUENTA"
+            """,
+            ["PERIODO", "SIEFORE", "SUBCUENTA"],
+            ["MONTO_PESOS"],
+            params={"term": term_id},
+        )
+        notify(
+            postgres,
+            f"Cifras de control movimientos integrity generadas - {datetime.now()}",
+            "Se han generado las cifras de control para movimientos integrity exitosamente",
+            report2,
+            term=term_id,
+            control=True,
+            area=area,
+            fase=phase
+        )
