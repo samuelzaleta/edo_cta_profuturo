@@ -2,43 +2,49 @@ from sqlalchemy import text, Engine, Connection
 from datetime import datetime, time, timedelta
 from contextlib import contextmanager
 from dotenv import load_dotenv
+from typing import Union
 from .database import use_pools
 from .exceptions import ProfuturoException
 
 
 @contextmanager
-def define_extraction(phase: int, main_pool: Engine, *pools: Engine):
+def define_extraction(phase: int, area: int, main_pool: Engine, *pools: Engine):
     load_dotenv()
 
-    with notify_exceptions(main_pool, phase):
+    with notify_exceptions(main_pool, phase, area):
         with use_pools(phase, main_pool, *pools) as pools:
             yield pools
 
 
 @contextmanager
-def register_time(pool: Engine, phase: int, area: int, usuario: int, term: int = None):
+def register_time(pool: Engine, phase: int, term: int, user: int, area: int):
     with pool.begin() as conn:
-        binnacle_id = register_start(conn, phase, area, usuario, datetime.now(), term=term)
+        binnacle_id = register_start(conn, phase, term, user, area, datetime.now())
 
-    yield
+    exc = None
+    try:
+        yield
+    except Exception as e:
+        exc = e
 
     with pool.begin() as conn:
-        register_end(conn, binnacle_id, datetime.now())
+        register_end(conn, binnacle_id, datetime.now(), exc)
 
 
-def register_start(conn: Connection, phase: int, area: int, usuario: int ,start: datetime, term: int = None) -> int:
+def register_start(conn: Connection, phase: int, term: int, user: int, area: int, start: datetime) -> int:
     try:
         cursor = conn.execute(text("""
         INSERT INTO "TTGESPRO_BITACORA_ESTADO_CUENTA" (
-           "FTD_FECHA_HORA_INICIO", "FCN_ID_PERIODO", "FCN_ID_FASE", "FCN_ID_AREA", "FCN_ID_USUARIO")
-        VALUES (:start, :term, :phase, :area, :usuario)
+           "FTD_FECHA_HORA_INICIO", "FCN_ID_PERIODO", "FCN_ID_FASE", "FCN_ID_AREA", "FCN_ID_USUARIO"
+        )
+        VALUES (:start, :term, :phase, :area, :user)
         RETURNING "FTN_ID_BITACORA_ESTADO_CUENTA"
         """), {
             "start": start,
-            "term": term,
             "phase": phase,
+            "term": term,
+            "user": user,
             "area": area,
-            "usuario": usuario
         })
         row = cursor.fetchone()
 
@@ -47,7 +53,16 @@ def register_start(conn: Connection, phase: int, area: int, usuario: int ,start:
         raise ProfuturoException("BINNACLE_ERROR", phase, term) from e
 
 
-def register_end(conn: Connection, binnacle_id: int, end: datetime) -> None:
+def register_end(conn: Connection, binnacle_id: int, end: datetime, exc: Union[Exception, None]) -> None:
+    if exc:
+        conn.execute(text("""
+        UPDATE "TTGESPRO_BITACORA_ESTADO_CUENTA"
+        SET "FTD_FECHA_HORA_FIN" = :end, "FTC_BANDERA_NIVEL_SERVICIO" = :flag
+        WHERE "FTN_ID_BITACORA_ESTADO_CUENTA" = :id
+        """), {"id": binnacle_id, "end": end, "flag": "Error"})
+
+        raise exc
+
     try:
         cursor = conn.execute(text("""
         SELECT "FTD_FECHA_HORA_INICIO", "FCN_ID_FASE"
@@ -91,7 +106,7 @@ def register_end(conn: Connection, binnacle_id: int, end: datetime) -> None:
 
 
 @contextmanager
-def notify_exceptions(pool: Engine, phase: int):
+def notify_exceptions(pool: Engine, phase: int, area: int):
     try:
         yield
     except ProfuturoException as e:
@@ -99,68 +114,79 @@ def notify_exceptions(pool: Engine, phase: int):
             notify(
                 conn,
                 f"Error al ingestar la etapa {phase}",
-                e.msg,
-                str(e),
-                e.term,
+                phase,
+                area,
+                term=e.term,
+                message=e.msg,
+                details=str(e),
+                control=False,
             )
 
         raise e
     except Exception as e:
         with pool.begin() as conn:
-            notify(conn, f"Error desconocido al ingestar la etapa {phase}", details=str(e))
+            notify(
+                conn,
+                f"Error desconocido al ingestar la etapa {phase}",
+                phase,
+                area,
+                details=str(e),
+                control=False,
+            )
 
         raise e
 
 
-def notify(conn: Connection, title: str, message: str = None, details: str = None, term: int = None,
-           control: bool = True, area: int = 0, fase: int = None,
-           control_validadas: bool = False):
-    cursor = conn.execute(text(f"""
-    select
-        DISTINCT "FCN_ID_USUARIO"
-    from "MAESTROS"."TCDATMAE_AREA" ma
-    INNER JOIN "GESTOR"."TCGESPRO_ROL_AREA" ra
-    ON ma."FTN_ID_AREA" = ra."FCN_ID_AREA"
-    INNER JOIN "GESTOR"."TCGESPRO_ROL" rp
-    ON ra."FCN_ID_ROL" =  rp."FTN_ID_ROL"
-    inner join "GESTOR"."TCGESPRO_ROL_MENU_PRIVILEGIO" rmp
-    on rp."FTN_ID_ROL" = rmp."FCN_ID_ROL"
-    inner join "GESTOR"."TTGESPRO_ROL_USUARIO" ru
-    on ra."FCN_ID_ROL" = ru."FCN_ID_ROL"
-    INNER JOIN "GESTOR"."TCGESPRO_MENU_FUNCION" mf
-    on rmp."FCN_ID_MENU" =  mf."FTN_ID_FUNCION"
-    where
-    "FTN_ID_AREA" = {area}
-    and "FTN_ID_MENU" = 7
-    """))
-    if cursor.rowcount == 0:
+def notify(
+    conn: Connection,
+    title: str,
+    phase: int,
+    area: int,
+    term: int = None,
+    message: str = None,
+    details: str = None,
+    control: bool = True,
+    validated: bool = False,
+) -> None:
+    users = conn.execute(text(f"""
+    SELECT DISTINCT "FCN_ID_USUARIO"
+    FROM "MAESTROS"."TCDATMAE_AREA" a
+        INNER JOIN "GESTOR"."TCGESPRO_ROL_AREA" ra ON a."FTN_ID_AREA" = ra."FCN_ID_AREA"
+        INNER JOIN "GESTOR"."TCGESPRO_ROL" rp ON ra."FCN_ID_ROL" =  rp."FTN_ID_ROL"
+        INNER JOIN "GESTOR"."TCGESPRO_ROL_MENU_PRIVILEGIO" rmp ON rp."FTN_ID_ROL" = rmp."FCN_ID_ROL"
+        INNER JOIN "GESTOR"."TTGESPRO_ROL_USUARIO" ru ON ra."FCN_ID_ROL" = ru."FCN_ID_ROL"
+        INNER JOIN "GESTOR"."TCGESPRO_MENU_FUNCION" mf ON rmp."FCN_ID_MENU" =  mf."FTN_ID_FUNCION"
+    WHERE "FTN_ID_AREA" = :area
+      AND "FTN_ID_MENU" = 7
+    """), {"area": area})
+    if users.rowcount == 0:
         raise ValueError("The area does not exist")
-    conn.execute(text("""
+
+    notification = conn.execute(text("""
     INSERT INTO "TTGESPRO_NOTIFICACION" (
         "FTC_TITULO", "FTC_DETALLE_TEXTO", "FTC_DETALLE_BLOB", 
         "FTB_CIFRAS_CONTROL", "FCN_ID_PERIODO", "FCN_ID_FASE",
         "FTB_CIFRAS_CONTROL_VALIDADAS", "FTD_FECHA_CREACION"
     )
-    VALUES (:title, :message, :details, :control, :term, :fase, :control_validadas, now())
+    VALUES (:title, :message, :details, :control, :term, :phase, :validated, now())
+    RETURNING "FTN_ID_NOTIFICACION"
     """), {
         "title": title,
+        "phase": phase,
+        "term": term,
         "message": message,
         "details": details,
         "control": control,
-        "term": term,
-        "fase": fase,
-        "control_validadas": control_validadas
-    })
+        "validated": validated,
+    }).fetchone()
 
-    for row in cursor.fetchall():
+    for user in users.fetchall():
         conn.execute(text("""
-        INSERT INTO "TTGESPRO_NOTIFICACION_USUARIO" (
-            "FCN_ID_NOTIFICATION", "FCN_ID_USUARIO",
-            "FTB_LEIDA", "FTD_FECHA_LECTURA"
-        )
-        VALUES (:user,  now())
+        INSERT INTO "TTGESPRO_NOTIFICACION_USUARIO" ("FCN_ID_NOTIFICACION", "FCN_ID_USUARIO")
+        VALUES (:notification, :user)
         """), {
-            "user": row[0]
+            "notification": notification[0],
+            "user": user[0]
         })
 
 

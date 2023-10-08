@@ -1,11 +1,10 @@
 from sqlalchemy import text, Connection, CursorResult
-from profuturo.database import configure_postgres_spark, configure_bigquery_spark
+from profuturo.database import configure_postgres_spark
 from profuturo.extraction import _write_spark_dataframe, _get_spark_session, read_table_insert_temp_view
-from profuturo.common import register_time, define_extraction,truncate_table
+from profuturo.common import register_time, define_extraction, truncate_table
 from profuturo.database import get_postgres_pool
 from profuturo.reporters import HtmlReporter
 from profuturo.extraction import extract_terms
-from pyspark.sql.types import StructType, StructField, LongType
 from pyspark.sql.functions import lit, col, current_timestamp, concat
 import sys
 
@@ -39,12 +38,12 @@ def find_samples(samples_cursor: CursorResult):
 
 html_reporter = HtmlReporter()
 postgres_pool = get_postgres_pool()
-phase = int(sys.argv[1])
-area = int(sys.argv[4])
-user = int(sys.argv[3])
-periodo = int(sys.argv[2])
 
-with define_extraction(phase, postgres_pool, postgres_pool) as (postgres, _):
+phase = int(sys.argv[1])
+user = int(sys.argv[3])
+area = int(sys.argv[4])
+
+with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, _):
     postgres: Connection
 
     term = extract_terms(postgres, phase)
@@ -53,7 +52,7 @@ with define_extraction(phase, postgres_pool, postgres_pool) as (postgres, _):
     end_month = term["end_month"]
     spark = _get_spark_session()
 
-    with register_time(postgres_pool, phase, area, usuario=user, term=term_id):
+    with register_time(postgres_pool, phase, term_id, user, area):
         truncate_table(postgres, "TCGESPRO_MUESTRA_SOL_RE_CONSAR")
         truncate_table(postgres, "TCGESPRO_MUESTRA", term=term_id)
         # Extracción
@@ -105,7 +104,7 @@ with define_extraction(phase, postgres_pool, postgres_pool) as (postgres, _):
         filas = [{"FCN_CUENTA": records_as_dict} for records_as_dict in records_as_dicts]
 
         df = spark.createDataFrame(filas)
-        df = df.withColumn("FCN_ID_PERIODO", lit(periodo))
+        df = df.withColumn("FCN_ID_PERIODO", lit(term_id))
         df = df.withColumn("FCN_ID_USUARIO", lit(user))
         df = df.withColumn("FCN_ID_AREA", lit(area))
         df = df.withColumn("FTC_ESTATUS", lit("Pendiente"))

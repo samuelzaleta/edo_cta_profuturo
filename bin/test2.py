@@ -1,17 +1,18 @@
-from profuturo.common import define_extraction, register_time, truncate_table
-from profuturo.database import get_postgres_pool, configure_postgres_spark, configure_bigquery_spark
-from profuturo.extraction import _write_spark_dataframe_overwrite, _write_spark_dataframe, extract_terms, extract_dataset_spark, _get_spark_session, read_table_insert_temp_view
-from pyspark.sql.types import StructType, StringType
+from profuturo.common import define_extraction, truncate_table
+from profuturo.database import get_postgres_pool, configure_postgres_spark
+from profuturo.extraction import extract_terms, _get_spark_session, read_table_insert_temp_view
+from pyspark.sql.types import StringType
 from pyspark.sql.functions import udf, concat, col, current_timestamp,lit
 import uuid
 import sys
 
 postgres_pool = get_postgres_pool()
+
 phase = int(sys.argv[1])
 user = int(sys.argv[3])
 area = int(sys.argv[4])
 
-with define_extraction(phase, postgres_pool, postgres_pool) as (postgres, _):
+with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, _):
     term = extract_terms(postgres, phase)
     term_id = term["id"]
     start_month = term["start_month"]

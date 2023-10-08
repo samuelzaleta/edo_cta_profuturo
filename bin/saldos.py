@@ -7,18 +7,19 @@ from datetime import datetime
 
 html_reporter = HtmlReporter()
 postgres_pool = get_postgres_pool()
-phase = int(sys.argv[1])
-area = int(sys.argv[4])
-user = int(sys.argv[3])
 
-with define_extraction(phase, postgres_pool, postgres_pool) as (postgres, _):
+phase = int(sys.argv[1])
+user = int(sys.argv[3])
+area = int(sys.argv[4])
+
+with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, _):
     term = extract_terms(postgres, phase)
     term_id = term["id"]
     time_period = term["time_period"]
     print(term_id)
     end_saldos = term["end_saldos"]
 
-    with register_time(postgres_pool, phase=phase, area=area, usuario=user, term=term_id):
+    with register_time(postgres_pool, phase, term_id, user, area):
         # Extracción
         query = """
         SELECT SH.FTN_NUM_CTA_INVDUAL AS FCN_CUENTA,
@@ -71,7 +72,7 @@ with define_extraction(phase, postgres_pool, postgres_pool) as (postgres, _):
         )
 
         # Cifras de control
-        report = html_reporter.generate(
+        report1 = html_reporter.generate(
             postgres,
             """
             SELECT
@@ -96,17 +97,7 @@ with define_extraction(phase, postgres_pool, postgres_pool) as (postgres, _):
             ["Saldo final en pesos", "Saldo final en acciones"],
             params={"term": term_id},
         )
-        notify(
-            postgres,
-            f"Cifras de control Saldos generadas 1 de 2 - {datetime.now()}",
-            f"Se han generado las cifras de control para saldos exitosamente para el periodo {time_period}",
-            report,
-            term=term_id,
-            area=area,
-            fase=phase
-        )
-
-        report = html_reporter.generate(
+        report2 = html_reporter.generate(
             postgres,
             """
             SELECT TS."FCC_VALOR" AS TIPO_SUBCUENTA,
@@ -125,12 +116,22 @@ with define_extraction(phase, postgres_pool, postgres_pool) as (postgres, _):
             ["Saldo final en pesos", "Saldo final en acciones"],
             params={"term": term_id},
         )
+
+        notify(
+            postgres,
+            f"Cifras de control Saldos generadas 1 de 2 - {datetime.now()}",
+            phase,
+            area,
+            term=term_id,
+            message=f"Se han generado las cifras de control para saldos exitosamente para el periodo {time_period}",
+            details=report1,
+        )
         notify(
             postgres,
             f"Cifras de control Saldos generadas 2 de 2 - {datetime.now()}",
-            f"Se han generado las cifras de control para saldos exitosamente para el periodo {time_period}",
-            report,
+            phase,
+            area,
             term=term_id,
-            area=area,
-            fase=phase
+            message=f"Se han generado las cifras de control para saldos exitosamente para el periodo {time_period}",
+            details=report2,
         )

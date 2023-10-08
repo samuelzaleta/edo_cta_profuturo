@@ -1,21 +1,20 @@
-from profuturo.common import register_time, define_extraction, notify,truncate_table
-from profuturo.database import get_postgres_pool, get_buc_pool,  configure_buc_spark, configure_mit_spark, configure_postgres_spark
-from profuturo.extraction import extract_dataset_spark, _get_spark_session, _write_spark_dataframe, read_table_insert_temp_view
+from profuturo.common import register_time, define_extraction, notify, truncate_table
+from profuturo.database import get_postgres_pool, get_buc_pool, configure_buc_spark, configure_mit_spark, configure_postgres_spark
+from profuturo.extraction import _get_spark_session, _write_spark_dataframe, read_table_insert_temp_view
 from profuturo.reporters import HtmlReporter
 from profuturo.extraction import extract_terms
-from pyspark.sql.functions import lit
-import sys
 from datetime import datetime
-
+import sys
 
 html_reporter = HtmlReporter()
 postgres_pool = get_postgres_pool()
 buc_pool = get_buc_pool()
-phase = int(sys.argv[1])
-area = int(sys.argv[4])
-user = int(sys.argv[3])
 
-with define_extraction(phase, postgres_pool, buc_pool) as (postgres, buc):
+phase = int(sys.argv[1])
+user = int(sys.argv[3])
+area = int(sys.argv[4])
+
+with define_extraction(phase, area, postgres_pool, buc_pool) as (postgres, buc):
     term = extract_terms(postgres, phase)
     term_id = term["id"]
     time_period = term["time_period"]
@@ -23,7 +22,7 @@ with define_extraction(phase, postgres_pool, buc_pool) as (postgres, buc):
     end_month = term["end_month"]
     spark = _get_spark_session()
 
-    with register_time(postgres_pool, phase=phase,area= area, usuario=user, term=term_id):
+    with register_time(postgres_pool, phase, term_id, user, area):
         truncate_table(postgres, "TCDATMAE_CLIENTE")
         # Extracción
         query = """
@@ -269,9 +268,9 @@ with define_extraction(phase, postgres_pool, buc_pool) as (postgres, buc):
         notify(
             postgres,
             f"Clientes ingestados - {datetime.now()}",
-            f"Se han ingestado los clientes de forma exitosa para el periodo {time_period}",
-            report,
+            phase,
+            area,
             term=term_id,
-            area=area,
-            fase=phase
+            message=f"Se han ingestado los clientes de forma exitosa para el periodo {time_period}",
+            details=report,
         )

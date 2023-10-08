@@ -7,18 +7,19 @@ from datetime import datetime
 
 html_reporter = HtmlReporter()
 postgres_pool = get_postgres_pool()
-phase = int(sys.argv[1])
-area = int(sys.argv[4])
-user = int(sys.argv[3])
 
-with define_extraction(phase, postgres_pool, postgres_pool) as (postgres, _):
+phase = int(sys.argv[1])
+user = int(sys.argv[3])
+area = int(sys.argv[4])
+
+with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, _):
     term = extract_terms(postgres, phase)
     term_id = term["id"]
     time_period = term["time_period"]
     start_month = term["start_month"]
     end_month = term["end_month"]
 
-    with register_time(postgres_pool, phase=phase, area=area, usuario=user, term=term_id):
+    with register_time(postgres_pool, phase, term_id, user, area):
         # Extracción
         query = """
         SELECT FTN_NUM_CTA_INVDUAL AS FCN_CUENTA,
@@ -70,9 +71,9 @@ with define_extraction(phase, postgres_pool, postgres_pool) as (postgres, _):
         notify(
             postgres,
             f"Cifras de control Comisiones generadas - {datetime.now()}",
-            f"Se han ingestado las comisiones de forma exitosa para el periodo {time_period}",
-            report,
+            phase,
+            area,
             term=term_id,
-            area=area,
-            fase=phase
+            message=f"Se han ingestado las comisiones de forma exitosa para el periodo {time_period}",
+            details=report,
         )

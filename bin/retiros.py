@@ -5,18 +5,17 @@ from profuturo.reporters import HtmlReporter
 from pyspark.sql.functions import col
 from warnings import filterwarnings
 import sys
-from datetime import datetime
 
 filterwarnings(action='ignore', category=DeprecationWarning, message='`np.bool` is a deprecated alias')
 html_reporter = HtmlReporter()
 postgres_pool = get_postgres_pool()
 mit_pool = get_mit_pool()
-phase = int(sys.argv[1])
-area = int(sys.argv[4])
-user = int(sys.argv[3])
-print(int(sys.argv[1]), int(sys.argv[2]), int(sys.argv[3]), int(sys.argv[4]))
 
-with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
+phase = int(sys.argv[1])
+user = int(sys.argv[3])
+area = int(sys.argv[4])
+
+with define_extraction(phase, area, postgres_pool, mit_pool) as (postgres, mit):
     term = extract_terms(postgres, phase)
     term_id = term["id"]
     time_period = term["time_period"]
@@ -660,9 +659,9 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
             notify(
                 postgres,
                 f"Cifras de control Retiros generadas - Parte {start}-{end - 1}",
-                f"Se han generado las cifras de control para retiros exitosamente para el periodo {time_period}",
-                batch_html_table,
+                phase,
+                area,
                 term=term_id,
-                area=area,
-                fase=phase
+                message=f"Se han generado las cifras de control para retiros exitosamente para el periodo {time_period}",
+                details=batch_html_table,
             )
