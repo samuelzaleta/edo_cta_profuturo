@@ -40,7 +40,7 @@ def transform(df: DataFrame) -> DataFrame:
     # Extrae los MONPES en base a los switches
     for switch in switches:
         codmov = switch[0]
-        monpes = "CSIE1_" + str(switch[1])
+        monpes = "CSIE1_MONPES_" + str(switch[1])
         subcuenta = switch[2]
 
         if monpes not in df.columns:
@@ -79,10 +79,10 @@ with define_extraction(phase, area, postgres_pool, integrity_pool) as (postgres,
     with register_time(postgres_pool, phase, term_id, user, area):
         # SWITCH
         switches = postgres.execute(text("""
-        SELECT "FTN_ID_MOVIMIENTO_PROFUTURO", "FTN_MONPES", "FCN_ID_TIPO_SUBCUENTA"
+        SELECT DISTINCT "FTN_ID_MOVIMIENTO_PROFUTURO", "FTN_MONPES", "FCN_ID_TIPO_SUBCUENTA"
         FROM "GESTOR"."TCGESPRO_MOVIMIENTO_PROFUTURO"
         WHERE "FTB_SWITCH" = TRUE
-        AND "FTC_ORIGEN" in ('INTEGRITY')
+          AND "FTC_ORIGEN" = 'INTEGRITY'
         """)).fetchall()
 
         # with register_time(postgres_pool, phase, term_id, user, area):
