@@ -60,7 +60,7 @@ with define_extraction(phase, area, postgres_pool, mit_pool) as (postgres, mit):
         SET "FCN_ID_TIPO_SUBCUENTA" = EXCLUDED."FCN_ID_TIPO_SUBCUENTA", "FTC_ORIGEN" = EXCLUDED."FTC_ORIGEN",
             "FTC_DESCRIPCION" = EXCLUDED."FTC_DESCRIPCION", "FTB_SWITCH" = EXCLUDED."FTB_SWITCH"
         """, lambda i: [f":cod_mov_{i}", f":monpes_{i}", f":tipo_subcta_{i}", "'MIT'", f":description_{i}", "false"],
-                       "TCGESPRO_MOVIMIENTO_PROFUTURO")
+                       "TCGESPRO_MOVIMIENTO_PROFUTURO", upsert_id=lambda row: f"{str(row[0])}-{str(row[1])}")
 
         upsert_dataset(mit, postgres, """
         SELECT FFN_ID_CONCEPTO_MOV AS cod_mov,
@@ -84,8 +84,8 @@ with define_extraction(phase, area, postgres_pool, mit_pool) as (postgres, mit):
         ON CONFLICT ("FTN_ID_MOVIMIENTO_PROFUTURO", "FTN_MONPES") DO UPDATE 
         SET "FCN_ID_TIPO_SUBCUENTA" = EXCLUDED."FCN_ID_TIPO_SUBCUENTA", "FTC_ORIGEN" = EXCLUDED."FTC_ORIGEN",
             "FTC_DESCRIPCION" = EXCLUDED."FTC_DESCRIPCION", "FTB_SWITCH" = EXCLUDED."FTB_SWITCH"
-        """, lambda i: [f":cod_mov_{i}", f":monpes_{i}", f":tipo_subcta_{i}", "'INTEGRITY'", f":description_{i}",
-                        "true"], "TCGESPRO_MOVIMIENTO_PROFUTURO")
+        """, lambda i: [f":cod_mov_{i}", f":monpes_{i}", f":tipo_subcta_{i}", "'INTEGRITY'", f":description_{i}", "true"],
+                       "TCGESPRO_MOVIMIENTO_PROFUTURO", upsert_id=lambda row: f"{str(row[0])}-{str(row[1])}")
 
         """
         tables = ["TCDATMAE_SIEFORE", "TCDATMAE_TIPO_SUBCUENTA", "TCGESPRO_MOVIMIENTO_PROFUTURO"]
