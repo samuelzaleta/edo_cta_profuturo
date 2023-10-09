@@ -1,21 +1,20 @@
-from profuturo.common import register_time, define_extraction, notify,truncate_table
-from profuturo.database import get_postgres_pool, get_buc_pool,  configure_buc_spark, configure_mit_spark, configure_postgres_spark
-from profuturo.extraction import extract_dataset_spark, _get_spark_session, _write_spark_dataframe, read_table_insert_temp_view
+from profuturo.common import register_time, define_extraction, notify, truncate_table
+from profuturo.database import get_postgres_pool, get_buc_pool, configure_buc_spark, configure_mit_spark, configure_postgres_spark
+from profuturo.extraction import _get_spark_session, _write_spark_dataframe, read_table_insert_temp_view
 from profuturo.reporters import HtmlReporter
 from profuturo.extraction import extract_terms
-from pyspark.sql.functions import lit
-import sys
 from datetime import datetime
-
+import sys
 
 html_reporter = HtmlReporter()
 postgres_pool = get_postgres_pool()
 buc_pool = get_buc_pool()
-phase = int(sys.argv[1])
-area = int(sys.argv[4])
-user = int(sys.argv[3])
 
-with define_extraction(phase, postgres_pool, buc_pool) as (postgres, buc):
+phase = int(sys.argv[1])
+user = int(sys.argv[3])
+area = int(sys.argv[4])
+
+with define_extraction(phase, area, postgres_pool, buc_pool) as (postgres, buc):
     term = extract_terms(postgres, phase)
     term_id = term["id"]
     time_period = term["time_period"]
@@ -23,7 +22,7 @@ with define_extraction(phase, postgres_pool, buc_pool) as (postgres, buc):
     end_month = term["end_month"]
     spark = _get_spark_session()
 
-    with register_time(postgres_pool, phase=phase,area= area, usuario=user, term=term_id):
+    with register_time(postgres_pool, phase, term_id, user, area):
         truncate_table(postgres, "TCDATMAE_CLIENTE")
         # Extracción
         query = """
@@ -224,13 +223,13 @@ with define_extraction(phase, postgres_pool, buc_pool) as (postgres, buc):
         )
         SELECT DISTINCT o.FCN_CUENTA,
                {term_id} AS FCN_ID_PERIODO,
-               coalesce(cast(p.FCC_VALOR AS BOOLEAN), cast('FALSE' as BOOLEAN)) AS FTB_PENSION, 
+               coalesce(cast(p.FCC_VALOR AS BOOLEAN), false) AS FTB_PENSION, 
                t.FCC_VALOR AS  FTC_TIPO_CLIENTE,
                o.FCC_VALOR AS FTC_ORIGEN,
                v.FCC_VALOR AS FTC_VIGENCIA,
                g.FCC_VALOR AS FTC_GENERACION,
-               coalesce(cast(p.FCC_VALOR AS BOOLEAN), cast('FALSE' as BOOLEAN))  AS FTB_BONO,
-               p.FCC_VALOR AS FTC_TIPO_PENSION,
+               coalesce(cast(p.FCC_VALOR AS BOOLEAN), false)  AS FTB_BONO,
+               tp.FCC_VALOR AS FTC_TIPO_PENSION,
                i.FCC_VALOR AS FTC_PERFIL_INVERSION
                --JSON_OBJECT('Vigencia', v.FCC_VALOR, 'Generacion', g.FCC_VALOR) AS FTO_INDICADORES
         FROM indicador_origen o
@@ -239,9 +238,9 @@ with define_extraction(phase, postgres_pool, buc_pool) as (postgres, buc):
             LEFT JOIN indicador_pension p ON o.FCN_CUENTA = p.FCN_CUENTA
             LEFT JOIN indicador_vigencia v ON o.FCN_CUENTA = v.FCN_CUENTA
             LEFT JOIN indicador_bono b ON o.FCN_CUENTA = b.FCN_CUENTA
-            LEFT JOIN indicador_tipo_pension p ON o.FCN_CUENTA = p.FCN_CUENTA
+            LEFT JOIN indicador_tipo_pension tp ON o.FCN_CUENTA = p.FCN_CUENTA
             LEFT JOIN indicador_perfil_inversion i ON o.FCN_CUENTA = i.FCN_CUENTA
-        WHERE o.FCN_CUENTA IN (SELECT FCN_CUENTA FROM cliente)
+        WHERE o.FCN_CUENTA IN (SELECT FTN_CUENTA FROM cliente)
         """)
         #df = df.withColumn("FTO_INDICADORES", to_json(struct(lit('{}'))))
         df.show(2)
@@ -253,13 +252,13 @@ with define_extraction(phase, postgres_pool, buc_pool) as (postgres, buc):
             postgres,
             """
              SELECT I."FTC_GENERACION" AS GENERACION,
-               I."FTC_VIGENCIA" AS VIGENCIA,
-               I."FTC_TIPO_CLIENTE" AS TIPO_CLIENTE,
-               I."FTC_ORIGEN" AS ORIGEN,
-               COUNT(DISTINCT I."FCN_CUENTA") AS CLIENTES
-        FROM "HECHOS"."TCHECHOS_CLIENTE" I
-         WHERE I."FCN_ID_PERIODO" = :term
-        GROUP BY I."FTC_GENERACION", I."FTC_VIGENCIA", I."FTC_TIPO_CLIENTE", I."FTC_ORIGEN"
+                    I."FTC_VIGENCIA" AS VIGENCIA,
+                    I."FTC_TIPO_CLIENTE" AS TIPO_CLIENTE,
+                    I."FTC_ORIGEN" AS ORIGEN,
+                    COUNT(DISTINCT I."FCN_CUENTA") AS CLIENTES
+             FROM "HECHOS"."TCHECHOS_CLIENTE" I
+             WHERE I."FCN_ID_PERIODO" = :term
+             GROUP BY I."FTC_GENERACION", I."FTC_VIGENCIA", I."FTC_TIPO_CLIENTE", I."FTC_ORIGEN"
              """,
             ["Tipo Generación", "Vigencia", "Tipo Cliente", "Indicador Afiliación"],
             ["Clientes"],
@@ -269,9 +268,9 @@ with define_extraction(phase, postgres_pool, buc_pool) as (postgres, buc):
         notify(
             postgres,
             f"Clientes ingestados - {datetime.now()}",
-            f"Se han ingestado los clientes de forma exitosa para el periodo {time_period}",
-            report,
+            phase,
+            area,
             term=term_id,
-            area=area,
-            fase=phase
+            message=f"Se han ingestado los clientes de forma exitosa para el periodo {time_period}",
+            details=report,
         )

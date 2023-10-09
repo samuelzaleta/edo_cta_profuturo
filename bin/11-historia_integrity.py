@@ -9,14 +9,16 @@ postgres_pool = get_postgres_pool()
 integrity_pool = get_integrity_pool("historia")
 
 phase = int(sys.argv[1])
+user = int(sys.argv[3])
+area = int(sys.argv[4])
 
-with define_extraction(phase, postgres_pool, integrity_pool) as (postgres, integrity):
+with define_extraction(phase, area, postgres_pool, integrity_pool) as (postgres, integrity):
     term = extract_terms(postgres, phase)
     term_id = term["id"]
     start_month = term["start_month"]
     end_month = term["end_month"]
 
-    with register_time(postgres_pool, phase, term=term_id):
+    with register_time(postgres_pool, phase, term_id, user, area):
         truncate_table(postgres, "TEST_HISTORIA", term=term_id)
         extract_dataset(integrity, postgres, """
         SELECT DISP_NUMCUE, DISP_NSSTRA, DISP_FECTRA, DISP_SECLOT, DISP_PERPAG,

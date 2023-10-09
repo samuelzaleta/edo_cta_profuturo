@@ -1,10 +1,8 @@
 from profuturo.common import define_extraction, register_time, truncate_table
 from profuturo.database import get_postgres_pool, configure_postgres_spark, configure_bigquery_spark
-from profuturo.extraction import _write_spark_dataframe, extract_terms, extract_dataset_spark, _get_spark_session, read_table_insert_temp_view
-from pyspark.sql.types import StructType, StringType
-from pyspark.sql.functions import udf, concat, col, current_date , row_number,lit, current_timestamp
+from profuturo.extraction import _write_spark_dataframe, extract_terms, _get_spark_session, read_table_insert_temp_view
+from pyspark.sql.functions import concat, col , row_number,lit, current_timestamp
 from pyspark.sql.window import Window
-import uuid
 import sys
 
 postgres_pool = get_postgres_pool()
@@ -12,17 +10,17 @@ phase = int(sys.argv[1])
 user = int(sys.argv[3])
 area = int(sys.argv[4])
 
-with define_extraction(phase, postgres_pool, postgres_pool) as (postgres, _):
+with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, _):
     term = extract_terms(postgres, phase)
     term_id = term["id"]
     start_month = term["start_month"]
     end_month = term["end_month"]
     spark = _get_spark_session()
 
-    with register_time(postgres_pool, phase=phase, area=area, usuario=user, term=term_id):
+    with register_time(postgres_pool, phase, term_id, user, area):
         read_table_insert_temp_view(configure_postgres_spark, """
-        SELECT 
-               DISTINCT 
+        SELECT
+               DISTINCT
                F."FCN_ID_GENERACION" AS "FTN_ID_GRUPO_SEGMENTACION",
                -- F."FCN_ID_GENERACION",
                'CANDADO' AS "FTC_CANDADO_APERTURA",
@@ -53,13 +51,17 @@ with define_extraction(phase, postgres_pool, postgres_pool) as (postgres, _):
             INNER JOIN "GESTOR"."TCGESPRO_PERIODICIDAD" PG ON F."FCN_ID_PERIODICIDAD_GENERACION" = PG."FTN_ID_PERIODICIDAD"
             INNER JOIN "GESTOR"."TCGESPRO_PERIODICIDAD" PA ON F."FCN_ID_PERIODICIDAD_ANVERSO" = PA."FTN_ID_PERIODICIDAD"
             INNER JOIN "GESTOR"."TCGESPRO_PERIODICIDAD" PR ON F."FCN_ID_PERIODICIDAD_REVERSO" = PR."FTN_ID_PERIODICIDAD"
-            INNER JOIN  "HECHOS"."TCHECHOS_CLIENTE" I ON I."FCN_ID_PERIODO" = :term  AND F."FCN_ID_GENERACION" = CASE I."FTC_GENERACION" WHEN 'AFORE' THEN 2 WHEN 'TRANSICION' THEN 3 END
-            INNER JOIN "GESTOR"."TCGESPRO_INDICADOR_ESTADO_CUENTA" IE ON IE."FTN_ID_INDICADOR_ESTADO_CUENTA" = F."FCN_ID_INDICADOR_CLIENTE" AND IE."FTN_VALOR" = CASE I."FTC_ORIGEN" WHEN 'ISSSTE' THEN  67 WHEN 'IMSS' THEN 66 WHEN 'MIXTO' THEN 69 WHEN 'INDEPENDIENTE' THEN 68 END
-            INNER JOIN "GESTOR"."TCGESPRO_INDICADOR_ESTADO_CUENTA" IEC ON IEC."FTN_ID_INDICADOR_ESTADO_CUENTA" = F."FCN_ID_INDICADOR_AFILIACION" AND IEC."FTN_VALOR" = CASE  WHEN I."FTC_TIPO_CLIENTE" = 'Afiliado' THEN  714 WHEN I."FTC_TIPO_CLIENTE" = 'Asignado' THEN 713 WHEN I."FTB_PENSION" = true THEN 1 END
-            -- INNER JOIN "GESTOR"."TCGESPRO_INDICADOR_ESTADO_CUENTA" TIEC ON TIEC."FTN_ID_INDICADOR_ESTADO_CUENTA" = F."FCN_ID_INDICADOR_BONO" AND TIEC."FTN_VALOR" = CASE I."FTB_BONO" WHEN false THEN  1 WHEN true THEN 2 END
-            INNER JOIN "MAESTROS"."TCDATMAE_CLIENTE" C ON I."FCN_CUENTA" = C."FTN_CUENTA"
-            INNER JOIN "GESTOR"."TCGESPRO_MUESTRA" M ON C."FTN_CUENTA" = M."FCN_CUENTA"
             INNER JOIN "GESTOR"."TCGESPRO_PERIODO" P ON P."FTN_ID_PERIODO" = :term
+            INNER JOIN "GESTOR"."TCGESPRO_MUESTRA" M ON P."FTN_ID_PERIODO" = M."FCN_ID_PERIODO"
+            INNER JOIN "HECHOS"."TCHECHOS_CLIENTE" I ON M."FCN_ID_PERIODO" = I."FCN_ID_PERIODO"
+                                                    AND M."FCN_CUENTA" = I."FCN_CUENTA"
+                                                    AND F."FCN_ID_GENERACION" = CASE I."FTC_GENERACION" WHEN 'AFORE' THEN 2 WHEN 'TRANSICION' THEN 3 END
+            INNER JOIN "MAESTROS"."TCDATMAE_CLIENTE" C ON I."FCN_CUENTA" = C."FTN_CUENTA"
+            INNER JOIN "GESTOR"."TCGESPRO_INDICADOR_ESTADO_CUENTA" IE ON IE."FTN_ID_INDICADOR_ESTADO_CUENTA" = F."FCN_ID_INDICADOR_CLIENTE"
+                                                                     AND IE."FTN_VALOR" = CASE I."FTC_ORIGEN" WHEN 'ISSSTE' THEN  67 WHEN 'IMSS' THEN 66 WHEN 'MIXTO' THEN 69 WHEN 'INDEPENDIENTE' THEN 68 END
+            INNER JOIN "GESTOR"."TCGESPRO_INDICADOR_ESTADO_CUENTA" IEC ON IEC."FTN_ID_INDICADOR_ESTADO_CUENTA" = F."FCN_ID_INDICADOR_AFILIACION"
+                                                                      AND IEC."FTN_VALOR" = CASE WHEN I."FTC_TIPO_CLIENTE" = 'Afiliado' THEN 714 WHEN I."FTC_TIPO_CLIENTE" = 'Asignado' THEN 713 WHEN I."FTB_PENSION" = true THEN 1 END
+            -- INNER JOIN "GESTOR"."TCGESPRO_INDICADOR_ESTADO_CUENTA" TIEC ON TIEC."FTN_ID_INDICADOR_ESTADO_CUENTA" = F."FCN_ID_INDICADOR_BONO" AND TIEC."FTN_VALOR" = CASE I."FTB_BONO" WHEN false THEN  1 WHEN true THEN 2 END
         WHERE mod(extract(MONTH FROM to_date(P."FTC_PERIODO", 'MM/YYYY')), PG."FTN_MESES") = 0
           AND F."FTB_ESTATUS" = true
         """, "edoCtaGenerales", params={"term": term_id, "start": start_month, "end": end_month, "user": str(user)})

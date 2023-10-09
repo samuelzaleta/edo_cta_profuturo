@@ -1,13 +1,13 @@
-from profuturo.common import truncate_table, notify, register_time, define_extraction
+from profuturo.common import notify, register_time, define_extraction
 from profuturo.database import get_postgres_pool, get_integrity_pool
 from profuturo.extraction import extract_terms, extract_dataset
 from profuturo.reporters import HtmlReporter
 from dotenv import load_dotenv
+from datetime import datetime
 from pandas import DataFrame
-from sqlalchemy import text, CursorResult
+from sqlalchemy import text
 import numpy as np
 import sys
-from datetime import datetime
 
 
 def transform_rcv(df: DataFrame) -> DataFrame:
@@ -40,7 +40,7 @@ def transform(df: DataFrame) -> DataFrame:
     # Extrae los MONPES en base a los switches
     for switch in switches:
         codmov = switch[0]
-        monpes = "CSIE1_" + str(switch[1])
+        monpes = "CSIE1_MONPES_" + str(switch[1])
         subcuenta = switch[2]
 
         if monpes not in df.columns:
@@ -67,27 +67,26 @@ postgres_pool = get_postgres_pool()
 integrity_pool = get_integrity_pool("cierren")
 
 phase = int(sys.argv[1])
-area = int(sys.argv[4])
 user = int(sys.argv[3])
+area = int(sys.argv[4])
 
-with define_extraction(phase, postgres_pool, integrity_pool) as (postgres, integrity):
-    print(1)
+with define_extraction(phase, area, postgres_pool, integrity_pool) as (postgres, integrity):
     term = extract_terms(postgres, phase)
     term_id = term["id"]
     start_month = term["start_month"]
     end_month = term["end_month"]
 
-    # SWITCH
-    cursor2: CursorResult = postgres.execute(text("""
-    SELECT "FTN_ID_MOVIMIENTO_PROFUTURO", "FTN_MONPES", "FCN_ID_TIPO_SUBCUENTA"
-    FROM "GESTOR"."TCGESPRO_MOVIMIENTO_PROFUTURO"
-    WHERE "FTB_SWITCH" = TRUE
-    AND "FTC_ORIGEN" in ('INTEGRITY')
-    """))
-    switches = cursor2.fetchall()
+    with register_time(postgres_pool, phase, term_id, user, area):
+        # SWITCH
+        switches = postgres.execute(text("""
+        SELECT DISTINCT "FTN_ID_MOVIMIENTO_PROFUTURO", "FTN_MONPES", "FCN_ID_TIPO_SUBCUENTA"
+        FROM "GESTOR"."TCGESPRO_MOVIMIENTO_PROFUTURO"
+        WHERE "FTB_SWITCH" = TRUE
+          AND "FTC_ORIGEN" = 'INTEGRITY'
+        """)).fetchall()
 
-    with register_time(postgres_pool, phase, area, usuario=user, term=term_id):
-        truncate_table(postgres, "TTHECHOS_MOVIMIENTOS_INTEGRITY", term=term_id)
+        # with register_time(postgres_pool, phase, term_id, user, area):
+        # truncate_table(postgres, '"HECHOS"."TTHECHOS_MOVIMIENTOS_INTEGRITY"', term=term_id)
         extract_dataset(integrity, postgres, """
         SELECT CSIE1_NUMCUE, 
                CSIE1_CODMOV,
@@ -99,9 +98,8 @@ with define_extraction(phase, postgres_pool, integrity_pool) as (postgres, integ
                CSIE1_FECTRA, CSIE1_SECLOT, CSIE1_CORREL,
                CSIE1_PERPAG, CSIE1_FOLSUA, CSIE1_FECPAG, CSIE1_FECPRO
         FROM MOV_GOBIERNO
-        WHERE CSIE1_FECCON >= :start
-          AND CSIE1_FECCON <= :end
-          --AND CSIE1_NUMCUE = 17000044823
+        WHERE CSIE1_FECCON >= 20230101
+          AND CSIE1_FECCON <= 20230131
           AND CSIE1_CODMOV  IN (
               106, 109, 129, 129, 210, 210, 260, 260, 405, 406, 410, 410, 412, 413, 414, 416, 420, 420, 421, 423, 424, 
               426, 430, 430, 430, 433, 436, 440, 440, 441,442, 443, 444, 446, 450, 450, 450, 450, 450, 450,452, 453, 
@@ -120,9 +118,8 @@ with define_extraction(phase, postgres_pool, integrity_pool) as (postgres, integ
                CSIE1_FECTRA, CSIE1_SECLOT, CSIE1_CORREL,
                CSIE1_PERPAG, CSIE1_FOLSUA, CSIE1_FECPAG, CSIE1_FECPRO
         FROM MOV_RCV
-        WHERE CSIE1_FECCON >= :start
-          AND CSIE1_FECCON <= :end
-          --AND CSIE1_NUMCUE = 17000044823
+        WHERE CSIE1_FECCON >= 20230101
+          AND CSIE1_FECCON <= 20230131
           AND CSIE1_CODMOV IN (
               106, 109, 129, 129, 210, 210, 260, 260, 405, 406, 410, 410, 412, 413, 414, 416, 420, 420, 421, 423, 424, 
               426, 430, 430, 430, 433, 436, 440, 440, 441,442, 443, 444, 446, 450, 450, 450, 450, 450, 450,452, 453, 
@@ -139,9 +136,8 @@ with define_extraction(phase, postgres_pool, integrity_pool) as (postgres, integ
                CSIE1_FECTRA, CSIE1_SECLOT, CSIE1_CORREL,
                CSIE1_PERPAG, CSIE1_FOLSUA, CSIE1_FECPAG, CSIE1_FECPRO
         FROM MOV_VIV97
-        WHERE CSIE1_FECCON >= :start
-          AND CSIE1_FECCON <= :end
-          --AND CSIE1_NUMCUE = 17000044823
+        WHERE CSIE1_FECCON >= 20230101
+          AND CSIE1_FECCON <= 20230131
           AND CSIE1_CODMOV IN (
               106, 109, 129, 129, 210, 210, 260, 260, 405, 406, 410, 410, 412, 413, 414, 416, 420, 420, 421, 423, 424, 
               426, 430, 430, 430, 433, 436, 440, 440, 441,442, 443, 444, 446, 450, 450, 450, 450, 450, 450,452, 453, 
@@ -157,9 +153,8 @@ with define_extraction(phase, postgres_pool, integrity_pool) as (postgres, integ
                CSIE1_FECHA_2, CSIE1_FECTRA, CSIE1_CORREL,
                CSIE1_PERPAG, CSIE1_FOLSUA, CSIE1_FECPAG, CSIE1_FECPRO
         FROM MOV_COMRET
-        WHERE CSIE1_FECCON >= :start
-          AND CSIE1_FECCON <= :end
-          --AND CSIE1_NUMCUE = 17000044823
+        WHERE CSIE1_FECCON >= 20230101
+          AND CSIE1_FECCON <= 20230131
           AND CSIE1_CODMOV IN (
               106, 109, 129, 129, 210, 210, 260, 260, 405, 406, 410, 410, 412, 413, 414, 416, 420, 420, 421, 423, 424, 
               426, 430, 430, 430, 433, 436, 440, 440, 441,442, 443, 444, 446, 450, 450, 450, 450, 450, 450,452, 453, 
@@ -175,9 +170,8 @@ with define_extraction(phase, postgres_pool, integrity_pool) as (postgres, integ
                CSIE1_FECHA_2, CSIE1_FECTRA, CSIE1_SECLOT, CSIE1_CORREL,
                CSIE1_PERPAG, CSIE1_FOLSUA, CSIE1_FECPAG, CSIE1_FECPRO
         FROM MOV_SAR92
-        WHERE CSIE1_FECCON >= :start
-          AND CSIE1_FECCON <= :end
-          --AND CSIE1_NUMCUE = 17000044823
+        WHERE CSIE1_FECCON >= 20230101
+          AND CSIE1_FECCON <= 20230131
           AND CSIE1_CODMOV IN (
               106, 109, 129, 129, 210, 210, 260, 260, 405, 406, 410, 410, 412, 413, 414, 416, 420, 420, 421, 423, 424, 
               426, 430, 430, 430, 433, 436, 440, 440, 441,442, 443, 444, 446, 450, 450, 450, 450, 450, 450,452, 453, 
@@ -193,9 +187,8 @@ with define_extraction(phase, postgres_pool, integrity_pool) as (postgres, integ
                CSIE1_FECTRA, CSIE1_SECLOT, CSIE1_CORREL, CSIE1_PERPAG,
                CSIE1_FOLSUA, CSIE1_FECPAG, CSIE1_FECPRO
         FROM MOV_VIV92
-        WHERE CSIE1_FECCON >= :start
-          AND CSIE1_FECCON <= :end
-          --AND CSIE1_NUMCUE = 17000044823
+        WHERE CSIE1_FECCON >= 20230101
+          AND CSIE1_FECCON <= 20230131
           AND CSIE1_CODMOV IN (
               106, 109, 129, 129, 210, 210, 260, 260, 405, 406, 410, 410, 412, 413, 414, 416, 420, 420, 421, 423, 424, 
               426, 430, 430, 430, 433, 436, 440, 440, 441,442, 443, 444, 446, 450, 450, 450, 450, 450, 450,452, 453, 
@@ -211,9 +204,8 @@ with define_extraction(phase, postgres_pool, integrity_pool) as (postgres, integ
                CSIE1_FECHA_2, CSIE1_FECTRA, CSIE1_SECLOT, CSIE1_CORREL, 
                CSIE1_PERPAG, CSIE1_FOLSUA, CSIE1_FECPAG, CSIE1_FECPRO
         FROM MOV_BONO_UDI
-        WHERE CSIE1_FECCON >= :start
-          AND CSIE1_FECCON <= :end
-          --AND CSIE1_NUMCUE = 17000044823
+        WHERE CSIE1_FECCON >= 20230101
+          AND CSIE1_FECCON <= 20230131
           AND CSIE1_CODMOV IN (
               106, 109, 129, 129, 210, 210, 260, 260, 405, 406, 410, 410, 412, 413, 414, 416, 420, 420, 421, 423, 424, 
               426, 430, 430, 430, 433, 436, 440, 440, 441,442, 443, 444, 446, 450, 450, 450, 450, 450, 450,452, 453, 
@@ -225,7 +217,7 @@ with define_extraction(phase, postgres_pool, integrity_pool) as (postgres, integ
         }, transform=transform)
 
         # Cifras de control
-        report2 = html_reporter.generate(
+        report = html_reporter.generate(
             postgres,
             """
             --movimientos postgres
@@ -250,10 +242,9 @@ with define_extraction(phase, postgres_pool, integrity_pool) as (postgres, integ
         notify(
             postgres,
             f"Cifras de control movimientos integrity generadas - {datetime.now()}",
-            "Se han generado las cifras de control para movimientos integrity exitosamente",
-            report2,
+            phase,
+            area,
             term=term_id,
-            control=True,
-            area=area,
-            fase=phase
+            message="Se han generado las cifras de control para movimientos integrity exitosamente",
+            details=report,
         )

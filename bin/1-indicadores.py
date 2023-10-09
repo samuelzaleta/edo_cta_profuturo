@@ -1,4 +1,4 @@
-from profuturo.common import notify, register_time, define_extraction, truncate_table
+from profuturo.common import register_time, define_extraction, truncate_table
 from profuturo.database import get_postgres_pool, get_mit_pool, get_buc_pool
 from profuturo.extraction import extract_indicator, update_indicator
 from profuturo.reporters import HtmlReporter
@@ -10,16 +10,18 @@ html_reporter = HtmlReporter()
 postgres_pool = get_postgres_pool()
 mit_pool = get_mit_pool()
 buc_pool = get_buc_pool()
+
 phase = int(sys.argv[1])
 user = int(sys.argv[3])
+area = int(sys.argv[4])
 
-with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
+with define_extraction(phase, area, postgres_pool, mit_pool) as (postgres, mit):
     term = extract_terms(postgres, phase)
     term_id = term["id"]
     start_month = term["start_month"]
     end_month = term["end_month"]
 
-    with register_time(postgres_pool, phase, usuario=user, term=term_id):
+    with register_time(postgres_pool, phase, term_id, user, area):
         # Extracción
         truncate_table(postgres, "TCHECHOS_CLIENTE", term=term_id)
 

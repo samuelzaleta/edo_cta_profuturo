@@ -1,24 +1,22 @@
 from profuturo.common import register_time, define_extraction, notify
 from profuturo.database import get_postgres_pool, get_mit_pool
 from profuturo.extraction import upsert_dataset, extract_terms, _get_spark_session
-from pyspark.sql.functions import col
 import sys
-from datetime import datetime
 
 postgres_pool = get_postgres_pool()
 mit_pool = get_mit_pool()
-phase = int(sys.argv[1])
-area = int(sys.argv[4])
-user = int(sys.argv[3])
 
-with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
+phase = int(sys.argv[1])
+user = int(sys.argv[3])
+area = int(sys.argv[4])
+
+with define_extraction(phase, area, postgres_pool, mit_pool) as (postgres, mit):
     term = extract_terms(postgres, phase)
     term_id = term["id"]
     time_period = term["time_period"]
     spark = _get_spark_session()
 
-    with register_time(postgres_pool, phase, area, user, term_id):
-
+    with register_time(postgres_pool, phase, term_id, user, area):
         upsert_dataset(mit, postgres, """
         SELECT S.FCN_ID_SIEFORE AS id, C.FCC_VALOR AS description
         FROM TCCRXGRAL_SIEFORE S
@@ -114,10 +112,11 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
                     notify(
                         postgres,
                         f"Cifras de control {table} generadas - Parte {start}-{end - 1}",
-                        f"Se han generado las cifras de control para {table} exitosamente",
-                        batch_html_table,
+                        phase,
+                        area,
                         term=term_id,
-                        control=True,
+                        message=f"Se han generado las cifras de control para {table} exitosamente",
+                        details=batch_html_table,
                     )
 
 
@@ -126,10 +125,9 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
         notify(
             postgres,
             f"Catálogos ingestados",
-            f"Se han ingestado los catálogos de forma exitosa para el periodo {time_period}",
+            phase,
+            area,
             term=term_id,
-            area=area,
-            fase=phase,
-            control=False,
-            control_validadas=True
+            message=f"Se han ingestado los catálogos de forma exitosa para el periodo {time_period}",
+            validated=True
         )

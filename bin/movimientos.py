@@ -2,24 +2,26 @@ from profuturo.common import truncate_table, notify, register_time, define_extra
 from profuturo.database import get_postgres_pool, configure_mit_spark, configure_postgres_spark
 from profuturo.extraction import extract_terms, extract_dataset_spark
 from profuturo.reporters import HtmlReporter
-import sys
 from datetime import datetime
+import sys
 
 html_reporter = HtmlReporter()
 postgres_pool = get_postgres_pool()
+
 phase = int(sys.argv[1])
-area = int(sys.argv[4])
 user = int(sys.argv[3])
+area = int(sys.argv[4])
+
 table = '"HECHOS"."TTHECHOS_MOVIMIENTO"'
 
-with define_extraction(phase, postgres_pool, postgres_pool) as (postgres, _):
+with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, _):
     term = extract_terms(postgres, phase)
     term_id = term["id"]
     time_period = term["time_period"]
     start_month = term["start_month"]
     end_month = term["end_month"]
 
-    with register_time(postgres_pool, phase=phase, area=area, usuario=user, term=term_id):
+    with register_time(postgres_pool, phase, term_id, user, area):
         # Extracción
         truncate_table(postgres, 'TTHECHOS_MOVIMIENTO', term=term_id)
         extract_dataset_spark(configure_mit_spark, configure_postgres_spark, """
@@ -208,18 +210,18 @@ with define_extraction(phase, postgres_pool, postgres_pool) as (postgres, _):
         notify(
             postgres,
             f"Cifras de control Movimientos generadas - {datetime.now()}",
-            f"Se han generado las cifras de control para movimientos exitosamente para el periodo {time_period}",
-            report1,
+            phase,
+            area,
             term=term_id,
-            area=area,
-            fase=phase
+            message=f"Se han generado las cifras de control para movimientos exitosamente para el periodo {time_period}",
+            details=report1,
         )
         notify(
             postgres,
             f"Cifras de control Movimientos generadas - {datetime.now()}",
-            f"Se han generado las cifras de control para movimientos exitosamente para el periodo {time_period}",
-            report2,
+            phase,
+            area,
             term=term_id,
-            area=area,
-            fase=phase
+            message=f"Se han generado las cifras de control para movimientos exitosamente para el periodo {time_period}",
+            details=report2,
         )
