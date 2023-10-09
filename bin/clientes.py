@@ -223,13 +223,13 @@ with define_extraction(phase, area, postgres_pool, buc_pool) as (postgres, buc):
         )
         SELECT DISTINCT o.FCN_CUENTA,
                {term_id} AS FCN_ID_PERIODO,
-               coalesce(cast(p.FCC_VALOR AS BOOLEAN), cast('FALSE' as BOOLEAN)) AS FTB_PENSION, 
+               coalesce(cast(p.FCC_VALOR AS BOOLEAN), false) AS FTB_PENSION, 
                t.FCC_VALOR AS  FTC_TIPO_CLIENTE,
                o.FCC_VALOR AS FTC_ORIGEN,
                v.FCC_VALOR AS FTC_VIGENCIA,
                g.FCC_VALOR AS FTC_GENERACION,
-               coalesce(cast(p.FCC_VALOR AS BOOLEAN), cast('FALSE' as BOOLEAN))  AS FTB_BONO,
-               p.FCC_VALOR AS FTC_TIPO_PENSION,
+               coalesce(cast(p.FCC_VALOR AS BOOLEAN), false)  AS FTB_BONO,
+               tp.FCC_VALOR AS FTC_TIPO_PENSION,
                i.FCC_VALOR AS FTC_PERFIL_INVERSION
                --JSON_OBJECT('Vigencia', v.FCC_VALOR, 'Generacion', g.FCC_VALOR) AS FTO_INDICADORES
         FROM indicador_origen o
@@ -238,9 +238,9 @@ with define_extraction(phase, area, postgres_pool, buc_pool) as (postgres, buc):
             LEFT JOIN indicador_pension p ON o.FCN_CUENTA = p.FCN_CUENTA
             LEFT JOIN indicador_vigencia v ON o.FCN_CUENTA = v.FCN_CUENTA
             LEFT JOIN indicador_bono b ON o.FCN_CUENTA = b.FCN_CUENTA
-            LEFT JOIN indicador_tipo_pension p ON o.FCN_CUENTA = p.FCN_CUENTA
+            LEFT JOIN indicador_tipo_pension tp ON o.FCN_CUENTA = p.FCN_CUENTA
             LEFT JOIN indicador_perfil_inversion i ON o.FCN_CUENTA = i.FCN_CUENTA
-        WHERE o.FCN_CUENTA IN (SELECT FCN_CUENTA FROM cliente)
+        WHERE o.FCN_CUENTA IN (SELECT FTN_CUENTA FROM cliente)
         """)
         #df = df.withColumn("FTO_INDICADORES", to_json(struct(lit('{}'))))
         df.show(2)
@@ -252,13 +252,13 @@ with define_extraction(phase, area, postgres_pool, buc_pool) as (postgres, buc):
             postgres,
             """
              SELECT I."FTC_GENERACION" AS GENERACION,
-               I."FTC_VIGENCIA" AS VIGENCIA,
-               I."FTC_TIPO_CLIENTE" AS TIPO_CLIENTE,
-               I."FTC_ORIGEN" AS ORIGEN,
-               COUNT(DISTINCT I."FCN_CUENTA") AS CLIENTES
-        FROM "HECHOS"."TCHECHOS_CLIENTE" I
-         WHERE I."FCN_ID_PERIODO" = :term
-        GROUP BY I."FTC_GENERACION", I."FTC_VIGENCIA", I."FTC_TIPO_CLIENTE", I."FTC_ORIGEN"
+                    I."FTC_VIGENCIA" AS VIGENCIA,
+                    I."FTC_TIPO_CLIENTE" AS TIPO_CLIENTE,
+                    I."FTC_ORIGEN" AS ORIGEN,
+                    COUNT(DISTINCT I."FCN_CUENTA") AS CLIENTES
+             FROM "HECHOS"."TCHECHOS_CLIENTE" I
+             WHERE I."FCN_ID_PERIODO" = :term
+             GROUP BY I."FTC_GENERACION", I."FTC_VIGENCIA", I."FTC_TIPO_CLIENTE", I."FTC_ORIGEN"
              """,
             ["Tipo Generación", "Vigencia", "Tipo Cliente", "Indicador Afiliación"],
             ["Clientes"],
