@@ -1,20 +1,20 @@
-from profuturo.common import register_time, define_extraction, notify,truncate_table
-from profuturo.database import get_postgres_pool, get_buc_pool,  configure_buc_spark, configure_mit_spark, configure_postgres_spark
-from profuturo.extraction import extract_dataset_spark, _get_spark_session, _write_spark_dataframe, read_table_insert_temp_view
+from profuturo.common import register_time, define_extraction, notify, truncate_table
+from profuturo.database import get_postgres_pool, get_buc_pool, configure_buc_spark, configure_mit_spark, configure_postgres_spark
+from profuturo.extraction import _get_spark_session, _write_spark_dataframe, read_table_insert_temp_view
 from profuturo.reporters import HtmlReporter
 from profuturo.extraction import extract_terms
-from pyspark.sql.functions import lit
+from datetime import datetime
 import sys
-
 
 html_reporter = HtmlReporter()
 postgres_pool = get_postgres_pool()
 buc_pool = get_buc_pool()
-phase = int(sys.argv[1])
-area = int(sys.argv[4])
-user = int(sys.argv[3])
 
-with define_extraction(phase, postgres_pool, buc_pool) as (postgres, buc):
+phase = int(sys.argv[1])
+user = int(sys.argv[3])
+area = int(sys.argv[4])
+
+with define_extraction(phase, area, postgres_pool, buc_pool) as (postgres, buc):
     term = extract_terms(postgres, phase)
     term_id = term["id"]
     time_period = term["time_period"]
@@ -22,24 +22,24 @@ with define_extraction(phase, postgres_pool, buc_pool) as (postgres, buc):
     end_month = term["end_month"]
     spark = _get_spark_session()
 
-    with register_time(postgres_pool, phase=phase,area= area, usuario=user, term=term_id):
+    with register_time(postgres_pool, phase, term_id, user, area):
         truncate_table(postgres, "TCDATMAE_CLIENTE")
         # Extracción
         query = """
-        SELECT 
-        FTN_CUENTA,
-        FTC_NOMBRE,
-        FTC_AP_PATERNO,
-        FTC_AP_MATERNO,
-        FTC_CALLE,
-        FTC_NUMERO,
-        FTC_COLONIA,
-        FTC_DELEGACION,
-        FTN_CODIGO_POSTAL,
-        FTC_ENTIDAD_FEDERATIVA,
-        FTC_NSS,
-        FTC_CURP,
-        FTC_RFC 
+        SELECT
+            FTN_CUENTA,
+            FTC_NOMBRE,
+            FTC_AP_PATERNO,
+            FTC_AP_MATERNO,
+            FTC_CALLE,
+            FTC_NUMERO,
+            FTC_COLONIA,
+            FTC_DELEGACION,
+            FTN_CODIGO_POSTAL,
+            FTC_ENTIDAD_FEDERATIVA,
+            FTC_NSS,
+            FTC_CURP,
+            FTC_RFC 
         FROM (
             SELECT
                ROW_NUMBER() over (partition by TO_NUMBER(REGEXP_REPLACE(TO_CHAR(C.NUMERO), '[^0-9]', '')) order by C.NUMERO) AS id,
@@ -56,35 +56,35 @@ with define_extraction(phase, postgres_pool, buc_pool) as (postgres, buc):
                NSS.VALOR_IDENTIFICADOR AS FTC_NSS,
                CURP.VALOR_IDENTIFICADOR AS FTC_CURP,
                RFC.VALOR_IDENTIFICADOR AS FTC_RFC
-        FROM CONTRATO C
-            INNER JOIN PERSONA_CONT_ROL PCR ON C.IDCONTRATO = PCR.IDCONTRATO
-            INNER JOIN PERSONA_FISICA PF ON PCR.IDPERSONA = PF.IDPERSONA
-            INNER JOIN DOMICILIO D ON PF.IDPERSONA = D.IDPERSONA
-            INNER JOIN DIRECCION DI ON D.IDDIRECCION = DI.IDDIRECCION
-            LEFT JOIN CODIGO_POSTAL CP ON DI.IDCODIGOPOSTAL = CP.IDCODIGOPOSTAL
-            LEFT JOIN ESTADO E ON CP.IDESTADO = E.IDESTADO
-            LEFT JOIN MUNICIPIO M ON CP.IDMUNICIPIO = M.IDMUNICIPIO
-            LEFT JOIN CIUDAD CD ON CP.IDCIUDAD = CD.IDCIUDAD
-            LEFT JOIN ASENTAMIENTO ASE ON DI.IDASENTAMIENTO = ASE.IDASENTAMIENTO
-            LEFT JOIN IDENTIFICADOR NSS ON PF.IDPERSONA = NSS.IDPERSONA AND NSS.IDTIPOIDENTIFICADOR = 3 
-            AND NSS.VALIDO = 1 AND NSS.ACTIVO = 1
-            LEFT JOIN IDENTIFICADOR CURP ON PF.IDPERSONA = CURP.IDPERSONA AND CURP.IDTIPOIDENTIFICADOR = 2 
-            AND CURP.VALIDO = 1 AND CURP.ACTIVO = 1
-            LEFT JOIN IDENTIFICADOR RFC ON PF.IDPERSONA = RFC.IDPERSONA AND RFC.IDTIPOIDENTIFICADOR = 1 
-            AND RFC.VALIDO = 1 AND RFC.ACTIVO = 1
-        WHERE PCR.IDROL = 787 -- Rol cliente
-          AND C.IDLINEANEGOCIO = 763 -- Linea de negocio
-          AND D.IDTIPODOM = 818 -- Tipo de domicilio Particular
-          -- AND D.IDSTATUSDOM = 761 ACTIVO
-          -- AND D.PREFERENTE = 1 Domicilio preferente
-            ) where id = 1
+            FROM CONTRATO C
+                INNER JOIN PERSONA_CONT_ROL PCR ON C.IDCONTRATO = PCR.IDCONTRATO
+                INNER JOIN PERSONA_FISICA PF ON PCR.IDPERSONA = PF.IDPERSONA
+                INNER JOIN DOMICILIO D ON PF.IDPERSONA = D.IDPERSONA
+                INNER JOIN DIRECCION DI ON D.IDDIRECCION = DI.IDDIRECCION
+                LEFT JOIN CODIGO_POSTAL CP ON DI.IDCODIGOPOSTAL = CP.IDCODIGOPOSTAL
+                LEFT JOIN ESTADO E ON CP.IDESTADO = E.IDESTADO
+                LEFT JOIN MUNICIPIO M ON CP.IDMUNICIPIO = M.IDMUNICIPIO
+                LEFT JOIN CIUDAD CD ON CP.IDCIUDAD = CD.IDCIUDAD
+                LEFT JOIN ASENTAMIENTO ASE ON DI.IDASENTAMIENTO = ASE.IDASENTAMIENTO
+                LEFT JOIN IDENTIFICADOR NSS ON PF.IDPERSONA = NSS.IDPERSONA AND NSS.IDTIPOIDENTIFICADOR = 3 
+                                           AND NSS.VALIDO = 1 AND NSS.ACTIVO = 1
+                LEFT JOIN IDENTIFICADOR CURP ON PF.IDPERSONA = CURP.IDPERSONA AND CURP.IDTIPOIDENTIFICADOR = 2 
+                                            AND CURP.VALIDO = 1 AND CURP.ACTIVO = 1
+                LEFT JOIN IDENTIFICADOR RFC ON PF.IDPERSONA = RFC.IDPERSONA AND RFC.IDTIPOIDENTIFICADOR = 1 
+                                           AND RFC.VALIDO = 1 AND RFC.ACTIVO = 1
+            WHERE PCR.IDROL = 787 -- Rol cliente
+              AND C.IDLINEANEGOCIO = 763 -- Linea de negocio
+              AND D.IDTIPODOM = 818 -- Tipo de domicilio Particular
+              -- AND D.IDSTATUSDOM = 761 ACTIVO
+              -- AND D.PREFERENTE = 1 Domicilio preferente
+        ) where id = 1
         """
-        extract_dataset_spark(
+        read_table_insert_temp_view(
             configure_buc_spark,
-            configure_postgres_spark,
             query,
-            '"MAESTROS"."TCDATMAE_CLIENTE"'
+            'cliente',
         )
+
         # Extracción
         truncate_table(postgres, "TCHECHOS_CLIENTE_INDICADOR", term=term_id)
         truncate_table(postgres, "TCHECHOS_CLIENTE", term=term_id)
@@ -198,6 +198,13 @@ with define_extraction(phase, postgres_pool, buc_pool) as (postgres, buc):
         """, "generacion_transicion")
         spark.sql("select count(*) as count_generacion_transicion from generacion_transicion").show()
 
+        df = spark.sql("""
+        SELECT *
+        FROM cliente
+        """)
+        df.show()
+        _write_spark_dataframe(df, configure_postgres_spark, '"MAESTROS"."TCDATMAE_CLIENTE"')
+
         df = spark.sql(f"""
         WITH indicador_generacion AS (
             SELECT FCN_CUENTA, FCC_VALOR 
@@ -216,13 +223,13 @@ with define_extraction(phase, postgres_pool, buc_pool) as (postgres, buc):
         )
         SELECT DISTINCT o.FCN_CUENTA,
                {term_id} AS FCN_ID_PERIODO,
-               coalesce(cast(p.FCC_VALOR AS BOOLEAN), cast('FALSE' as BOOLEAN)) AS FTB_PENSION, 
+               coalesce(cast(p.FCC_VALOR AS BOOLEAN), false) AS FTB_PENSION, 
                t.FCC_VALOR AS  FTC_TIPO_CLIENTE,
                o.FCC_VALOR AS FTC_ORIGEN,
                v.FCC_VALOR AS FTC_VIGENCIA,
                g.FCC_VALOR AS FTC_GENERACION,
-               coalesce(cast(p.FCC_VALOR AS BOOLEAN), cast('FALSE' as BOOLEAN))  AS FTB_BONO,
-               p.FCC_VALOR AS FTC_TIPO_PENSION,
+               coalesce(cast(p.FCC_VALOR AS BOOLEAN), false)  AS FTB_BONO,
+               tp.FCC_VALOR AS FTC_TIPO_PENSION,
                i.FCC_VALOR AS FTC_PERFIL_INVERSION
                --JSON_OBJECT('Vigencia', v.FCC_VALOR, 'Generacion', g.FCC_VALOR) AS FTO_INDICADORES
         FROM indicador_origen o
@@ -231,8 +238,9 @@ with define_extraction(phase, postgres_pool, buc_pool) as (postgres, buc):
             LEFT JOIN indicador_pension p ON o.FCN_CUENTA = p.FCN_CUENTA
             LEFT JOIN indicador_vigencia v ON o.FCN_CUENTA = v.FCN_CUENTA
             LEFT JOIN indicador_bono b ON o.FCN_CUENTA = b.FCN_CUENTA
-            LEFT JOIN indicador_tipo_pension p ON o.FCN_CUENTA = p.FCN_CUENTA
+            LEFT JOIN indicador_tipo_pension tp ON o.FCN_CUENTA = p.FCN_CUENTA
             LEFT JOIN indicador_perfil_inversion i ON o.FCN_CUENTA = i.FCN_CUENTA
+        WHERE o.FCN_CUENTA IN (SELECT FTN_CUENTA FROM cliente)
         """)
         #df = df.withColumn("FTO_INDICADORES", to_json(struct(lit('{}'))))
         df.show(2)
@@ -244,13 +252,13 @@ with define_extraction(phase, postgres_pool, buc_pool) as (postgres, buc):
             postgres,
             """
              SELECT I."FTC_GENERACION" AS GENERACION,
-               I."FTC_VIGENCIA" AS VIGENCIA,
-               I."FTC_TIPO_CLIENTE" AS TIPO_CLIENTE,
-               I."FTC_ORIGEN" AS ORIGEN,
-               COUNT(DISTINCT I."FCN_CUENTA") AS CLIENTES
-        FROM "HECHOS"."TCHECHOS_CLIENTE" I
-         WHERE I."FCN_ID_PERIODO" = :term
-        GROUP BY I."FTC_GENERACION", I."FTC_VIGENCIA", I."FTC_TIPO_CLIENTE", I."FTC_ORIGEN"
+                    I."FTC_VIGENCIA" AS VIGENCIA,
+                    I."FTC_TIPO_CLIENTE" AS TIPO_CLIENTE,
+                    I."FTC_ORIGEN" AS ORIGEN,
+                    COUNT(DISTINCT I."FCN_CUENTA") AS CLIENTES
+             FROM "HECHOS"."TCHECHOS_CLIENTE" I
+             WHERE I."FCN_ID_PERIODO" = :term
+             GROUP BY I."FTC_GENERACION", I."FTC_VIGENCIA", I."FTC_TIPO_CLIENTE", I."FTC_ORIGEN"
              """,
             ["Tipo Generación", "Vigencia", "Tipo Cliente", "Indicador Afiliación"],
             ["Clientes"],
@@ -259,10 +267,10 @@ with define_extraction(phase, postgres_pool, buc_pool) as (postgres, buc):
 
         notify(
             postgres,
-            "Clientes ingestados",
-            f"Se han ingestado los clientes de forma exitosa para el periodo {time_period}",
-            report,
+            f"Clientes ingestados - {datetime.now()}",
+            phase,
+            area,
             term=term_id,
-            area=area,
-            fase=phase
+            message=f"Se han ingestado los clientes de forma exitosa para el periodo {time_period}",
+            details=report,
         )

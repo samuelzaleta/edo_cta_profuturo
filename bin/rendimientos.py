@@ -4,29 +4,28 @@ from profuturo.extraction import _get_spark_session, _write_spark_dataframe, rea
 from profuturo.reporters import HtmlReporter
 from profuturo.extraction import extract_terms
 import sys
+from datetime import datetime
 
 
 html_reporter = HtmlReporter()
 postgres_pool = get_postgres_pool()
 buc_pool = get_buc_pool()
+
 phase = int(sys.argv[1])
-periodo = int(sys.argv[2])
-area = int(sys.argv[4])
 user = int(sys.argv[3])
+area = int(sys.argv[4])
 
-
-with define_extraction(phase, postgres_pool, buc_pool) as (postgres, buc):
+with define_extraction(phase, area, postgres_pool, buc_pool) as (postgres, buc):
     term = extract_terms(postgres, phase)
     term_id = term["id"]
     start_month = term["start_month"]
     end_month = term["end_month"]
     end_month_anterior = term["end_saldos_anterior"]
     valor_accion_anterior = term["valor_accion_anterior"]
-    print(end_month_anterior,valor_accion_anterior, )
+    print(end_month_anterior, valor_accion_anterior)
     spark = _get_spark_session()
 
-    print('phase',phase,'area', area, 'usuario',user, 'periodo', periodo)
-    with register_time(postgres_pool, phase=phase,area= area, usuario=user, term=term_id):
+    with register_time(postgres_pool, phase, term_id, user, area):
         saldo_inicial_query_1 = f"""
                 SELECT
                     tsh."FCN_CUENTA"
@@ -97,61 +96,31 @@ with define_extraction(phase, postgres_pool, buc_pool) as (postgres, buc):
             , tsh."FCN_CUENTA"
             , tsh."FCN_ID_TIPO_SUBCTA"
         """
-        cargo_query = f"""
-        SELECT
-            tmov."FCN_CUENTA"
-            , tmov."FCN_ID_TIPO_SUBCTA"
-            , SUM(tmov."FTF_MONTO_PESOS"::double precision) AS "FTF_CARGO"
+        cargo_query = """
+        SELECT tmov."FCN_CUENTA", tmov."FCN_ID_TIPO_SUBCTA", SUM(tmov."FTF_MONTO_PESOS"::double precision) AS "FTF_CARGO"
         FROM
             "HECHOS"."TTHECHOS_MOVIMIENTO" tmov
-        WHERE
-            1=1
-            AND tmov."FTD_FEH_LIQUIDACION" BETWEEN :start_month AND :end_month
-            AND tmov."FCN_ID_TIPO_MOVIMIENTO" = '181'
-            AND tmov."FCN_ID_PERIODO" = :term_id
-        GROUP BY
-            1=1
-            , tmov."FCN_CUENTA"
-            , tmov."FCN_ID_TIPO_SUBCTA"
+        WHERE tmov."FTD_FEH_LIQUIDACION" BETWEEN :start_month AND :end_month
+          AND tmov."FCN_ID_TIPO_MOVIMIENTO" = '181'
+          AND tmov."FCN_ID_PERIODO" = :term_id
+        GROUP BY tmov."FCN_CUENTA", tmov."FCN_ID_TIPO_SUBCTA"
         """
-        abono_query = f"""
-        SELECT
-            tmov."FCN_CUENTA"
-            , tmov."FCN_ID_TIPO_SUBCTA"
-            , SUM(tmov."FTF_MONTO_PESOS"::double precision) AS "FTF_ABONO"
+        abono_query = """
+        SELECT tmov."FCN_CUENTA", tmov."FCN_ID_TIPO_SUBCTA", SUM(tmov."FTF_MONTO_PESOS"::double precision) AS "FTF_ABONO"
         FROM
             "HECHOS"."TTHECHOS_MOVIMIENTO" tmov
-        WHERE
-            1=1
-            AND tmov."FTD_FEH_LIQUIDACION" BETWEEN :start_month AND :end_month
-            AND tmov."FCN_ID_TIPO_MOVIMIENTO" = '180'
-            AND tmov."FCN_ID_PERIODO" = :term_id
-        GROUP BY
-            1=1
-            , tmov."FCN_CUENTA" 
-            , tmov."FCN_ID_TIPO_SUBCTA"
+        WHERE tmov."FTD_FEH_LIQUIDACION" BETWEEN :start_month AND :end_month
+          AND tmov."FCN_ID_TIPO_MOVIMIENTO" = '180'
+          AND tmov."FCN_ID_PERIODO" = :term_id
+        GROUP BY tmov."FCN_CUENTA", tmov."FCN_ID_TIPO_SUBCTA"
         """
-        comision_query = f"""
-        SELECT
-            C."FTN_NUM_CTA_INVDUAL" AS FCN_CUENTA,
-            S."FCN_ID_TIPO_SUBCTA",
-            SUM(C."FTF_MONTO_PESOS") AS "FTF_COMISION"
+        comision_query = """
+        SELECT C."FTN_NUM_CTA_INVDUAL" AS FCN_CUENTA, S."FCN_ID_TIPO_SUBCTA", SUM(C."FTF_MONTO_PESOS") AS "FTF_COMISION"
         FROM CIERREN.TTAFOGRAL_MOV_CMS C
-        INNER JOIN CIERREN.TFCRXGRAL_CONFIG_MOV_ITGY M
-        ON C.FCN_ID_CONCEPTO_MOV =M.FFN_ID_CONCEPTO_MOV
+        INNER JOIN CIERREN.TFCRXGRAL_CONFIG_MOV_ITGY M ON C.FCN_ID_CONCEPTO_MOV = M.FFN_ID_CONCEPTO_MOV
         INNER JOIN TRAFOGRAL_MOV_SUBCTA S ON M.FRN_ID_MOV_SUBCTA = S.FRN_ID_MOV_SUBCTA
         WHERE C."FTD_FEH_LIQUIDACION" BETWEEN :start_month AND :end_month
         GROUP BY C."FTN_NUM_CTA_INVDUAL", S."FCN_ID_TIPO_SUBCTA"
-        """
-        """
-                read_table_insert_temp_view(
-                    configure_postgres_spark,
-                    saldo_inicial_query_1,
-                    "saldoinicial",
-                    params={"start_month ": start_month,
-                            "end_month": end_month,
-                            "term_id": term_id}
-                )
         """
         truncate_table(postgres, "TTCALCUL_RENDIMIENTO", term=term_id)
 
@@ -161,7 +130,6 @@ with define_extraction(phase, postgres_pool, buc_pool) as (postgres, buc):
             "saldoinicial",
             params={"date": end_month_anterior, "type": "F", "accion": valor_accion_anterior}
         )
-
         read_table_insert_temp_view(
             configure_postgres_spark,
             saldo_final_query,
@@ -195,44 +163,37 @@ with define_extraction(phase, postgres_pool, buc_pool) as (postgres, buc):
         )
 
         df = spark.sql(f"""
-            WITH tablon as (SELECT
-                COALESCE(si.FCN_CUENTA, sf.FCN_CUENTA, ca.FCN_CUENTA, ab.FCN_CUENTA, cm.FCN_CUENTA) AS FCN_CUENTA
-                , COALESCE(si.FCN_ID_TIPO_SUBCTA, sf.FCN_ID_TIPO_SUBCTA, ca.FCN_ID_TIPO_SUBCTA, ab.FCN_ID_TIPO_SUBCTA) AS FCN_ID_TIPO_SUBCTA
-                , SUM(COALESCE(si.FTF_SALDO_INICIAL, 0)) AS FTF_SALDO_INICIAL
-                , SUM(COALESCE(sf.FTF_SALDO_FINAL, 0)) AS FTF_SALDO_FINAL
-                , SUM(COALESCE(ca.FTF_CARGO, 0)) AS FTF_CARGO
-                , SUM(COALESCE(ab.FTF_ABONO, 0)) AS FTF_ABONO
-                , SUM(COALESCE(cm.FTF_COMISION, 0)) AS FTF_COMISION
-			FROM saldoinicial AS si
-			l JOIN saldofinal AS sf
-			ON si.FCN_CUENTA = sf.FCN_CUENTA 
-			FULL JOIN cargo AS ca
-			ON sf.FCN_CUENTA = ca.FCN_CUENTA 
-			FULL JOIN abono AS ab
-			ON ca.FCN_CUENTA = ab.FCN_CUENTA
-			FULL JOIN comision AS cm
-			ON ca.FCN_CUENTA = cm.FCN_CUENTA
-			GROUP BY 
-			si.FCN_CUENTA, sf.FCN_CUENTA, ca.FCN_CUENTA, ab.FCN_CUENTA, cm.FCN_CUENTA,
-			si.FCN_ID_TIPO_SUBCTA, sf.FCN_ID_TIPO_SUBCTA, ca.FCN_ID_TIPO_SUBCTA, ab.FCN_ID_TIPO_SUBCTA
-			)
-			select
-			ta.FCN_CUENTA
-			, {term_id} as FCN_ID_PERIODO
-			, ta.FCN_ID_TIPO_SUBCTA
-			, ta.FTF_SALDO_INICIAL
-			, ta.FTF_SALDO_FINAL
-			, ta.FTF_ABONO
-			, ta.FTF_CARGO
-			, (ta.FTF_SALDO_FINAL - (ta.FTF_ABONO + ta.FTF_SALDO_INICIAL - 0 - ta.FTF_CARGO)) AS FTF_RENDIMIENTO_CALCULADO
-		FROM tablon AS ta
-		WHERE (ta.FTF_SALDO_FINAL - (ta.FTF_ABONO + ta.FTF_SALDO_INICIAL - 0 - ta.FTF_CARGO)) > 0 
+        WITH tablon as (
+            SELECT COALESCE(si.FCN_CUENTA, sf.FCN_CUENTA, ca.FCN_CUENTA, ab.FCN_CUENTA, cm.FCN_CUENTA) AS FCN_CUENTA, 
+                   COALESCE(si.FCN_ID_TIPO_SUBCTA, sf.FCN_ID_TIPO_SUBCTA, ca.FCN_ID_TIPO_SUBCTA, ab.FCN_ID_TIPO_SUBCTA) AS FCN_ID_TIPO_SUBCTA, 
+                   SUM(COALESCE(si.FTF_SALDO_INICIAL, 0)) AS FTF_SALDO_INICIAL, 
+                   SUM(COALESCE(sf.FTF_SALDO_FINAL, 0)) AS FTF_SALDO_FINAL, 
+                   SUM(COALESCE(ca.FTF_CARGO, 0)) AS FTF_CARGO, 
+                   SUM(COALESCE(ab.FTF_ABONO, 0)) AS FTF_ABONO, 
+                   SUM(COALESCE(cm.FTF_COMISION, 0)) AS FTF_COMISION
+            FROM saldoinicial AS si
+                FULL JOIN abono AS ab ON si.FCN_CUENTA = ab.FCN_CUENTA AND si.FCN_ID_TIPO_SUBCTA = ab.FCN_ID_TIPO_SUBCTA
+                LEFT JOIN comision AS cm ON si.FCN_CUENTA = cm.FCN_CUENTA AND si.FCN_ID_TIPO_SUBCTA = cm.FCN_ID_TIPO_SUBCTA
+                FULL JOIN cargo AS ca ON si.FCN_CUENTA = ca.FCN_CUENTA AND si.FCN_ID_TIPO_SUBCTA = ca.FCN_ID_TIPO_SUBCTA
+                FULL JOIN saldofinal AS sf ON si.FCN_CUENTA = sf.FCN_CUENTA AND si.FCN_ID_TIPO_SUBCTA = ca.FCN_ID_TIPO_SUBCTA			
+            GROUP BY si.FCN_CUENTA, sf.FCN_CUENTA, ca.FCN_CUENTA, ab.FCN_CUENTA, cm.FCN_CUENTA,
+                     si.FCN_ID_TIPO_SUBCTA, sf.FCN_ID_TIPO_SUBCTA, ca.FCN_ID_TIPO_SUBCTA, ab.FCN_ID_TIPO_SUBCTA
+        )
+        select ta.FCN_CUENTA,
+               {term_id} as FCN_ID_PERIODO,
+               ta.FCN_ID_TIPO_SUBCTA,
+               ta.FTF_SALDO_INICIAL,
+               ta.FTF_SALDO_FINAL,
+               ta.FTF_ABONO,
+               ta.FTF_CARGO,
+               (ta.FTF_SALDO_FINAL - (ta.FTF_ABONO + ta.FTF_SALDO_INICIAL - ta.FTF_COMISION - ta.FTF_CARGO)) AS FTF_RENDIMIENTO_CALCULADO
+        FROM tablon AS ta
         """)
         df.show(5)
         _write_spark_dataframe(df, configure_postgres_spark, '"HECHOS"."TTCALCUL_RENDIMIENTO"')
 
         # Cifras de control
-        report = html_reporter.generate(
+        report1 = html_reporter.generate(
             postgres,
             """
             SELECT I."FTC_GENERACION" AS GENERACION,
@@ -255,16 +216,7 @@ with define_extraction(phase, postgres_pool, buc_pool) as (postgres, buc):
             ["Clientes", "SALDO_INICIAL", "SALDO_FINAL", "ABONO", "CARGO", "COMISION", "RENDIMIENTO"],
             params={"term_id": term_id},
         )
-
-        notify(
-            postgres,
-            "Clientes Cifras de control Generales (Rendimientos 1 of 2)",
-            "Se han generado las cifras de control para Rendimientos exitosamente",
-            report,
-            term=term_id,
-        )
-        # Cifras de control
-        report = html_reporter.generate(
+        report2 = html_reporter.generate(
             postgres,
             """
             SELECT I."FTC_GENERACION" AS GENERACION,
@@ -288,11 +240,21 @@ with define_extraction(phase, postgres_pool, buc_pool) as (postgres, buc):
 
         notify(
             postgres,
-            "Clientes Cifras de control Generales (Rendimientos 2 of 2)",
-            "Se han generado las cifras de control para Rendimientos exitosamente",
-            report,
+            f"Clientes Cifras de control Generales (Rendimientos 1 of 2) - {datetime.now()}",
+            phase,
+            area,
             term=term_id,
-            area=area
+            message="Se han generado las cifras de control para Rendimientos exitosamente",
+            details=report1,
+        )
+        notify(
+            postgres,
+            f"Clientes Cifras de control Generales (Rendimientos 2 of 2) - {datetime.now()}",
+            phase,
+            area,
+            term=term_id,
+            message="Se han generado las cifras de control para Rendimientos exitosamente",
+            details=report2,
         )
 
 
