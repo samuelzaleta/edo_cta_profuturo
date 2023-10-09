@@ -1,6 +1,8 @@
 from sqlalchemy import text
 from profuturo.common import register_time, define_extraction, truncate_table, notify
-from profuturo.database import SparkConnectionConfigurator, get_postgres_pool, configure_mit_spark, configure_postgres_spark, configure_buc_spark, configure_integrity_spark
+from profuturo.database import SparkConnectionConfigurator, get_postgres_pool, configure_mit_spark, \
+                               configure_postgres_spark, configure_buc_spark, configure_integrity_spark, \
+                               configure_bigquery_spark
 from profuturo.extraction import update_indicator_spark, extract_dataset_spark
 from profuturo.reporters import HtmlReporter
 from profuturo.extraction import extract_terms
@@ -53,8 +55,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                 else:
                     origin_configurator = configure_postgres_spark
 
-                update_indicator_spark(origin_configurator, configure_postgres_spark, query, indicator._mapping,
-                                       term=term_id)
+                update_indicator_spark(origin_configurator, configure_postgres_spark, query, indicator._mapping, term=term_id)
 
             print(f"Done extracting {indicator[1]}!")
 
@@ -65,6 +66,11 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
             INNER JOIN "GESTOR"."TCGESPRO_INDICADOR" I ON CA."FTC_TRAMITE" = I."FTC_TRAMITE"
         WHERE "FCN_ID_PERIODO" = :term
         """, '"HECHOS"."TCHECHOS_CLIENTE_INDICADOR"', term=term_id, params={'term': term_id})
+
+        extract_dataset_spark(configure_postgres_spark, configure_bigquery_spark, """
+        SELECT "FCN_CUENTA", "FCN_ID_PERIODO", "FCN_ID_INDICADOR", "FTN_EVALUA_INDICADOR", "FTA_EVALUA_INDICADOR"
+        FROM "HECHOS"."TCHECHOS_CLIENTE_INDICADOR"
+        """, "ESTADO_CUENTA.TEST_INDICADOR")
 
         notify(
             postgres,
