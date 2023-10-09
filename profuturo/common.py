@@ -147,6 +147,10 @@ def notify(
     details: str = None,
     control: bool = True,
     validated: bool = False,
+    descarga: bool = True,
+    aprobar: bool = True,
+    visualiza: bool = True,
+    reproceso: bool = True
 ) -> None:
     users = conn.execute(text(f"""
     SELECT DISTINCT "FCN_ID_USUARIO"
@@ -166,9 +170,11 @@ def notify(
     INSERT INTO "TTGESPRO_NOTIFICACION" (
         "FTC_TITULO", "FTC_DETALLE_TEXTO", "FTC_DETALLE_BLOB", 
         "FTB_CIFRAS_CONTROL", "FCN_ID_PERIODO", "FCN_ID_FASE",
-        "FTB_CIFRAS_CONTROL_VALIDADAS", "FTD_FECHA_CREACION"
+        "FTB_CIFRAS_CONTROL_VALIDADAS", "FTD_FECHA_CREACION",
+        "FTB_APROBAR", "FTB_VISUALIZA_CIFRAS", "FTB_REPROCESO",
+        "FTB_DESCARGA"
     )
-    VALUES (:title, :message, :details, :control, :term, :phase, :validated, now())
+    VALUES (:title, :message, :details, :control, :term, :phase, :validated, now(), :aprobar, :visualiza, :reproceso, :descarga)
     RETURNING "FTN_ID_NOTIFICACION"
     """), {
         "title": title,
@@ -178,6 +184,10 @@ def notify(
         "details": details,
         "control": control,
         "validated": validated,
+        "aprobar": aprobar,
+        "visualiza": visualiza,
+        "reproceso": reproceso,
+        "descarga": descarga
     }).fetchone()
 
     for user in users.fetchall():
