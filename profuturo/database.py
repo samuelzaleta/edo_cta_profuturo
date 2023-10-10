@@ -141,7 +141,7 @@ def configure_buc_spark(connection: SparkConnection, table: str, reading: bool) 
 
 def configure_integrity_spark(database: str) -> SparkConnectionConfigurator:
     host = '130.40.30.144'
-    port = int(1714)
+    port = int(1730)
     user = 'SIEFORE'
     password = 'SIEFORE2019'
 
