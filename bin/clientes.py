@@ -23,6 +23,7 @@ with define_extraction(phase, area, postgres_pool, buc_pool) as (postgres, buc):
     spark = _get_spark_session()
 
     with register_time(postgres_pool, phase, term_id, user, area):
+
         truncate_table(postgres, "TCDATMAE_CLIENTE")
         # Extracción
         query = """
@@ -84,7 +85,6 @@ with define_extraction(phase, area, postgres_pool, buc_pool) as (postgres, buc):
             query,
             'cliente',
         )
-
         # Extracción
         truncate_table(postgres, "TCHECHOS_CLIENTE_INDICADOR", term=term_id)
         truncate_table(postgres, "TCHECHOS_CLIENTE", term=term_id)
