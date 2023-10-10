@@ -146,7 +146,7 @@ def configure_integrity_spark(database: str) -> SparkConnectionConfigurator:
     password = 'SIEFORE2019'
 
     return lambda connection, table, reading: configure_jdbc_spark(connection, table, reading) \
-        .option("url", f"jdbc:rdbThin://{host}:{port}/mexico$base:{database}") \
+        .option("url", f"jdbc:rdbThin://{host}:{port}/mexico$base:{database}@transaction=readonly") \
         .option("driver", "oracle.rdb.jdbc.rdbThin.Driver") \
         .option("oracle.jdbc.timezoneAsRegion", False) \
         .option("user", user) \
