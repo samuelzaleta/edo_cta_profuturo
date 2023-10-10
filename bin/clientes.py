@@ -208,7 +208,7 @@ with define_extraction(phase, area, postgres_pool, buc_pool) as (postgres, buc):
         df = spark.sql(f"""
         WITH indicador_generacion AS (
             SELECT 
-            X.FCN_CUENTA
+            X.FCN_CUENTA,
             COALESCE(Y.FCC_VALOR, X.FCC_VALOR) AS FCC_VALOR
             FROM (
             SELECT FCN_CUENTA, FCC_VALOR 
