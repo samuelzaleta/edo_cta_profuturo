@@ -207,19 +207,21 @@ with define_extraction(phase, area, postgres_pool, buc_pool) as (postgres, buc):
 
         df = spark.sql(f"""
         WITH indicador_generacion AS (
+            SELECT 
+            X.FCN_CUENTA
+            COALESCE(Y.FCC_VALOR, X.FCC_VALOR) AS FCC_VALOR
+            FROM (
             SELECT FCN_CUENTA, FCC_VALOR 
             FROM generacion_afore ga
-
             UNION ALL
-
             SELECT FCN_CUENTA, FCC_VALOR 
             FROM generacion_transicion gt
-
-            UNION ALL
-
+            ) X
+            LEFT JOIN (
             SELECT FCN_CUENTA, 'MIXTO' /* 4 MIXTO */ AS FCC_VALOR 
             FROM indicador_origen ori
-            WHERE FCC_VALOR = 69
+            WHERE FCC_VALOR = 69) Y 
+            ON X.FCN_CUENTA = Y.FCN_CUENTA
         )
         SELECT DISTINCT o.FCN_CUENTA,
                {term_id} AS FCN_ID_PERIODO,
