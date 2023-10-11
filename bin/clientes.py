@@ -208,6 +208,7 @@ with define_extraction(phase, area, postgres_pool, buc_pool) as (postgres, buc):
         df = spark.sql(f"""
         WITH indicador_generacion AS (
             SELECT 
+            DISTINCT 
             X.FCN_CUENTA,
             COALESCE(Y.FCC_VALOR, X.FCC_VALOR) AS FCC_VALOR
             FROM (
@@ -242,7 +243,7 @@ with define_extraction(phase, area, postgres_pool, buc_pool) as (postgres, buc):
             LEFT JOIN indicador_bono b ON o.FCN_CUENTA = b.FCN_CUENTA
             LEFT JOIN indicador_tipo_pension tp ON o.FCN_CUENTA = p.FCN_CUENTA
             LEFT JOIN indicador_perfil_inversion i ON o.FCN_CUENTA = i.FCN_CUENTA
-        WHERE o.FCN_CUENTA IN (SELECT FTN_CUENTA FROM cliente)
+        WHERE o.FCN_CUENTA IN (SELECT DISTINCT FTN_CUENTA FROM cliente)
         """)
         #df = df.withColumn("FTO_INDICADORES", to_json(struct(lit('{}'))))
         df.show(2)
