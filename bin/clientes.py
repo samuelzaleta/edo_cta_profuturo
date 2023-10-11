@@ -219,7 +219,7 @@ with define_extraction(phase, area, postgres_pool, buc_pool) as (postgres, buc):
             FROM generacion_transicion gt
             ) X
             LEFT JOIN (
-            SELECT FCN_CUENTA, 'MIXTO' /* 4 MIXTO */ AS FCC_VALOR 
+            SELECT DISTINCT FCN_CUENTA, 'MIXTO' /* 4 MIXTO */ AS FCC_VALOR 
             FROM indicador_origen ori
             WHERE FCC_VALOR = 69) Y 
             ON X.FCN_CUENTA = Y.FCN_CUENTA
