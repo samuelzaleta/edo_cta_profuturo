@@ -241,7 +241,7 @@ with define_extraction(phase, area, postgres_pool, integrity_pool) as (postgres,
         )
         notify(
             postgres,
-            f"Cifras de control movimientos integrity generadas - {datetime.now()}",
+            f"Cifras de control movimientos integrity generadas",
             phase,
             area,
             term=term_id,

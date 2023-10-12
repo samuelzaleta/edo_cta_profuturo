@@ -74,7 +74,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
 
         notify(
             postgres,
-            f"Indicadores ingestados - {datetime.now()}",
+            f"Indicadores ingestados",
             phase,
             area,
             term=term_id,

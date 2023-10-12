@@ -119,7 +119,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
 
         notify(
             postgres,
-            f"Cifras de control Saldos generadas 1 de 2 - {datetime.now()}",
+            f"Cifras de control Saldos generadas 1 de 2",
             phase,
             area,
             term=term_id,
@@ -128,7 +128,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
         )
         notify(
             postgres,
-            f"Cifras de control Saldos generadas 2 de 2 - {datetime.now()}",
+            f"Cifras de control Saldos generadas 2 de 2",
             phase,
             area,
             term=term_id,

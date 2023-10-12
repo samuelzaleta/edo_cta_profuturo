@@ -270,7 +270,7 @@ with define_extraction(phase, area, postgres_pool, buc_pool) as (postgres, buc):
 
         notify(
             postgres,
-            f"Clientes ingestados - {datetime.now()}",
+            f"Clientes ingestados",
             phase,
             area,
             term=term_id,

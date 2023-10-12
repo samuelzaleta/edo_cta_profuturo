@@ -262,7 +262,7 @@ with define_extraction(phase, area, postgres_pool, buc_pool) as (postgres, buc):
 
         notify(
             postgres,
-            f"Clientes Cifras de control Generales (Rendimientos 1 of 2) - {datetime.now()}",
+            f"Clientes Cifras de control Generales (Rendimientos 1 of 2)",
             phase,
             area,
             term=term_id,
@@ -271,7 +271,7 @@ with define_extraction(phase, area, postgres_pool, buc_pool) as (postgres, buc):
         )
         notify(
             postgres,
-            f"Clientes Cifras de control Generales (Rendimientos 2 of 2) - {datetime.now()}",
+            f"Clientes Cifras de control Generales (Rendimientos 2 of 2)",
             phase,
             area,
             term=term_id,
