@@ -40,6 +40,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                             where pa."FCN_ID_AREA" = 1
                                 and pa."FTB_ESTATUS" = true
                                 and mp."FTC_ORIGEN" = '{movement}'
+                                and msrc."FTC_STATUS" = 'Reproceso'
                             """
             if movement == "INTEGRITY":
                 query = query + """\nand mp."FTB_SWITCH" = true"""
