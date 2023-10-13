@@ -22,57 +22,82 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
     spark = _get_spark_session()
 
     with register_time(postgres_pool, phase, term_id, user, area):
-        movements = ['MIT', 'INTEGRITY']
 
         #Getting data from DB
-        for movement in movements:
-            query = f"""
-            select distinct msrc.*
-            from "GESTOR"."TCGESPRO_MUESTRA_SOL_RE_CONSAR" msrc
-            inner join "GESTOR"."TCGESPRO_MUESTRA" m
-                on m."FTN_ID_MUESTRA" = msrc."FCN_ID_MUESTRA"
-            inner join "GESTOR"."TCGESPRO_PERIODO_AREA" pa
-                on pa."FCN_ID_PERIODO" = m."FCN_ID_PERIODO"
-            inner join "GESTOR"."TTGESPRO_MOV_PROFUTURO_CONSAR" mpc
-                on msrc."FCN_ID_MOVIMIENTO_CONSAR" = mpc."FCN_ID_MOVIMIENTO_CONSAR"
-            inner join "GESTOR"."TCGESPRO_MOVIMIENTO_PROFUTURO" mp
-                on mpc."FCN_ID_MOVIMIENTO_PROFUTURO" = mp."FTN_ID_MOVIMIENTO_PROFUTURO" 
-            where pa."FCN_ID_AREA" = {area}
-                and pa."FTB_ESTATUS" = true
-                and msrc."FTC_STATUS" = 'Aprobado'
-                and mp."FTB_SWITCH" = true;
-            """
+        query_reproceso = f"""
+        select distinct msrc.*
+        from "GESTOR"."TCGESPRO_MUESTRA_SOL_RE_CONSAR" msrc
+        inner join "GESTOR"."TCGESPRO_MUESTRA" m
+            on m."FTN_ID_MUESTRA" = msrc."FCN_ID_MUESTRA"
+        inner join "GESTOR"."TCGESPRO_PERIODO_AREA" pa
+            on pa."FCN_ID_PERIODO" = m."FCN_ID_PERIODO"
+        inner join "GESTOR"."TTGESPRO_MOV_PROFUTURO_CONSAR" mpc
+            on msrc."FCN_ID_MOVIMIENTO_CONSAR" = mpc."FCN_ID_MOVIMIENTO_CONSAR"
+        inner join "GESTOR"."TCGESPRO_MOVIMIENTO_PROFUTURO" mp
+            on mpc."FCN_ID_MOVIMIENTO_PROFUTURO" = mp."FTN_ID_MOVIMIENTO_PROFUTURO" 
+        where pa."FCN_ID_AREA" = {area}
+            and pa."FTB_ESTATUS" = true
+            and msrc."FTC_STATUS" = 'Aprobado'
+            and mp."FTB_SWITCH" = true;
+        """
 
-            df = spark.sql(query)
+        query_muestra = f"""
+                    select distinct m.*
+                    from "GESTOR"."TCGESPRO_MUESTRA_SOL_RE_CONSAR" msrc
+                    inner join "GESTOR"."TCGESPRO_MUESTRA" m
+                        on m."FTN_ID_MUESTRA" = msrc."FCN_ID_MUESTRA"
+                    inner join "GESTOR"."TCGESPRO_PERIODO_AREA" pa
+                        on pa."FCN_ID_PERIODO" = m."FCN_ID_PERIODO"
+                    inner join "GESTOR"."TTGESPRO_MOV_PROFUTURO_CONSAR" mpc
+                        on msrc."FCN_ID_MOVIMIENTO_CONSAR" = mpc."FCN_ID_MOVIMIENTO_CONSAR"
+                    inner join "GESTOR"."TCGESPRO_MOVIMIENTO_PROFUTURO" mp
+                        on mpc."FCN_ID_MOVIMIENTO_PROFUTURO" = mp."FTN_ID_MOVIMIENTO_PROFUTURO" 
+                    where pa."FCN_ID_AREA" = {area}
+                        and pa."FTB_ESTATUS" = true
+                        and msrc."FTC_STATUS" = 'Aprobado'
+                        and mp."FTB_SWITCH" = true;
+                    """
 
-            id_consar_movements = (data[0] for data in df.select("FCN_ID_MOVIMIENTO_CONSAR").collect())
 
-            #Eliminating records from the reprocesing table
-            delete_records = f"""
-            delete from "GESTOR"."TCGESPRO_MUESTRA_SOL_RE_CONSAR"
-            where "FCN_ID_MOVIMIENTO_CONSAR" in {id_consar_movements}
-            """
+        df_reproceso = spark.sql(query_reproceso)
+        df_muestra = spark.sql(query_muestra)
 
-            update_df = df.withColumn("FTC_STATUS", f.lit("Reprocesado"))
+        id_consar_movements = (data[0] for data in df_reproceso.select("FCN_ID_MOVIMIENTO_CONSAR").collect())
+        id_muestra = (data[0] for data in df_muestra.select("FTN_ID_MUESTRA").collect())
 
-            #Upload updating data
-            _write_spark_dataframe(update_df, configure_postgres_spark, '"GESTOR"."TCGESPRO_MUESTRA_SOL_RE_CONSAR"')
+        #Eliminating records from the reprocesing table
+        delete_records_consar = f"""
+        delete from "GESTOR"."TCGESPRO_MUESTRA_SOL_RE_CONSAR"
+        where "FCN_ID_MOVIMIENTO_CONSAR" in {id_consar_movements}
+        """
+        delete_records_muestra = f"""
+                    delete from "GESTOR"."TCGESPRO_MUESTRA"
+                    where "FTN_ID_MUESTRA" in {id_muestra}
+                    """
 
-            # Cifras de control
-            report = html_reporter.generate(
-                postgres,
-                query,
-                ["Solicitud de Reproceso", "ID Muestra", "ID Movimiento CONSAR", "Estatus", "Comentario Solicitud", "Comentario Estatus"],
-                [],
-                params={"term": term_id},
-            )
 
-            notify(
-                postgres,
-                f"Cifras de control Movimientos {movement}",
-                phase,
-                area,
-                term=term_id,
-                message=f"Se han generado las cifras de control para movimientos {movement} exitosamente para el periodo {time_period}",
-                details=report,
-            )
+        update_df_reproceso = df_reproceso.withColumn("FTC_STATUS", f.lit("Reprocesado"))
+        update_df_muestra = df_muestra.withColumn("FTN_ID_MUESTRA", f.lit("Reprocesado"))
+
+        #Upload updating data
+        _write_spark_dataframe(update_df_reproceso, configure_postgres_spark, '"GESTOR"."TCGESPRO_MUESTRA_SOL_RE_CONSAR"')
+        _write_spark_dataframe(update_df_muestra, configure_postgres_spark,'"GESTOR"."TCGESPRO_MUESTRA"')
+
+        # Cifras de control
+        report = html_reporter.generate(
+            postgres,
+            query_reproceso,
+            ["Solicitud de Reproceso", "ID Muestra", "ID Movimiento CONSAR", "Estatus", "Comentario Solicitud", "Comentario Estatus"],
+            [],
+            params={"term": term_id},
+        )
+
+        notify(
+            postgres,
+            f"Cifras de control de reprocesamiento consar",
+            phase,
+            area,
+            term=term_id,
+            message=f"Se han generado las cifras de control para reprocesamiento consar exitosamente para el periodo {time_period}",
+            details=report,
+        )
