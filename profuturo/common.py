@@ -120,6 +120,8 @@ def notify_exceptions(pool: Engine, phase: int, area: int):
                 message=e.msg,
                 details=str(e),
                 control=False,
+                aprobar=False,
+                descarga=False
             )
 
         raise e
@@ -132,6 +134,8 @@ def notify_exceptions(pool: Engine, phase: int, area: int):
                 area,
                 details=str(e),
                 control=False,
+                aprobar=False,
+                descarga=False
             )
 
         raise e

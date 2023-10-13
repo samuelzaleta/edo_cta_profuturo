@@ -70,7 +70,7 @@ def get_integrity_conn(database: str):
 
     return lambda: jaydebeapi.connect(
         "oracle.rdb.jdbc.rdbThin.Driver",
-        f"jdbc:rdbThin://{host}:{port}/mexico$base:cierren",
+        f"jdbc:rdbThin://{host}:{port}/mexico$base:cierren@transaction=readonly",
         {"user": user, "password": password},
         "/opt/profuturo/libs/RDBTHIN.JAR"
     )
@@ -141,12 +141,12 @@ def configure_buc_spark(connection: SparkConnection, table: str, reading: bool) 
 
 def configure_integrity_spark(database: str) -> SparkConnectionConfigurator:
     host = '130.40.30.144'
-    port = int(1714)
+    port = int(1730)
     user = 'SIEFORE'
     password = 'SIEFORE2019'
 
     return lambda connection, table, reading: configure_jdbc_spark(connection, table, reading) \
-        .option("url", f"jdbc:rdbThin://{host}:{port}/mexico$base:{database}") \
+        .option("url", f"jdbc:rdbThin://{host}:{port}/mexico$base:{database}@transaction=readonly") \
         .option("driver", "oracle.rdb.jdbc.rdbThin.Driver") \
         .option("oracle.jdbc.timezoneAsRegion", False) \
         .option("user", user) \
