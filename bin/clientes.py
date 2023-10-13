@@ -221,7 +221,7 @@ with define_extraction(phase, area, postgres_pool, buc_pool) as (postgres, buc):
             LEFT JOIN (
             SELECT DISTINCT FCN_CUENTA, 'MIXTO' /* 4 MIXTO */ AS FCC_VALOR 
             FROM indicador_origen ori
-            WHERE FCC_VALOR = 69) Y 
+            WHERE FCC_VALOR = 'MIXTO') Y 
             ON X.FCN_CUENTA = Y.FCN_CUENTA
         )
         SELECT DISTINCT o.FCN_CUENTA,

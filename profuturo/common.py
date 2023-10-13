@@ -113,7 +113,7 @@ def notify_exceptions(pool: Engine, phase: int, area: int):
         with pool.begin() as conn:
             notify(
                 conn,
-                f"Error al ingestar la etapa {phase}",
+                f"Error al ingestar la fase {phase}",
                 phase,
                 area,
                 term=e.term,
@@ -129,7 +129,7 @@ def notify_exceptions(pool: Engine, phase: int, area: int):
         with pool.begin() as conn:
             notify(
                 conn,
-                f"Error desconocido al ingestar la etapa {phase}",
+                f"Error desconocido al ingestar la fase {phase}",
                 phase,
                 area,
                 details=str(e),

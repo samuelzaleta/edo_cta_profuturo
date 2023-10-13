@@ -71,7 +71,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
 
             notify(
                 postgres,
-                f"Cifras de control Movimientos {movement} - {datetime.now()}",
+                f"Cifras de control Movimientos {movement}",
                 phase,
                 area,
                 term=term_id,

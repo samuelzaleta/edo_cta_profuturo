@@ -202,13 +202,13 @@ with define_extraction(phase, area, postgres_pool, buc_pool) as (postgres, buc):
             , SUM(COALESCE(ab.FTF_ABONO, 0)) AS FTF_ABONO
             , SUM(COALESCE(cm.FTF_COMISION, 0)) AS FTF_COMISION
         FROM saldoinicial AS si
-        FULL JOIN abono AS ab
+        LEFT JOIN abono AS ab
         ON si.FCN_CUENTA = ab.FCN_CUENTA
         AND si.FCN_ID_TIPO_SUBCTA = ab.FCN_ID_TIPO_SUBCTA
         LEFT JOIN comision AS cm
         ON si.FCN_CUENTA = cm.FCN_CUENTA
         AND si.FCN_ID_TIPO_SUBCTA = cm.FCN_ID_TIPO_SUBCTA
-        FULL JOIN cargo AS ca
+        LEFT JOIN cargo AS ca
         ON si.FCN_CUENTA = ca.FCN_CUENTA 
         AND si.FCN_ID_TIPO_SUBCTA = ca.FCN_ID_TIPO_SUBCTA
         FULL JOIN saldofinal AS sf
@@ -226,7 +226,7 @@ with define_extraction(phase, area, postgres_pool, buc_pool) as (postgres, buc):
         , ta.FTF_SALDO_FINAL
         , ta.FTF_ABONO
         , ta.FTF_CARGO
-        , ta.FTF_COMISION,
+        , ta.FTF_COMISION
         , (ta.FTF_SALDO_FINAL - (ta.FTF_ABONO + ta.FTF_SALDO_INICIAL - ta.FTF_COMISION - ta.FTF_CARGO)) AS FTF_RENDIMIENTO_CALCULADO
     FROM tablon AS ta
     WHERE (ta.FTF_SALDO_FINAL - (ta.FTF_ABONO + ta.FTF_SALDO_INICIAL - ta.FTF_COMISION - ta.FTF_CARGO)) > 0 
