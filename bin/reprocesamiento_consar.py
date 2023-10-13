@@ -27,23 +27,21 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
         #Getting data from DB
         for movement in movements:
             query = f"""
-                            select distinct msrc.*
-                            from "GESTOR"."TCGESPRO_MUESTRA_SOL_RE_CONSAR" msrc
-                            left join "GESTOR"."TCGESPRO_MUESTRA" m
-                                on m."FTN_ID_MUESTRA" = msrc."FCN_ID_MUESTRA"
-                            left join "GESTOR"."TCGESPRO_PERIODO_AREA" pa
-                                on pa."FCN_ID_PERIODO" = m."FCN_ID_PERIODO" 
-                            left join "GESTOR"."TTGESPRO_MOV_PROFUTURO_CONSAR" mpc 
-                                on msrc."FCN_ID_MOVIMIENTO_CONSAR" = mpc."FCN_ID_MOVIMIENTO_CONSAR"
-                            left join "GESTOR"."TCGESPRO_MOVIMIENTO_PROFUTURO" mp
-                                on mpc."FCN_ID_MOVIMIENTO_PROFUTURO" = mp."FTN_ID_MOVIMIENTO_PROFUTURO" 
-                            where pa."FCN_ID_AREA" = 1
-                                and pa."FTB_ESTATUS" = true
-                                and mp."FTC_ORIGEN" = '{movement}'
-                                and msrc."FTC_STATUS" = 'Reproceso'
-                            """
-            if movement == "INTEGRITY":
-                query = query + """\nand mp."FTB_SWITCH" = true"""
+            select distinct msrc.*
+            from "GESTOR"."TCGESPRO_MUESTRA_SOL_RE_CONSAR" msrc
+            inner join "GESTOR"."TCGESPRO_MUESTRA" m
+                on m."FTN_ID_MUESTRA" = msrc."FCN_ID_MUESTRA"
+            inner join "GESTOR"."TCGESPRO_PERIODO_AREA" pa
+                on pa."FCN_ID_PERIODO" = m."FCN_ID_PERIODO"
+            inner join "GESTOR"."TTGESPRO_MOV_PROFUTURO_CONSAR" mpc
+                on msrc."FCN_ID_MOVIMIENTO_CONSAR" = mpc."FCN_ID_MOVIMIENTO_CONSAR"
+            inner join "GESTOR"."TCGESPRO_MOVIMIENTO_PROFUTURO" mp
+                on mpc."FCN_ID_MOVIMIENTO_PROFUTURO" = mp."FTN_ID_MOVIMIENTO_PROFUTURO" 
+            where pa."FCN_ID_AREA" = {area}
+                and pa."FTB_ESTATUS" = true
+                and msrc."FTC_STATUS" = 'Aprobado'
+                and mp."FTB_SWITCH" = true;
+            """
 
             df = spark.sql(query)
 
@@ -55,7 +53,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
             where "FCN_ID_MOVIMIENTO_CONSAR" in {id_consar_movements}
             """
 
-            update_df = df.withColumn("FTC_STATUS", f.lit("REPROCESADO"))
+            update_df = df.withColumn("FTC_STATUS", f.lit("Reprocesado"))
 
             #Upload updating data
             _write_spark_dataframe(update_df, configure_postgres_spark, '"GESTOR"."TCGESPRO_MUESTRA_SOL_RE_CONSAR"')
