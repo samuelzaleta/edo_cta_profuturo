@@ -27,7 +27,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
         #Getting data from DB
         for movement in movements:
             query = f"""
-                            select msrc.*
+                            select distinct msrc.*
                             from "GESTOR"."TCGESPRO_MUESTRA_SOL_RE_CONSAR" msrc
                             left join "GESTOR"."TCGESPRO_MUESTRA" m
                                 on m."FTN_ID_MUESTRA" = msrc."FCN_ID_MUESTRA"
@@ -62,21 +62,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
             # Cifras de control
             report = html_reporter.generate(
                 postgres,
-                f"""
-                select *
-                from "GESTOR"."TCGESPRO_MUESTRA_SOL_RE_CONSAR" msrc
-                join "GESTOR"."TCGESPRO_MUESTRA" m
-                    on m."FTN_ID_MUESTRA" = msrc."FCN_ID_MUESTRA"
-                join "GESTOR"."TCGESPRO_PERIODO_AREA" pa
-                    on pa."FCN_ID_PERIODO" = m."FCN_ID_PERIODO" 
-                join "GESTOR"."TTGESPRO_MOV_PROFUTURO_CONSAR" mpc 
-                    on msrc."FCN_ID_MOVIMIENTO_CONSAR" = mpc."FCN_ID_MOVIMIENTO_CONSAR"
-                join "GESTOR"."TCGESPRO_MOVIMIENTO_PROFUTURO" mp
-                    on mpc."FCN_ID_MOVIMIENTO_PROFUTURO" = mp."FTN_ID_MOVIMIENTO_PROFUTURO" 
-                where pa."FCN_ID_AREA" = 1
-                    and pa."FTB_ESTATUS" = true
-                    and mp."FTC_ORIGEN" = '{movement}';
-                """,
+                query,
                 ["Solicitud de Reproceso", "ID Muestra", "ID Movimiento CONSAR", "Estatus", "Comentario Solicitud", "Comentario Estatus"],
                 [],
                 params={"term": term_id},
