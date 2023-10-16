@@ -270,6 +270,20 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
             )
             , DATOS_PAGO AS (
             SELECT
+            FTC_FOLIO,
+            FCN_ID_PROCESO,
+            FCN_ID_SUBPROCESO,
+            FCN_TIPO_PAGO,
+            FTC_FOLIO_LIQUIDACION,
+            FTD_FEH_CRE,
+            FCC_CVE_BANCO,
+            FTN_ISR,
+            FCN_ID_CAT_CATALOGO,
+            FCC_TIPO_BANCO,
+            FCC_MEDIO_PAGO
+            FROM (
+            SELECT
+            ROW_NUMBER() over (PARTITION BY FTC_FOLIO ORDER BY FTD_FEH_CRE DESC)  rownumid,
             ptp.FTC_FOLIO,
             ptp.FCN_ID_PROCESO,
             ptp.FCN_ID_SUBPROCESO,
@@ -279,13 +293,14 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
             ptp.FCC_CVE_BANCO,
             ptp.FTN_ISR,
             ptp.FCN_ID_CAT_CATALOGO,
-            ptp.FCC_VALOR AS FCC_TIPO_BANCO,
-            thccc.FCC_VALOR AS FCC_MEDIO_PAGO
+            ptp.FCC_VALOR  AS FCC_TIPO_BANCO,
+            thccc.FCC_DESC AS FCC_MEDIO_PAGO
             FROM PAGO_TIPO_BANCO ptp
             INNER JOIN CIERREN.TCCRXGRAL_CAT_CATALOGO thccc
             ON ptp.FCN_TIPO_PAGO = thccc.FCN_ID_CAT_CATALOGO
             )
-            , LIQUIDACIONES AS (
+            WHERE rownumid = 1
+            ), LIQUIDACIONES AS (
             SELECT
             FTC_FOLIO,
             FTC_FOLIO_REL,
@@ -408,24 +423,28 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
             ON TR.FTC_TIPO_TRAMITE = PT.TMN_CVE_NCI
             )
             SELECT
-            FCN_CUENTA,
-            FTC_FOLIO,
-            FCN_ID_PROCESO,
-            FCN_ID_SUBPROCESO,
-            FCN_ID_ESTATUS,
-            FTF_MONTO_LIQUIDADO,
-            FTC_TIPO_TRAMITE,
-            FTC_TPSEGURO,
-            FTC_REGIMEN,
-            FTC_TPPENSION,
-            FTC_TMC_DESC_ITGY,
-            FTN_TMN_CVE_ITGY,
-            FTC_TMC_DESC_NCI,
-            FTN_TMN_CVE_NCI,
-            FTN_FEH_INI_PEN,
-            FTN_FEH_RES_PEN,
-            FTN_TIPO_AHORRO,
-            CASE FTC_TMC_DESC_ITGY
+            D.FCN_CUENTA,
+            D.FTC_FOLIO,
+            D.FCN_ID_PROCESO,
+            D.FCN_ID_SUBPROCESO,
+            D.FCN_ID_ESTATUS,
+            (D.FTF_MONTO_LIQUIDADO - P.FTN_ISR) AS FTF_MONTO_LIQUIDADO,
+            P.FCC_CVE_BANCO,
+            P.FTN_ISR,
+            P.FCC_TIPO_BANCO,
+            P.FCC_MEDIO_PAGO,
+            D.FTC_TIPO_TRAMITE,
+            D.FTC_TPSEGURO,
+            D.FTC_REGIMEN,
+            D.FTC_TPPENSION,
+            D.FTC_TMC_DESC_ITGY,
+            D.FTN_TMN_CVE_ITGY,
+            D.FTC_TMC_DESC_NCI,
+            D.FTN_TMN_CVE_NCI,
+            D.FTN_FEH_INI_PEN,
+            D.FTN_FEH_RES_PEN,
+            D.FTN_TIPO_AHORRO,
+            CASE D.FTC_TMC_DESC_ITGY
             WHEN 'RJP' THEN '73'
             WHEN 'T73' THEN '73'
             WHEN 'TED' THEN '73'
@@ -471,12 +490,14 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
             WHEN 'TNP' THEN 'ISSSTE'
             WHEN 'TNP' THEN 'ISSSTE'
             END FTC_LEY_PENSION,
-            CASE FTC_TMC_DESC_ITGY
+            CASE D.FTC_TMC_DESC_ITGY
             WHEN 'TAI' THEN 'ASEGURADORA'
             WHEN 'TGF' THEN 'GOBIERNO FEDERAL'
             END FTC_FON_ENTIDAD,
-            FTD_FEH_CRE
-            FROM DIS_TRANS
+            D.FTD_FEH_CRE
+            FROM DIS_TRANS D
+            INNER JOIN DATOS_PAGO P
+            ON D.FTC_FOLIO = P.FTC_FOLIO
         """
 
         query_saldos ="""

@@ -213,7 +213,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
             phase,
             area,
             term=term_id,
-            message=f"Se han generado las cifras de control para movimientos exitosamente para el periodo {time_period}",
+            message=f"Se han generado las cifras de control para movimientos exitosamente para el periodo",
             details=report1,
         )
         notify(
@@ -222,6 +222,6 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
             phase,
             area,
             term=term_id,
-            message=f"Se han generado las cifras de control para movimientos exitosamente para el periodo {time_period}",
+            message=f"Se han generado las cifras de control para movimientos exitosamente para el periodo",
             details=report2,
         )

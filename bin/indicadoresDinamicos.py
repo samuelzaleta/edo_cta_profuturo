@@ -78,7 +78,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
             phase,
             area,
             term=term_id,
-            message=f"Se han ingestado los indicadores de forma exitosa para el periodo {time_period}",
+            message=f"Se han ingestado los indicadores de forma exitosa para el periodo",
             validated=True,
             aprobar=False,
             descarga=False

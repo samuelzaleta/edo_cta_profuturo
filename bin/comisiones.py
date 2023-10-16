@@ -74,6 +74,6 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
             phase,
             area,
             term=term_id,
-            message=f"Se han ingestado las comisiones de forma exitosa para el periodo {time_period}",
+            message=f"Se han ingestado las comisiones de forma exitosa para el periodo",
             details=report,
         )

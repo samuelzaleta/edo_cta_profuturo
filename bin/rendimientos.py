@@ -227,11 +227,11 @@ with define_extraction(phase, area, postgres_pool, buc_pool) as (postgres, buc):
                    coalesce(ROUND(cast(SUM(R."FTF_SALDO_FINAL") AS numeric(16,2)) ,2),0) AS SALDO_FINAL,
                    ROUND(cast(SUM(R."FTF_ABONO") AS numeric(16,2)) ,2) AS ABONO,
                    ROUND(cast(SUM(R."FTF_CARGO") AS numeric(16,2)) ,2) AS CARGO,
-                   ROUND(cast(SUM(R."FTF_COMISION") AS numeric(16,2)) ,2) AS COMISION,
+                   coalesce(ROUND(cast(SUM(R."FTF_COMISION") AS numeric(16,2)) ,2),0) AS COMISION,
                    ROUND(cast(SUM(R."FTF_RENDIMIENTO_CALCULADO") AS numeric(16,2)) ,2) AS RENDIMIENTO
             FROM "HECHOS"."TTCALCUL_RENDIMIENTO" R
             INNER JOIN "HECHOS"."TCHECHOS_CLIENTE" I ON R."FCN_CUENTA" = I."FCN_CUENTA" AND R."FCN_ID_PERIODO" = I."FCN_ID_PERIODO"
-            WHERE R."FCN_ID_PERIODO" = :term_id
+            --WHERE R."FCN_ID_PERIODO" = :term_id
             GROUP BY I."FTC_GENERACION", I."FTC_VIGENCIA", I."FTC_TIPO_CLIENTE", I."FTC_ORIGEN"
             """,
             ["Tipo Generación", "Vigencia", "Tipo Cliente", "Indicador Afiliación"],
