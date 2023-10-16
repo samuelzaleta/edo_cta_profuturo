@@ -107,6 +107,8 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                            'M' AS FTC_BD_ORIGEN
                     FROM {mov_table_ref}
                     WHERE FTD_FEH_LIQUIDACION BETWEEN :start AND :end
+                    AND FCN_ID_CONCEPTO_MOVIMIENTO IN {id_consar_movements}
+                    AND "FCN_ID_PERIODO" = {term}
                     """
             extract_dataset_spark(configure_mit_spark, configure_postgres_spark, query_mov_ref, table, term=term_id, params={"start": start_month, "end": end_month})
 
@@ -124,6 +126,8 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                        'M' AS FTC_BD_ORIGEN
                 FROM {mov_table}
                 WHERE FTD_FEH_LIQUIDACION BETWEEN :start AND :end
+                AND FCN_ID_CONCEPTO_MOVIMIENTO IN {id_consar_movements}
+                AND "FCN_ID_PERIODO" = {term}
                 """
 
             extract_dataset_spark(configure_mit_spark, configure_postgres_spark, query_mov, table, term=term_id, params={"start": start_month, "end": end_month})
