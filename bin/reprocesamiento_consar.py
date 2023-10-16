@@ -1,9 +1,8 @@
 from profuturo.common import notify, register_time, define_extraction
 from profuturo.database import get_postgres_pool, configure_mit_spark, configure_postgres_spark
-from profuturo.extraction import extract_terms, _get_spark_session, _write_spark_dataframe, extract_dataset_spark
+from profuturo.extraction import extract_terms, _get_spark_session, extract_dataset_spark
 from profuturo.reporters import HtmlReporter
 import pyspark.sql.functions as f
-from datetime import datetime
 import sys
 
 html_reporter = HtmlReporter()
@@ -24,7 +23,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
 
     with register_time(postgres_pool, phase, term_id, user, area):
 
-        #Getting data from DB
+        # Getting data from DB
         query_reproceso = f"""
             select distinct msrc.*
             from "GESTOR"."TCGESPRO_MUESTRA_SOL_RE_CONSAR" msrc
@@ -59,36 +58,47 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                 and mp."FTB_SWITCH" = true;
             """
 
-
         df_reproceso = spark.sql(query_reproceso)
         df_muestra = spark.sql(query_muestra)
 
-        id_consar_movements = (data[0] for data in df_reproceso.select("FCN_ID_MOVIMIENTO_CONSAR").collect())
-        id_muestra = (data[0] for data in df_muestra.select("FTN_ID_MUESTRA").collect())
-
-        #Deleting records
-        spark.sql(f"""
-                delete from "GESTOR"."TCGESPRO_MUESTRA_SOL_RE_CONSAR"
-                where "FCN_ID_MOVIMIENTO_CONSAR" in {id_consar_movements}
-                """)
-        spark.sql(f"""
-                delete from "GESTOR"."TCGESPRO_MUESTRA"
-                where "FTN_ID_MUESTRA" in {id_muestra}
-                and "FCN_ID_PERIODO" = {term}
-                """)
-        spark.sql(f"""
-                delete from "HECHOS"."TTHECHOS_MOVIMIENTO"
-                where "FCN_ID_CONCEPTO_MOVIMIENTO" in {id_consar_movements}
-                and "FCN_ID_PERIODO" = {term}
-                """)
-
+        id_consar_movements = df_reproceso.select("FCN_ID_MOVIMIENTO_CONSAR").collect()
+        id_muestra = df_muestra.select("FTN_ID_MUESTRA").collect()
 
         update_df_reproceso = df_reproceso.withColumn("FTC_STATUS", f.lit("Reprocesado"))
-        update_df_muestra = df_muestra.withColumn("FTN_ID_MUESTRA", f.lit("Reprocesado"))
+        update_df_muestra = df_muestra.withColumn("FTC_ESTATUS", f.lit("Reprocesado"))
 
-        #Upload updating data
-        _write_spark_dataframe(update_df_reproceso, configure_postgres_spark, '"GESTOR"."TCGESPRO_MUESTRA_SOL_RE_CONSAR"')
-        _write_spark_dataframe(update_df_muestra, configure_postgres_spark,'"GESTOR"."TCGESPRO_MUESTRA"')
+        #
+        # # Deleting records
+        # spark.sql(f"""
+        #         delete from "GESTOR"."TCGESPRO_MUESTRA_SOL_RE_CONSAR"
+        #         where "FCN_ID_MOVIMIENTO_CONSAR" in {id_consar_movements}
+        #         """)
+        # spark.sql(f"""
+        #         delete from "GESTOR"."TCGESPRO_MUESTRA"
+        #         where "FTN_ID_MUESTRA" in {id_muestra}
+        #         and "FCN_ID_PERIODO" = {term}
+        #         """)
+        #
+        # # Upload updating data
+        # _write_spark_dataframe(update_df_reproceso, configure_postgres_spark,
+        #                        '"GESTOR"."TCGESPRO_MUESTRA_SOL_RE_CONSAR"')
+        # _write_spark_dataframe(update_df_muestra, configure_postgres_spark, '"GESTOR"."TCGESPRO_MUESTRA"')
+
+        configure_postgres_spark(update_df_reproceso.write, '"GESTOR"."TCGESPRO_MUESTRA_SOL_RE_CONSAR"', False) \
+            .mode("overwrite") \
+            .condition(f.col('FCN_ID_MOVIMIENTO_CONSAR').isin(id_consar_movements)) \
+            .save()
+        configure_postgres_spark(update_df_muestra.write, '"GESTOR"."TCGESPRO_MUESTRA"', False) \
+            .mode("overwrite") \
+            .condition(f.col('FTN_ID_MUESTRA').isin(id_consar_movements) & f.col('FCN_ID_PERIODO') == term) \
+            .save()
+
+        spark.sql(f"""
+                        delete from "HECHOS"."TTHECHOS_MOVIMIENTO"
+                        where "FCN_ID_PERIODO" = {term}
+                        and "FCN_ID_CONCEPTO_MOVIMIENTO" in {id_consar_movements}
+                        """)
+
         mov_tables_ref = ["TTAFOGRAL_MOV_AVOL", "TTAFOGRAL_MOV_RCV", "TTAFOGRAL_MOV_COMP"]
         mov_tables = ["TTAFOGRAL_MOV_BONO", "TTAFOGRAL_MOV_GOB", "TTAFOGRAL_MOV_SAR", "TTAFOGRAL_MOV_VIV"]
 
@@ -110,7 +120,8 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                     AND FCN_ID_CONCEPTO_MOVIMIENTO IN {id_consar_movements}
                     AND "FCN_ID_PERIODO" = {term}
                     """
-            extract_dataset_spark(configure_mit_spark, configure_postgres_spark, query_mov_ref, table, term=term_id, params={"start": start_month, "end": end_month})
+            extract_dataset_spark(configure_mit_spark, configure_postgres_spark, query_mov_ref, table, term=term_id,
+                                  params={"start": start_month, "end": end_month})
 
         for mov_table in mov_tables:
             query_mov = f"""
@@ -129,14 +140,15 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                 AND FCN_ID_CONCEPTO_MOVIMIENTO IN {id_consar_movements}
                 AND "FCN_ID_PERIODO" = {term}
                 """
-
-            extract_dataset_spark(configure_mit_spark, configure_postgres_spark, query_mov, table, term=term_id, params={"start": start_month, "end": end_month})
+            extract_dataset_spark(configure_mit_spark, configure_postgres_spark, query_mov, table, term=term_id,
+                                  params={"start": start_month, "end": end_month})
 
         # Cifras de control
         report = html_reporter.generate(
             postgres,
             query_reproceso,
-            ["Solicitud de Reproceso", "ID Muestra", "ID Movimiento CONSAR", "Estatus", "Comentario Solicitud", "Comentario Estatus"],
+            ["Solicitud de Reproceso", "ID Muestra", "ID Movimiento CONSAR", "Estatus", "Comentario Solicitud",
+             "Comentario Estatus"],
             [],
             params={"term": term_id},
         )
