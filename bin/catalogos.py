@@ -129,4 +129,6 @@ with define_extraction(phase, area, postgres_pool, mit_pool) as (postgres, mit):
             area,
             term=term_id,
             message=f"Se han ingestado los catálogos de forma exitosa para el periodo {time_period}",
+            aprobar=False,
+            descarga=False
         )
