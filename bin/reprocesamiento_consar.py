@@ -1,6 +1,6 @@
-from profuturo.common import notify, register_time, define_extraction
-from profuturo.database import get_postgres_pool, configure_mit_spark, configure_postgres_spark
-from profuturo.extraction import extract_terms, _get_spark_session, extract_dataset_spark
+from profuturo.common import register_time, define_extraction, notify, truncate_table
+from profuturo.database import get_postgres_pool, get_buc_pool, configure_postgres_spark
+from profuturo.extraction import extract_terms, _get_spark_session, extract_dataset_spark, read_table_insert_temp_view
 from profuturo.reporters import HtmlReporter
 import pyspark.sql.functions as f
 import sys
@@ -24,7 +24,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
     with register_time(postgres_pool, phase, term_id, user, area):
 
         # Getting data from DB
-        query_reproceso = f"""
+        query_reproceso = """
             select distinct msrc.*
             from "GESTOR"."TCGESPRO_MUESTRA_SOL_RE_CONSAR" msrc
             inner join "GESTOR"."TCGESPRO_MUESTRA" m
@@ -35,13 +35,13 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                 on msrc."FCN_ID_MOVIMIENTO_CONSAR" = mpc."FCN_ID_MOVIMIENTO_CONSAR"
             inner join "GESTOR"."TCGESPRO_MOVIMIENTO_PROFUTURO" mp
                 on mpc."FCN_ID_MOVIMIENTO_PROFUTURO" = mp."FTN_ID_MOVIMIENTO_PROFUTURO" 
-            where pa."FCN_ID_AREA" = {area}
+            where pa."FCN_ID_AREA" = :area
                 and pa."FTB_ESTATUS" = true
                 and msrc."FTC_STATUS" = 'Aprobado'
-                and mp."FTB_SWITCH" = true;
+                and mp."FTB_SWITCH" = true
             """
 
-        query_muestra = f"""
+        query_muestra = """
             select distinct m.*
             from "GESTOR"."TCGESPRO_MUESTRA_SOL_RE_CONSAR" msrc
             inner join "GESTOR"."TCGESPRO_MUESTRA" m
@@ -52,14 +52,29 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                 on msrc."FCN_ID_MOVIMIENTO_CONSAR" = mpc."FCN_ID_MOVIMIENTO_CONSAR"
             inner join "GESTOR"."TCGESPRO_MOVIMIENTO_PROFUTURO" mp
                 on mpc."FCN_ID_MOVIMIENTO_PROFUTURO" = mp."FTN_ID_MOVIMIENTO_PROFUTURO" 
-            where pa."FCN_ID_AREA" = {area}
+            where pa."FCN_ID_AREA" = :area
                 and pa."FTB_ESTATUS" = true
                 and msrc."FTC_STATUS" = 'Aprobado'
-                and mp."FTB_SWITCH" = true;
+                and mp."FTB_SWITCH" = true
             """
 
-        df_reproceso = spark.sql(query_reproceso)
-        df_muestra = spark.sql(query_muestra)
+        read_table_insert_temp_view(
+            configure_postgres_spark,
+            query_reproceso,
+            "query_proceso",
+            params={"area": area}
+        )
+
+        read_table_insert_temp_view(
+            configure_postgres_spark,
+            query_muestra,
+            "query_muestra",
+            params={"area": area}
+        )
+
+        print(1)
+        df_reproceso = spark.sql("select * from query_proceso")
+        df_muestra = spark.sql("select * from query_muestra")
 
         id_consar_movements = df_reproceso.select("FCN_ID_MOVIMIENTO_CONSAR").collect()
         id_muestra = df_muestra.select("FTN_ID_MUESTRA").collect()
