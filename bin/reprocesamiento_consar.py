@@ -1,9 +1,11 @@
 from profuturo.common import register_time, define_extraction, notify, truncate_table
 from profuturo.database import get_postgres_pool, get_buc_pool, configure_postgres_spark
-from profuturo.extraction import extract_terms, _get_spark_session, extract_dataset_spark, read_table_insert_temp_view
+from profuturo.extraction import extract_terms, _get_spark_session, extract_dataset_spark, read_table_insert_temp_view, \
+    _write_spark_dataframe
 from profuturo.reporters import HtmlReporter
 import pyspark.sql.functions as f
 import sys
+from sqlalchemy import text, Engine, Connection as conn
 
 html_reporter = HtmlReporter()
 postgres_pool = get_postgres_pool()
@@ -82,31 +84,21 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
         update_df_reproceso = df_reproceso.withColumn("FTC_STATUS", f.lit("Reprocesado"))
         update_df_muestra = df_muestra.withColumn("FTC_ESTATUS", f.lit("Reprocesado"))
 
-        #
-        # # Deleting records
-        # spark.sql(f"""
-        #         delete from "GESTOR"."TCGESPRO_MUESTRA_SOL_RE_CONSAR"
-        #         where "FCN_ID_MOVIMIENTO_CONSAR" in {id_consar_movements}
-        #         """)
-        # spark.sql(f"""
-        #         delete from "GESTOR"."TCGESPRO_MUESTRA"
-        #         where "FTN_ID_MUESTRA" in {id_muestra}
-        #         and "FCN_ID_PERIODO" = {term}
-        #         """)
-        #
-        # # Upload updating data
-        # _write_spark_dataframe(update_df_reproceso, configure_postgres_spark,
-        #                        '"GESTOR"."TCGESPRO_MUESTRA_SOL_RE_CONSAR"')
-        # _write_spark_dataframe(update_df_muestra, configure_postgres_spark, '"GESTOR"."TCGESPRO_MUESTRA"')
 
-        configure_postgres_spark(update_df_reproceso.write, '"GESTOR"."TCGESPRO_MUESTRA_SOL_RE_CONSAR"', False) \
-            .mode("overwrite") \
-            .condition(f.col('FCN_ID_MOVIMIENTO_CONSAR').isin(id_consar_movements)) \
-            .save()
-        configure_postgres_spark(update_df_muestra.write, '"GESTOR"."TCGESPRO_MUESTRA"', False) \
-            .mode("overwrite") \
-            .condition(f.col('FTN_ID_MUESTRA').isin(id_consar_movements) & f.col('FCN_ID_PERIODO') == term) \
-            .save()
+        # Deleting records
+        conn.execute(text("""delete from "GESTOR"."TCGESPRO_MUESTRA_SOL_RE_CONSAR"
+                where "FCN_ID_MOVIMIENTO_CONSAR" in :id_consar_movements"""), {"id_consar_movements": id_consar_movements})
+        conn.execute(text("""
+                delete from "GESTOR"."TCGESPRO_MUESTRA"
+                where "FTN_ID_MUESTRA" in :id_muestra
+                and "FCN_ID_PERIODO" = :term
+                """),{"id_muestra": id_muestra, "term": term})
+
+
+        # Upload updating data
+        _write_spark_dataframe(update_df_reproceso, configure_postgres_spark,
+                               '"GESTOR"."TCGESPRO_MUESTRA_SOL_RE_CONSAR"')
+        _write_spark_dataframe(update_df_muestra, configure_postgres_spark, '"GESTOR"."TCGESPRO_MUESTRA"')
 
         spark.sql(f"""
                         delete from "HECHOS"."TTHECHOS_MOVIMIENTO"
