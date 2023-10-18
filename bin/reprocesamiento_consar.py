@@ -78,95 +78,96 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
         df_reproceso = spark.sql("select * from query_proceso")
         df_muestra = spark.sql("select * from query_muestra")
 
-        id_consar_movements = df_reproceso.select("FCN_ID_MOVIMIENTO_CONSAR").collect()
-        id_muestra = df_muestra.select("FTN_ID_MUESTRA").collect()
+        id_consar_movements = (data[0] for data in df_reproceso.select("FCN_ID_MOVIMIENTO_CONSAR").collect())
+        id_muestra = (data[0] for data in df_muestra.select("FTN_ID_MUESTRA").collect())
 
         update_df_reproceso = df_reproceso.withColumn("FTC_STATUS", f.lit("Reprocesado"))
         update_df_muestra = df_muestra.withColumn("FTC_ESTATUS", f.lit("Reprocesado"))
 
+        with postgres_pool.connect() as conn:
+            # Deleting records
+            conn.execute(text("""delete from "GESTOR"."TCGESPRO_MUESTRA_SOL_RE_CONSAR"
+                    where "FCN_ID_MOVIMIENTO_CONSAR" in :id_consar_movements"""), {"id_consar_movements": id_consar_movements})
 
-        # Deleting records
-        conn.execute(text("""delete from "GESTOR"."TCGESPRO_MUESTRA_SOL_RE_CONSAR"
-                where "FCN_ID_MOVIMIENTO_CONSAR" in :id_consar_movements"""), {"id_consar_movements": id_consar_movements})
-        conn.execute(text("""
-                delete from "GESTOR"."TCGESPRO_MUESTRA"
-                where "FTN_ID_MUESTRA" in :id_muestra
-                and "FCN_ID_PERIODO" = :term
-                """),{"id_muestra": id_muestra, "term": term})
-
-
-        # Upload updating data
-        _write_spark_dataframe(update_df_reproceso, configure_postgres_spark,
-                               '"GESTOR"."TCGESPRO_MUESTRA_SOL_RE_CONSAR"')
-        _write_spark_dataframe(update_df_muestra, configure_postgres_spark, '"GESTOR"."TCGESPRO_MUESTRA"')
-
-        conn.execute(text("""
-                        delete from "HECHOS"."TTHECHOS_MOVIMIENTO"
-                        where "FCN_ID_PERIODO" = :term
-                        and "FCN_ID_CONCEPTO_MOVIMIENTO" in :id_consar_movements
-                        """), {"id_consar_movements": id_consar_movements, "term": term})
+            conn.execute(text("""
+                    delete from "GESTOR"."TCGESPRO_MUESTRA"
+                    where "FTN_ID_MUESTRA" in :id_muestra
+                    and "FCN_ID_PERIODO" = :term
+                    """),{"id_muestra": id_muestra, "term": term})
 
 
-        mov_tables_ref = ["TTAFOGRAL_MOV_AVOL", "TTAFOGRAL_MOV_RCV", "TTAFOGRAL_MOV_COMP"]
-        mov_tables = ["TTAFOGRAL_MOV_BONO", "TTAFOGRAL_MOV_GOB", "TTAFOGRAL_MOV_SAR", "TTAFOGRAL_MOV_VIV"]
+            # Upload updating data
+            _write_spark_dataframe(update_df_reproceso, configure_postgres_spark,
+                                   '"GESTOR"."TCGESPRO_MUESTRA_SOL_RE_CONSAR"')
+            _write_spark_dataframe(update_df_muestra, configure_postgres_spark, '"GESTOR"."TCGESPRO_MUESTRA"')
 
-        for mov_table_ref in mov_tables_ref:
-            query_mov_ref = f"""
+            conn.execute(text("""
+                            delete from "HECHOS"."TTHECHOS_MOVIMIENTO"
+                            where "FCN_ID_PERIODO" = :term
+                            and "FCN_ID_CONCEPTO_MOVIMIENTO" in :id_consar_movements
+                            """), {"id_consar_movements": id_consar_movements, "term": term})
+
+
+            mov_tables_ref = ["TTAFOGRAL_MOV_AVOL", "TTAFOGRAL_MOV_RCV", "TTAFOGRAL_MOV_COMP"]
+            mov_tables = ["TTAFOGRAL_MOV_BONO", "TTAFOGRAL_MOV_GOB", "TTAFOGRAL_MOV_SAR", "TTAFOGRAL_MOV_VIV"]
+
+            for mov_table_ref in mov_tables_ref:
+                query_mov_ref = f"""
+                        SELECT FTN_NUM_CTA_INVDUAL AS FCN_CUENTA,
+                               FCN_ID_TIPO_MOV AS FCN_ID_TIPO_MOVIMIENTO,
+                               FCN_ID_CONCEPTO_MOV AS FCN_ID_CONCEPTO_MOVIMIENTO,
+                               FCN_ID_TIPO_SUBCTA,
+                               FCN_ID_SIEFORE,
+                               FTC_FOLIO,
+                               FNN_ID_REFERENCIA AS FTN_REFERENCIA,
+                               FTF_MONTO_ACCIONES,
+                               ROUND(DT.FTF_MONTO_PESOS, 2) AS FTF_MONTO_PESOS,
+                               FTD_FEH_LIQUIDACION,
+                               'M' AS FTC_BD_ORIGEN
+                        FROM {mov_table_ref}
+                        WHERE FTD_FEH_LIQUIDACION BETWEEN :start AND :end
+                        AND FCN_ID_CONCEPTO_MOVIMIENTO IN {id_consar_movements}
+                        AND "FCN_ID_PERIODO" = {term}
+                        """
+                extract_dataset_spark(configure_mit_spark, configure_postgres_spark, query_mov_ref, table, term=term_id,
+                                      params={"start": start_month, "end": end_month})
+
+            for mov_table in mov_tables:
+                query_mov = f"""
                     SELECT FTN_NUM_CTA_INVDUAL AS FCN_CUENTA,
                            FCN_ID_TIPO_MOV AS FCN_ID_TIPO_MOVIMIENTO,
                            FCN_ID_CONCEPTO_MOV AS FCN_ID_CONCEPTO_MOVIMIENTO,
                            FCN_ID_TIPO_SUBCTA,
                            FCN_ID_SIEFORE,
                            FTC_FOLIO,
-                           FNN_ID_REFERENCIA AS FTN_REFERENCIA,
                            FTF_MONTO_ACCIONES,
-                           ROUND(DT.FTF_MONTO_PESOS, 2) AS FTF_MONTO_PESOS,
+                           ROUND(FTF_MONTO_PESOS, 2) AS FTF_MONTO_PESOS,
                            FTD_FEH_LIQUIDACION,
                            'M' AS FTC_BD_ORIGEN
-                    FROM {mov_table_ref}
+                    FROM {mov_table}
                     WHERE FTD_FEH_LIQUIDACION BETWEEN :start AND :end
                     AND FCN_ID_CONCEPTO_MOVIMIENTO IN {id_consar_movements}
                     AND "FCN_ID_PERIODO" = {term}
                     """
-            extract_dataset_spark(configure_mit_spark, configure_postgres_spark, query_mov_ref, table, term=term_id,
-                                  params={"start": start_month, "end": end_month})
+                extract_dataset_spark(configure_mit_spark, configure_postgres_spark, query_mov, table, term=term_id,
+                                      params={"start": start_month, "end": end_month})
 
-        for mov_table in mov_tables:
-            query_mov = f"""
-                SELECT FTN_NUM_CTA_INVDUAL AS FCN_CUENTA,
-                       FCN_ID_TIPO_MOV AS FCN_ID_TIPO_MOVIMIENTO,
-                       FCN_ID_CONCEPTO_MOV AS FCN_ID_CONCEPTO_MOVIMIENTO,
-                       FCN_ID_TIPO_SUBCTA,
-                       FCN_ID_SIEFORE,
-                       FTC_FOLIO,
-                       FTF_MONTO_ACCIONES,
-                       ROUND(FTF_MONTO_PESOS, 2) AS FTF_MONTO_PESOS,
-                       FTD_FEH_LIQUIDACION,
-                       'M' AS FTC_BD_ORIGEN
-                FROM {mov_table}
-                WHERE FTD_FEH_LIQUIDACION BETWEEN :start AND :end
-                AND FCN_ID_CONCEPTO_MOVIMIENTO IN {id_consar_movements}
-                AND "FCN_ID_PERIODO" = {term}
-                """
-            extract_dataset_spark(configure_mit_spark, configure_postgres_spark, query_mov, table, term=term_id,
-                                  params={"start": start_month, "end": end_month})
+            # Cifras de control
+            report = html_reporter.generate(
+                postgres,
+                query_reproceso,
+                ["Solicitud de Reproceso", "ID Muestra", "ID Movimiento CONSAR", "Estatus", "Comentario Solicitud",
+                 "Comentario Estatus"],
+                [],
+                params={"term": term_id},
+            )
 
-        # Cifras de control
-        report = html_reporter.generate(
-            postgres,
-            query_reproceso,
-            ["Solicitud de Reproceso", "ID Muestra", "ID Movimiento CONSAR", "Estatus", "Comentario Solicitud",
-             "Comentario Estatus"],
-            [],
-            params={"term": term_id},
-        )
-
-        notify(
-            postgres,
-            f"Cifras de control de reprocesamiento consar",
-            phase,
-            area,
-            term=term_id,
-            message=f"Se han generado las cifras de control para reprocesamiento consar exitosamente para el periodo {time_period}",
-            details=report,
-        )
+            notify(
+                postgres,
+                f"Cifras de control de reprocesamiento consar",
+                phase,
+                area,
+                term=term_id,
+                message=f"Se han generado las cifras de control para reprocesamiento consar exitosamente para el periodo {time_period}",
+                details=report,
+            )

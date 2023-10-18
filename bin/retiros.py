@@ -27,7 +27,8 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
     with register_time(postgres_pool, phase, area, usuario=user, term=term_id):
         truncate_table(postgres, 'TTHECHOS_RETIRO', term=term_id)
         query_liquidaciones = """
-            WITH LIQ_SOLICITUDES AS (
+        
+                    WITH LIQ_SOLICITUDES AS (
             SELECT
             tthls.FTC_FOLIO,
             tthls.FTC_FOLIO_REL,
@@ -267,23 +268,12 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
             FROM BENEFICIOS.TTCRXGRAL_PAGO ttcp
             INNER JOIN CIERREN.TCCRXGRAL_CAT_CATALOGO thccc
             ON ttcp.FCC_CVE_BANCO = thccc.FCN_ID_CAT_CATALOGO
+            where ttcp.FTN_NUM_REEXP = 1
+
             )
             , DATOS_PAGO AS (
             SELECT
-            FTC_FOLIO,
-            FCN_ID_PROCESO,
-            FCN_ID_SUBPROCESO,
-            FCN_TIPO_PAGO,
-            FTC_FOLIO_LIQUIDACION,
-            FTD_FEH_CRE,
-            FCC_CVE_BANCO,
-            FTN_ISR,
-            FCN_ID_CAT_CATALOGO,
-            FCC_TIPO_BANCO,
-            FCC_MEDIO_PAGO
-            FROM (
-            SELECT
-            ROW_NUMBER() over (PARTITION BY FTC_FOLIO ORDER BY FTD_FEH_CRE DESC)  rownumid,
+            --ROW_NUMBER() over (PARTITION BY FTC_FOLIO ORDER BY FTD_FEH_CRE DESC)  rownumid,
             ptp.FTC_FOLIO,
             ptp.FCN_ID_PROCESO,
             ptp.FCN_ID_SUBPROCESO,
@@ -291,15 +281,25 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
             ptp.FTC_FOLIO_LIQUIDACION,
             ptp.FTD_FEH_CRE,
             ptp.FCC_CVE_BANCO,
-            ptp.FTN_ISR,
+            round(sum(ptp.FTN_ISR),2) as FTN_ISR,
             ptp.FCN_ID_CAT_CATALOGO,
             ptp.FCC_VALOR  AS FCC_TIPO_BANCO,
             thccc.FCC_DESC AS FCC_MEDIO_PAGO
             FROM PAGO_TIPO_BANCO ptp
             INNER JOIN CIERREN.TCCRXGRAL_CAT_CATALOGO thccc
             ON ptp.FCN_TIPO_PAGO = thccc.FCN_ID_CAT_CATALOGO
-            )
-            WHERE rownumid = 1
+            group by
+            ptp.FTC_FOLIO,
+            ptp.FCN_ID_PROCESO,
+            ptp.FCN_ID_SUBPROCESO,
+            ptp.FCN_TIPO_PAGO,
+            ptp.FTC_FOLIO_LIQUIDACION,
+            ptp.FTD_FEH_CRE,
+            ptp.FCC_CVE_BANCO,
+            ptp.FCN_ID_CAT_CATALOGO,
+            ptp.FCC_VALOR,
+            thccc.FCC_DESC
+            --WHERE rownumid = 1
             ), LIQUIDACIONES AS (
             SELECT
             FTC_FOLIO,
@@ -428,9 +428,16 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
             D.FCN_ID_PROCESO,
             D.FCN_ID_SUBPROCESO,
             D.FCN_ID_ESTATUS,
-            (D.FTF_MONTO_LIQUIDADO - P.FTN_ISR) AS FTF_MONTO_LIQUIDADO,
+            D.FTF_MONTO_LIQUIDADO,
+            CASE FTN_TIPO_AHORRO
+            WHEN 0 THEN (D.FTF_MONTO_LIQUIDADO - P.FTN_ISR)
+            WHEN 1 THEN D.FTF_MONTO_LIQUIDADO
+            END FTF_MONTO_LIQ,
+            CASE FTN_TIPO_AHORRO
+            WHEN 0 THEN P.FTN_ISR
+            WHEN 1 THEN 0
+            END FTN_ISR_LIQ,
             P.FCC_CVE_BANCO,
-            P.FTN_ISR,
             P.FCC_TIPO_BANCO,
             P.FCC_MEDIO_PAGO,
             D.FTC_TIPO_TRAMITE,
@@ -498,228 +505,11 @@ with define_extraction(phase, postgres_pool, mit_pool) as (postgres, mit):
             FROM DIS_TRANS D
             INNER JOIN DATOS_PAGO P
             ON D.FTC_FOLIO = P.FTC_FOLIO
+            --where d.FTC_FOLIO = 202303211253444562
         """
 
         query_saldos ="""
-            WITH LIQ_SOLICITUDES AS (
-            SELECT
-            tthls.FTC_FOLIO,
-            tthls.FTC_FOLIO_REL,
-            tthls.FTN_NUM_CTA_INVDUAL,
-            tthls.FCN_ID_PROCESO,
-            tthls.FCN_ID_SUBPROCESO,
-            tthls.FCN_ID_ESTATUS,
-            tthls.FTB_IND_FOLIO_AGRUP,
-            tthls.FTC_NSS,
-            tthls.FTC_CURP,
-            tthls.FTD_FEH_CRE, -- CONDICION
-            tthls.FTC_USU_CRE,
-            tthls.FTD_FEH_ACT,
-            tthls.FTC_USU_ACT
-            FROM BENEFICIOS.THAFORETI_HIST_LIQ_SOLICITUDES tthls
-            WHERE tthls.FTB_IND_FOLIO_AGRUP = '1'
-            AND tthls.FCN_ID_ESTATUS = 6649
-            AND tthls.FCN_ID_PROCESO IN (4045, 4046, 4047, 4048, 4049, 4050, 4051)
-            AND tthls.FTD_FEH_CRE BETWEEN to_date('01/03/2023', 'dd/MM/yyyy') AND to_date('31/03/2023', 'dd/MM/yyyy') --:start AND :end
-            union all
-            SELECT ttls.FTC_FOLIO,
-            ttls.FTC_FOLIO_REL,
-            ttls.FTN_NUM_CTA_INVDUAL,
-            ttls.FCN_ID_PROCESO,
-            ttls.FCN_ID_SUBPROCESO,
-            ttls.FCN_ID_ESTATUS,
-            ttls.FTB_IND_FOLIO_AGRUP,
-            ttls.FTC_NSS,
-            ttls.FTC_CURP,
-            ttls.FTD_FEH_CRE, -- CONDICION
-            ttls.FTC_USU_CRE,
-            ttls.FTD_FEH_ACT,
-            ttls.FTC_USU_ACT
-            FROM BENEFICIOS.TTAFORETI_LIQ_SOLICITUDES ttls
-            WHERE ttls.FTB_IND_FOLIO_AGRUP = '1'
-            AND ttls.FCN_ID_ESTATUS = 6649
-            AND ttls.FCN_ID_PROCESO IN (4045, 4046, 4047, 4048, 4049, 4050, 4051)
-            AND ttls.FTD_FEH_CRE BETWEEN to_date('01/03/2023', 'dd/MM/yyyy') AND to_date('31/03/2023', 'dd/MM/yyyy')
-            )
-            , LIQ AS (
-            SELECT
-            ls.FTC_FOLIO,
-            ls.FTC_FOLIO_REL,
-            ls.FTN_NUM_CTA_INVDUAL,
-            DT.FCN_ID_TIPO_SUBCTA AS FCN_ID_TIPO_SUBCTA,
-            DT.FCN_ID_SIEFORE AS FCN_ID_SIEFORE,
-            ROUND(DT.FTF_MONTO_PESOS, 2) AS FTF_MONTO_PESOS,
-            DT.FTD_FEH_LIQUIDACION AS FTD_FEH_LIQUIDACION
-            FROM TTAFOGRAL_MOV_RCV DT
-            INNER JOIN LIQ_SOLICITUDES ls
-            ON ls.FTC_FOLIO = DT.FTC_FOLIO AND ls.FTC_FOLIO_REL = DT.FTC_FOLIO_REL
-            UNION ALL
-            SELECT
-            ls.FTC_FOLIO,
-            ls.FTC_FOLIO_REL,
-            ls.FTN_NUM_CTA_INVDUAL,
-            DT.FCN_ID_TIPO_SUBCTA AS FCN_ID_TIPO_SUBCTA,
-            DT.FCN_ID_SIEFORE AS FCN_ID_SIEFORE,
-            ROUND(DT.FTF_MONTO_PESOS, 2) AS FTF_MONTO_PESOS,
-            DT.FTD_FEH_LIQUIDACION AS FTD_FEH_LIQUIDACION
-            FROM TTAFOGRAL_MOV_GOB DT
-            INNER JOIN LIQ_SOLICITUDES ls
-            ON ls.FTC_FOLIO = DT.FTC_FOLIO AND ls.FTC_FOLIO_REL = DT.FTC_FOLIO_REL
-            UNION ALL
-            SELECT
-            ls.FTC_FOLIO,
-            ls.FTC_FOLIO_REL,
-            ls.FTN_NUM_CTA_INVDUAL,
-            DT.FCN_ID_TIPO_SUBCTA AS FCN_ID_TIPO_SUBCTA,
-            DT.FCN_ID_SIEFORE AS FCN_ID_SIEFORE,
-            ROUND(DT.FTF_MONTO_PESOS, 2) AS FTF_MONTO_PESOS,
-            DT.FTD_FEH_LIQUIDACION AS FTD_FEH_LIQUIDACION
-            FROM TTAFOGRAL_MOV_VIV DT
-            INNER JOIN LIQ_SOLICITUDES ls
-            ON ls.FTC_FOLIO = DT.FTC_FOLIO AND ls.FTC_FOLIO_REL = DT.FTC_FOLIO_REL
-            UNION ALL
-            SELECT
-            ls.FTC_FOLIO,
-            ls.FTC_FOLIO_REL,
-            ls.FTN_NUM_CTA_INVDUAL,
-            DT.FCN_ID_TIPO_SUBCTA AS FCN_ID_TIPO_SUBCTA,
-            DT.FCN_ID_SIEFORE AS FCN_ID_SIEFORE,
-            ROUND(DT.FTF_MONTO_PESOS, 2) AS FTF_MONTO_PESOS,
-            DT.FTD_FEH_LIQUIDACION AS FTD_FEH_LIQUIDACION
-            FROM TTAFOGRAL_MOV_COMP DT
-            INNER JOIN LIQ_SOLICITUDES ls
-            ON ls.FTC_FOLIO = DT.FTC_FOLIO AND ls.FTC_FOLIO_REL = DT.FTC_FOLIO_REL
-            UNION ALL
-            SELECT
-            ls.FTC_FOLIO,
-            ls.FTC_FOLIO_REL,
-            ls.FTN_NUM_CTA_INVDUAL,
-            DT.FCN_ID_TIPO_SUBCTA AS FCN_ID_TIPO_SUBCTA,
-            DT.FCN_ID_SIEFORE AS FCN_ID_SIEFORE,
-            ROUND(DT.FTF_MONTO_PESOS, 2) AS FTF_MONTO_PESOS,
-            DT.FTD_FEH_LIQUIDACION AS FTD_FEH_LIQUIDACION
-            FROM TTAFOGRAL_MOV_SAR DT
-            INNER JOIN LIQ_SOLICITUDES ls
-            ON ls.FTC_FOLIO = DT.FTC_FOLIO AND ls.FTC_FOLIO_REL = DT.FTC_FOLIO_REL
-            UNION ALL
-            SELECT
-            ls.FTC_FOLIO,
-            ls.FTC_FOLIO_REL,
-            ls.FTN_NUM_CTA_INVDUAL,
-            DT.FCN_ID_TIPO_SUBCTA AS FCN_ID_TIPO_SUBCTA,
-            DT.FCN_ID_SIEFORE AS FCN_ID_SIEFORE,
-            ROUND(DT.FTF_MONTO_PESOS, 2) AS FTF_MONTO_PESOS,
-            DT.FTD_FEH_LIQUIDACION AS FTD_FEH_LIQUIDACION
-            FROM TTAFOGRAL_MOV_AVOL DT
-            INNER JOIN LIQ_SOLICITUDES ls
-            ON ls.FTC_FOLIO = DT.FTC_FOLIO AND ls.FTC_FOLIO_REL = DT.FTC_FOLIO_REL
-            UNION ALL
-            SELECT
-            ls.FTC_FOLIO,
-            ls.FTC_FOLIO_REL,
-            ls.FTN_NUM_CTA_INVDUAL,
-            DT.FCN_ID_TIPO_SUBCTA AS FCN_ID_TIPO_SUBCTA,
-            DT.FCN_ID_SIEFORE AS FCN_ID_SIEFORE,
-            ROUND(DT.FTF_MONTO_PESOS, 2) AS FTF_MONTO_PESOS,
-            DT.FTD_FEH_LIQUIDACION AS FTD_FEH_LIQUIDACION
-            FROM TTAFOGRAL_MOV_BONO DT
-            INNER JOIN LIQ_SOLICITUDES ls
-            ON ls.FTC_FOLIO = DT.FTC_FOLIO AND ls.FTC_FOLIO_REL = DT.FTC_FOLIO_REL
-            )
-            , SALDOS_INIMES AS (
-            SELECT
-            SH.FTN_NUM_CTA_INVDUAL AS FCN_CUENTA,
-            --SH.FCN_ID_TIPO_SUBCTA,
-            CASE
-            WHEN SH.FCN_ID_TIPO_SUBCTA IN (15, 16) THEN 1
-            ELSE 0
-            END AS TIPO_AHORRO,
-            SH.FTD_FEH_LIQUIDACION,
-            ROUND(SUM(SH.FTN_DIA_ACCIONES * VA.FCN_VALOR_ACCION), 2) AS FTF_SALDO_DIA
-            FROM cierren.thafogral_saldo_historico_v2 SH
-            INNER JOIN cierren.TCCRXGRAL_TIPO_SUBCTA R ON R.FCN_ID_TIPO_SUBCTA = SH.FCN_ID_TIPO_SUBCTA
-            INNER JOIN (
-            SELECT SHMAX.FTN_NUM_CTA_INVDUAL,
-            SHMAX.FCN_ID_SIEFORE,
-            SHMAX.FCN_ID_TIPO_SUBCTA,
-            MAX(TRUNC(SHMAX.FTD_FEH_LIQUIDACION)) AS FTD_FEH_LIQUIDACION
-            FROM cierren.thafogral_saldo_historico_v2 SHMAX
-            WHERE SHMAX.FTD_FEH_LIQUIDACION <= (
-            SELECT MIN(SHMIN.FTD_FEH_LIQUIDACION)
-            FROM cierren.thafogral_saldo_historico_v2 SHMIN
-            WHERE SHMIN.FTD_FEH_LIQUIDACION > to_date('01/03/2023', 'dd/MM/yyyy')
-            )
-            AND SHMAX.FTN_NUM_CTA_INVDUAL IN (SELECT FTN_NUM_CTA_INVDUAL FROM LIQ)
-            AND SHMAX.FCN_ID_TIPO_SUBCTA NOT IN (17, 18)
-            -- AND SHMAX.FCN_ID_SIEFORE
-            GROUP BY SHMAX.FTN_NUM_CTA_INVDUAL, SHMAX.FCN_ID_SIEFORE, SHMAX.FCN_ID_TIPO_SUBCTA
-            ) SHMAXIMO ON SH.FTN_NUM_CTA_INVDUAL = SHMAXIMO.FTN_NUM_CTA_INVDUAL
-            AND SH.FCN_ID_TIPO_SUBCTA = SHMAXIMO.FCN_ID_TIPO_SUBCTA AND SH.FCN_ID_SIEFORE = SHMAXIMO.FCN_ID_SIEFORE
-            AND SH.FTD_FEH_LIQUIDACION = SHMAXIMO.FTD_FEH_LIQUIDACION
-            INNER JOIN (
-            SELECT ROW_NUMBER() OVER(PARTITION BY FCN_ID_SIEFORE, FCN_ID_REGIMEN ORDER BY FCD_FEH_ACCION DESC) AS ROW_NUM,
-            FCN_ID_SIEFORE, FCN_ID_REGIMEN, FCN_VALOR_ACCION, FCD_FEH_ACCION
-            FROM cierren.TCAFOGRAL_VALOR_ACCION
-            WHERE FCD_FEH_ACCION <= to_date('01/03/2023', 'dd/MM/yyyy')
-            ) VA ON SH.FCN_ID_SIEFORE = VA.FCN_ID_SIEFORE
-            AND R.FCN_ID_REGIMEN = VA.FCN_ID_REGIMEN
-            AND VA.ROW_NUM = 1
-            GROUP BY SH.FTN_NUM_CTA_INVDUAL, SH.FCN_ID_SIEFORE,  SH.FTD_FEH_LIQUIDACION ,SH.FCN_ID_TIPO_SUBCTA
-            )
-            ,SALDOS_lIQ AS (
-            SELECT
-            SH.FTN_NUM_CTA_INVDUAL AS FCN_CUENTA,
-            1 as TIPO_AHORRO,
-            SH.FTD_FEH_LIQUIDACION,
-            ROUND(SUM(SH.FTN_DIA_ACCIONES * VA.FCN_VALOR_ACCION), 2) AS FTF_SALDO_DIA
-            FROM cierren.thafogral_saldo_historico_v2 SH
-            INNER JOIN (
-            SELECT
-            SHMAX.FTN_NUM_CTA_INVDUAL,
-            SHMAX.FCN_ID_SIEFORE,
-            SHMAX.FCN_ID_TIPO_SUBCTA,
-            MAX(TRUNC(SHMAX.FTD_FEH_LIQUIDACION)) AS FTD_FEH_LIQUIDACION
-            FROM cierren.thafogral_saldo_historico_v2 SHMAX
-            GROUP BY SHMAX.FTN_NUM_CTA_INVDUAL, SHMAX.FCN_ID_SIEFORE, SHMAX.FCN_ID_TIPO_SUBCTA
-            ) SHMAXIMO
-            ON SH.FTN_NUM_CTA_INVDUAL = SHMAXIMO.FTN_NUM_CTA_INVDUAL
-            AND SH.FCN_ID_TIPO_SUBCTA = SHMAXIMO.FCN_ID_TIPO_SUBCTA
-            AND SH.FCN_ID_SIEFORE = SHMAXIMO.FCN_ID_SIEFORE
-            AND SH.FTD_FEH_LIQUIDACION = SHMAXIMO.FTD_FEH_LIQUIDACION
-            INNER JOIN cierren.TCCRXGRAL_TIPO_SUBCTA R
-            ON R.FCN_ID_TIPO_SUBCTA = SH.FCN_ID_TIPO_SUBCTA
-            INNER JOIN LIQ L
-            ON L.FTN_NUM_CTA_INVDUAL = SH.FTN_NUM_CTA_INVDUAL
-            AND L.FCN_ID_TIPO_SUBCTA = SH.FCN_ID_TIPO_SUBCTA
-            INNER JOIN cierren.TCAFOGRAL_VALOR_ACCION VA
-            ON SH.FCN_ID_SIEFORE = VA.FCN_ID_SIEFORE
-            AND R.FCN_ID_REGIMEN = VA.FCN_ID_REGIMEN
-            AND VA.FCD_FEH_ACCION = SH.FTD_FEH_LIQUIDACION
-            where sh.FCN_ID_TIPO_SUBCTA in (17,18)
-            GROUP BY SH.FTN_NUM_CTA_INVDUAL, SH.FCN_ID_SIEFORE, SH.FCN_ID_TIPO_SUBCTA, SH.FTD_FEH_LIQUIDACION
-            )
-            select
-            FCN_CUENTA,
-            FTC_TIPO_AHORRO,
-            SUM(FTF_SALDO_DIA) AS FTF_SALDO_DIA
-            from
-            (
-            select
-            FCN_CUENTA,
-            TIPO_AHORRO as FTN_TIPO_AHORRO,
-            FTF_SALDO_DIA
-            from SALDOS_LIQ
-            union all
-            select
-            FCN_CUENTA,
-            TIPO_AHORRO as FTC_TIPO_AHORRO,
-            FTF_SALDO_DIA
-            from SALDOS_INIMES
-            ) x
-            GROUP BY
-            FCN_CUENTA,
-            FTN_TIPO_AHORRO,
-            FTF_SALDO_DIA
+            
         """
 
         read_table_insert_temp_view(
