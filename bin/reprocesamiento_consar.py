@@ -1,5 +1,5 @@
-from profuturo.common import register_time, define_extraction, notify, truncate_table
-from profuturo.database import get_postgres_pool, get_buc_pool, configure_postgres_spark
+from profuturo.common import register_time, define_extraction, notify
+from profuturo.database import get_postgres_pool, configure_postgres_spark, configure_mit_spark
 from profuturo.extraction import extract_terms, _get_spark_session, extract_dataset_spark, read_table_insert_temp_view, \
     _write_spark_dataframe
 from profuturo.reporters import HtmlReporter
@@ -100,11 +100,12 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                                '"GESTOR"."TCGESPRO_MUESTRA_SOL_RE_CONSAR"')
         _write_spark_dataframe(update_df_muestra, configure_postgres_spark, '"GESTOR"."TCGESPRO_MUESTRA"')
 
-        spark.sql(f"""
+        conn.execute(text("""
                         delete from "HECHOS"."TTHECHOS_MOVIMIENTO"
-                        where "FCN_ID_PERIODO" = {term}
-                        and "FCN_ID_CONCEPTO_MOVIMIENTO" in {id_consar_movements}
-                        """)
+                        where "FCN_ID_PERIODO" = :term
+                        and "FCN_ID_CONCEPTO_MOVIMIENTO" in :id_consar_movements
+                        """), {"id_consar_movements": id_consar_movements, "term": term})
+
 
         mov_tables_ref = ["TTAFOGRAL_MOV_AVOL", "TTAFOGRAL_MOV_RCV", "TTAFOGRAL_MOV_COMP"]
         mov_tables = ["TTAFOGRAL_MOV_BONO", "TTAFOGRAL_MOV_GOB", "TTAFOGRAL_MOV_SAR", "TTAFOGRAL_MOV_VIV"]
