@@ -70,7 +70,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
 
         notify(
             postgres,
-            f"Cifras de control Comisiones generadas",
+            f"Comisiones",
             phase,
             area,
             term=term_id,

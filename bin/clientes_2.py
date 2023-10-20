@@ -232,7 +232,7 @@ with define_extraction(phase, area, postgres_pool, buc_pool) as (postgres, buc):
 
         notify(
             postgres,
-            f"Clientes ingestados",
+            f"Clientes",
             phase,
             area,
             term=term_id,

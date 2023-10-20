@@ -164,7 +164,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
 
             notify(
                 postgres,
-                f"Cifras de control de reprocesamiento consar",
+                f"Reprocesamiento Consar",
                 phase,
                 area,
                 term=term_id,

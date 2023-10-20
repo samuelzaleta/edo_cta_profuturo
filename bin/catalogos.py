@@ -124,7 +124,7 @@ with define_extraction(phase, area, postgres_pool, mit_pool) as (postgres, mit):
 """
         notify(
             postgres,
-            f"Catálogos ingestados",
+            f"Catálogos",
             phase,
             area,
             term=term_id,

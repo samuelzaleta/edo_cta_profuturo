@@ -74,7 +74,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
 
         notify(
             postgres,
-            f"Indicadores ingestados",
+            f"Indicadores",
             phase,
             area,
             term=term_id,
