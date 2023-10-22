@@ -1,5 +1,5 @@
 from sqlalchemy import text, Engine, Connection
-from datetime import datetime, time, timedelta
+from datetime import time, timedelta
 from contextlib import contextmanager
 from dotenv import load_dotenv
 from typing import Union
@@ -19,7 +19,7 @@ def define_extraction(phase: int, area: int, main_pool: Engine, *pools: Engine):
 @contextmanager
 def register_time(pool: Engine, phase: int, term: int, user: int, area: int):
     with pool.begin() as conn:
-        binnacle_id = register_start(conn, phase, term, user, area, datetime.now())
+        binnacle_id = register_start(conn, phase, term, user, area)
 
     exc = None
     try:
@@ -28,19 +28,18 @@ def register_time(pool: Engine, phase: int, term: int, user: int, area: int):
         exc = e
 
     with pool.begin() as conn:
-        register_end(conn, binnacle_id, datetime.now(), exc)
+        register_end(conn, binnacle_id, exc)
 
 
-def register_start(conn: Connection, phase: int, term: int, user: int, area: int, start: datetime) -> int:
+def register_start(conn: Connection, phase: int, term: int, user: int, area: int) -> int:
     try:
         cursor = conn.execute(text("""
         INSERT INTO "TTGESPRO_BITACORA_ESTADO_CUENTA" (
            "FTD_FECHA_HORA_INICIO", "FCN_ID_PERIODO", "FCN_ID_FASE", "FCN_ID_AREA", "FCN_ID_USUARIO"
         )
-        VALUES (:start, :term, :phase, :area, :user)
+        VALUES (now(), :term, :phase, :area, :user)
         RETURNING "FTN_ID_BITACORA_ESTADO_CUENTA"
         """), {
-            "start": start,
             "phase": phase,
             "term": term,
             "user": user,
@@ -53,26 +52,28 @@ def register_start(conn: Connection, phase: int, term: int, user: int, area: int
         raise ProfuturoException("BINNACLE_ERROR", phase, term) from e
 
 
-def register_end(conn: Connection, binnacle_id: int, end: datetime, exc: Union[Exception, None]) -> None:
+def register_end(conn: Connection, binnacle_id: int, exc: Union[Exception, None]) -> None:
     if exc:
         conn.execute(text("""
         UPDATE "TTGESPRO_BITACORA_ESTADO_CUENTA"
-        SET "FTD_FECHA_HORA_FIN" = :end, "FTC_BANDERA_NIVEL_SERVICIO" = :flag
+        SET "FTD_FECHA_HORA_FIN" = now(), "FTC_BANDERA_NIVEL_SERVICIO" = :flag
         WHERE "FTN_ID_BITACORA_ESTADO_CUENTA" = :id
-        """), {"id": binnacle_id, "end": end, "flag": "Error"})
+        """), {"id": binnacle_id, "flag": "Error"})
 
         raise exc
 
     try:
         cursor = conn.execute(text("""
-        SELECT "FTD_FECHA_HORA_INICIO", "FCN_ID_FASE"
-        FROM "TTGESPRO_BITACORA_ESTADO_CUENTA"
+        UPDATE "TTGESPRO_BITACORA_ESTADO_CUENTA"
+        SET "FTD_FECHA_HORA_FIN" = now()
         WHERE "FTN_ID_BITACORA_ESTADO_CUENTA" = :id
-        """), {'id': binnacle_id})
+        RETURNING "FTD_FECHA_HORA_INICIO", "FTD_FECHA_HORA_FIN", "FCN_ID_FASE"
+        """), {"id": binnacle_id})
 
         binnacle = cursor.fetchone()
         start = binnacle[0]
-        phase = binnacle[1]
+        end = binnacle[1]
+        phase = binnacle[2]
 
         cursor = conn.execute(text("""
         SELECT "FTC_VERDE", "FTC_AMARILLO"
@@ -98,9 +99,9 @@ def register_end(conn: Connection, binnacle_id: int, end: datetime, exc: Union[E
 
         conn.execute(text("""
         UPDATE "TTGESPRO_BITACORA_ESTADO_CUENTA"
-        SET "FTD_FECHA_HORA_FIN" = :end, "FTC_BANDERA_NIVEL_SERVICIO" = :flag
+        SET "FTC_BANDERA_NIVEL_SERVICIO" = :flag
         WHERE "FTN_ID_BITACORA_ESTADO_CUENTA" = :id
-        """), {"id": binnacle_id, "end": end, "flag": flag})
+        """), {"id": binnacle_id, "flag": flag})
     except Exception as e:
         raise ProfuturoException("BINNACLE_ERROR") from e
 
