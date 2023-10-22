@@ -209,19 +209,19 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
 
         notify(
             postgres,
-            f"Cifras de control Movimientos generadas - {datetime.now()}",
+            f"Movimientos",
             phase,
             area,
             term=term_id,
-            message=f"Se han generado las cifras de control para movimientos exitosamente para el periodo {time_period}",
+            message=f"Se han generado las cifras de control para movimientos exitosamente para el periodo",
             details=report1,
         )
         notify(
             postgres,
-            f"Cifras de control Movimientos generadas - {datetime.now()}",
+            f"Movimientos",
             phase,
             area,
             term=term_id,
-            message=f"Se han generado las cifras de control para movimientos exitosamente para el periodo {time_period}",
+            message=f"Se han generado las cifras de control para movimientos exitosamente para el periodo",
             details=report2,
         )

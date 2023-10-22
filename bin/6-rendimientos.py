@@ -64,7 +64,7 @@ with define_extraction(phase, area, postgres_pool, mit_pool) as (postgres, mit):
 
         notify(
             postgres,
-            f"Cifras de control Rendimiento generadas - {datetime.now()}",
+            f"Rendimientos",
             phase,
             area,
             term=term_id,

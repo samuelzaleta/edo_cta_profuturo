@@ -74,10 +74,11 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
 
         notify(
             postgres,
-            f"Indicadores ingestados - {datetime.now()}",
+            f"Indicadores",
             phase,
             area,
             term=term_id,
             message=f"Se han ingestado los indicadores de forma exitosa para el periodo {time_period}",
-            validated=True
+            aprobar=False,
+            descarga=False
         )

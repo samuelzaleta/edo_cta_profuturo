@@ -22,6 +22,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
     spark = _get_spark_session()
 
     with register_time(postgres_pool, phase, term_id, user, area):
+
         truncate_table(postgres, "TCDATMAE_CLIENTE")
         # Extracción
         query = """
@@ -83,7 +84,6 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
             query,
             'cliente',
         )
-
         # Extracción
         truncate_table(postgres, "TCHECHOS_CLIENTE_INDICADOR", term=term_id)
         truncate_table(postgres, "TCHECHOS_CLIENTE", term=term_id)
@@ -206,19 +206,22 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
 
         df = spark.sql(f"""
         WITH indicador_generacion AS (
+            SELECT 
+            DISTINCT 
+            X.FCN_CUENTA,
+            COALESCE(Y.FCC_VALOR, X.FCC_VALOR) AS FCC_VALOR
+            FROM (
             SELECT FCN_CUENTA, FCC_VALOR 
             FROM generacion_afore ga
-
             UNION ALL
-
             SELECT FCN_CUENTA, FCC_VALOR 
             FROM generacion_transicion gt
-
-            UNION ALL
-
-            SELECT FCN_CUENTA, 'MIXTO' /* 4 MIXTO */ AS FCC_VALOR 
+            ) X
+            LEFT JOIN (
+            SELECT DISTINCT FCN_CUENTA, 'MIXTO' /* 4 MIXTO */ AS FCC_VALOR 
             FROM indicador_origen ori
-            WHERE FCC_VALOR = 69
+            WHERE FCC_VALOR = 'MIXTO') Y 
+            ON X.FCN_CUENTA = Y.FCN_CUENTA
         )
         SELECT DISTINCT o.FCN_CUENTA,
                {term_id} AS FCN_ID_PERIODO,
@@ -239,7 +242,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
             LEFT JOIN indicador_bono b ON o.FCN_CUENTA = b.FCN_CUENTA
             LEFT JOIN indicador_tipo_pension tp ON o.FCN_CUENTA = p.FCN_CUENTA
             LEFT JOIN indicador_perfil_inversion i ON o.FCN_CUENTA = i.FCN_CUENTA
-        WHERE o.FCN_CUENTA IN (SELECT FTN_CUENTA FROM cliente)
+        WHERE o.FCN_CUENTA IN (SELECT DISTINCT FTN_CUENTA FROM cliente)
         """)
         #df = df.withColumn("FTO_INDICADORES", to_json(struct(lit('{}'))))
         df.show(2)
@@ -266,10 +269,10 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
 
         notify(
             postgres,
-            f"Clientes ingestados - {datetime.now()}",
+            f"Clientes",
             phase,
             area,
             term=term_id,
-            message=f"Se han ingestado los clientes de forma exitosa para el periodo {time_period}",
+            message=f"Se han ingestado los clientes de forma exitosa para el periodo",
             details=report,
         )
