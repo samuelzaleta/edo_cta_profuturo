@@ -279,6 +279,7 @@ def upsert_dataset(
     term: int = None,
     select_params: Dict[str, Any] = None,
     upsert_params: Dict[str, Any] = None,
+    upsert_id: Callable[[Row], str] = None,
     limit: int = None,
     partition_size: int = 100,
 ):
@@ -298,7 +299,7 @@ def upsert_dataset(
         for i, batch in enumerate(cursor.partitions(partition_size)):
             print(f"Upserting records {i * partition_size} through {(i + 1) * partition_size}")
 
-            batch_set = list(_deduplicate_records(batch))
+            batch_set = list(_deduplicate_records(batch, upsert_id))
             query = upsert_query.replace('(...)', _upsert_values_sentence(upsert_values, len(batch_set)))
 
             params = {}
@@ -354,19 +355,26 @@ def _write_spark_dataframe(df: SparkDataFrame, connection_configurator, table: s
         .mode("append") \
         .save()
 
+
 def _write_spark_dataframe_overwrite(df: SparkDataFrame, connection_configurator, table: str) -> None:
     connection_configurator(df.write, table, False) \
         .mode("overwrite") \
         .save()
 
-def _deduplicate_records(records: Sequence[Row]):
-    ids = set()
+
+def _deduplicate_records(records: Sequence[Row], key_generator: Callable[[Row], str]):
+    if not key_generator:
+        key_generator = lambda row: row[0]
+
+    upserted_ids = set()
 
     for record in records:
-        if record[0] in ids:
+        upsert_id = key_generator(record)
+
+        if upsert_id in upserted_ids:
             continue
 
-        ids.add(record[0])
+        upserted_ids.add(upsert_id)
         yield record
 
 
