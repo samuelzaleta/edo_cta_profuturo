@@ -1,8 +1,8 @@
 from pyspark.sql import SparkSession, DataFrame as SparkDataFrame
 from pyspark.sql.functions import lit
-from sqlalchemy import text, Connection, Row, RowMapping
+from sqlalchemy import text, Connection, Row, RowMapping, Compiled
 from pandas import DataFrame as PandasDataFrame
-from typing import Dict, Any, List, Callable, Sequence
+from typing import Dict, Any, List, Callable, Sequence, Union
 from datetime import datetime, date, time
 from numbers import Number
 from .database import SparkConnectionConfigurator
@@ -176,7 +176,7 @@ def extract_dataset_write_view_spark(
 def extract_dataset_spark(
     origin_configurator: SparkConnectionConfigurator,
     destination_configurator: SparkConnectionConfigurator,
-    query: str,
+    query: Union[str, Compiled],
     table: str,
     term: int = None,
     params: Dict[str, Any] = None,
@@ -185,6 +185,9 @@ def extract_dataset_spark(
 ):
     spark = _get_spark_session()
 
+    if isinstance(query, Compiled):
+        params = query.params
+        query = str(query)
     if params is None:
         params = {}
     if limit is not None:
