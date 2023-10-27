@@ -1,5 +1,5 @@
 from profuturo.common import register_time, define_extraction, notify, truncate_table
-from profuturo.database import get_postgres_pool, get_buc_pool, configure_buc_spark, configure_mit_spark, configure_postgres_spark
+from profuturo.database import get_postgres_pool, configure_buc_spark, configure_mit_spark, configure_postgres_spark
 from profuturo.extraction import _get_spark_session, _write_spark_dataframe, read_table_insert_temp_view
 from profuturo.reporters import HtmlReporter
 from profuturo.extraction import extract_terms
@@ -8,13 +8,12 @@ import sys
 
 html_reporter = HtmlReporter()
 postgres_pool = get_postgres_pool()
-buc_pool = get_buc_pool()
 
 phase = int(sys.argv[1])
 user = int(sys.argv[3])
 area = int(sys.argv[4])
 
-with define_extraction(phase, area, postgres_pool, buc_pool) as (postgres, buc):
+with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, _):
     term = extract_terms(postgres, phase)
     term_id = term["id"]
     time_period = term["time_period"]

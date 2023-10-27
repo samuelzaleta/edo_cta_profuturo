@@ -61,19 +61,20 @@ def get_postgres_conn():
 
 
 def get_integrity_conn(database: str):
-    host = '130.40.30.144'
-    port = int(1730)
-    user = 'SIEFORE'
-    password = 'SIEFORE2019'
+    def creator():
+        host = os.getenv("INTEGRITY_HOST")
+        port = os.getenv("INTEGRITY_PORT")
+        user = os.getenv("INTEGRITY_USER")
+        password = os.getenv("INTEGRITY_PASSWORD")
 
-    print(host, port, user, password, database)
+        return jaydebeapi.connect(
+            "oracle.rdb.jdbc.rdbThin.Driver",
+            f"jdbc:rdbThin://{host}:{port}/mexico$base:{database}@transaction=readonly",
+            {"user": user, "password": password},
+            "/opt/profuturo/libs/RDBTHIN.JAR"
+        )
 
-    return lambda: jaydebeapi.connect(
-        "oracle.rdb.jdbc.rdbThin.Driver",
-        f"jdbc:rdbThin://{host}:{port}/mexico$base:{database}@transaction=readonly",
-        {"user": user, "password": password},
-        "/opt/profuturo/libs/RDBTHIN.JAR"
-    )
+    return creator
 
 
 def get_mit_pool():

@@ -1,8 +1,8 @@
 from pyspark.sql import SparkSession, DataFrame as SparkDataFrame
 from pyspark.sql.functions import lit
-from sqlalchemy import text, Connection, Row, RowMapping
+from sqlalchemy import text, Connection, Row, RowMapping, Compiled
 from pandas import DataFrame as PandasDataFrame
-from typing import Dict, Any, List, Callable, Sequence
+from typing import Dict, Any, List, Callable, Sequence, Union
 from datetime import datetime, date, time
 from numbers import Number
 from .database import SparkConnectionConfigurator
@@ -175,7 +175,7 @@ def extract_dataset_write_view_spark(
 def extract_dataset_spark(
     origin_configurator: SparkConnectionConfigurator,
     destination_configurator: SparkConnectionConfigurator,
-    query: str,
+    query: Union[str, Compiled],
     table: str,
     term: int = None,
     params: Dict[str, Any] = None,
@@ -184,6 +184,9 @@ def extract_dataset_spark(
 ):
     spark = _get_spark_session()
 
+    if isinstance(query, Compiled):
+        params = query.params
+        query = str(query)
     if params is None:
         params = {}
     if limit is not None:
@@ -298,7 +301,7 @@ def upsert_dataset(
         for i, batch in enumerate(cursor.partitions(partition_size)):
             print(f"Upserting records {i * partition_size} through {(i + 1) * partition_size}")
 
-            batch_set = list(_deduplicate_records(batch))
+            batch_set = list(_deduplicate_records(batch, upsert_id))
             query = upsert_query.replace('(...)', _upsert_values_sentence(upsert_values, len(batch_set)))
 
             params = {}
@@ -354,19 +357,26 @@ def _write_spark_dataframe(df: SparkDataFrame, connection_configurator, table: s
         .mode("append") \
         .save()
 
+
 def _write_spark_dataframe_overwrite(df: SparkDataFrame, connection_configurator, table: str) -> None:
     connection_configurator(df.write, table, False) \
         .mode("overwrite") \
         .save()
 
-def _deduplicate_records(records: Sequence[Row]):
-    ids = set()
+
+def _deduplicate_records(records: Sequence[Row], key_generator: Callable[[Row], str]):
+    if not key_generator:
+        key_generator = lambda row: row[0]
+
+    upserted_ids = set()
 
     for record in records:
-        if record[0] in ids:
+        upsert_id = key_generator(record)
+
+        if upsert_id in upserted_ids:
             continue
 
-        ids.add(record[0])
+        upserted_ids.add(upsert_id)
         yield record
 
 

@@ -60,8 +60,6 @@ def transform(df: DataFrame) -> DataFrame:
     return df
 
 
-load_dotenv()
-
 html_reporter = HtmlReporter()
 postgres_pool = get_postgres_pool()
 integrity_pool = get_integrity_pool("cierren")
