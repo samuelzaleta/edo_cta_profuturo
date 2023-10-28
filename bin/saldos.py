@@ -94,7 +94,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
             GROUP BY TS."FCC_VALOR", S."FTC_DESCRIPCION_CORTA",I."FTC_GENERACION" , I."FTC_VIGENCIA", I."FTC_TIPO_CLIENTE", I."FTC_ORIGEN"
             """,
             ["Generación", "Vigencia", "tipo_cliente", "Origen", "Sub cuenta", "SIEFORE"],
-            ["Saldo final en pesos", "Saldo final en acciones"],
+            {"Saldo final en pesos": 2, "Saldo final en acciones": 6},
             params={"term": term_id},
         )
         report2 = html_reporter.generate(
@@ -113,7 +113,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
             GROUP BY TS."FCC_VALOR", S."FTC_DESCRIPCION_CORTA"
             """,
             ["TIPO_SUBCUENTA", "SIEFORE"],
-            ["Saldo final en pesos", "Saldo final en acciones"],
+            {"Saldo final en pesos": 2, "Saldo final en acciones": 6},
             params={"term": term_id},
         )
 

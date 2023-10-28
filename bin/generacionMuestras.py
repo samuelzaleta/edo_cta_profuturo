@@ -1,4 +1,4 @@
-from profuturo.common import define_extraction, register_time, truncate_table
+from profuturo.common import define_extraction, register_time, truncate_table, notify
 from profuturo.database import get_postgres_pool, configure_postgres_spark, configure_bigquery_spark
 from profuturo.extraction import _write_spark_dataframe, extract_terms, _get_spark_session, read_table_insert_temp_view
 from pyspark.sql.functions import concat, col , row_number,lit, current_timestamp
@@ -344,3 +344,14 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
         #_write_spark_dataframe(anverso_df, configure_bigquery_spark, 'ESTADO_CUENTA.TTMUESTR_ANVERSO')
         #_write_spark_dataframe(general_df, configure_bigquery_spark, 'ESTADO_CUENTA.TTMUESTR_GENERAL')
         _write_spark_dataframe(df, configure_postgres_spark, '"GESTOR"."TCGESPRO_MUESTRA"')
+
+        notify(
+            postgres,
+            "Generacion muestras",
+            phase,
+            area,
+            term=term_id,
+            message="Se terminaron de generar las muestras de los estados de cuenta con éxito",
+            aprobar=False,
+            descarga=False,
+        )

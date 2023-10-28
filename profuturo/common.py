@@ -177,9 +177,9 @@ def notify(
         "FTB_CIFRAS_CONTROL", "FCN_ID_PERIODO", "FCN_ID_FASE",
         "FTB_CIFRAS_CONTROL_VALIDADAS", "FTD_FECHA_CREACION",
         "FTB_APROBAR", "FTB_VISUALIZA_CIFRAS", "FTB_REPROCESO",
-        "FTB_DESCARGA"
+        "FTB_DESCARGA", "FCN_ID_AREA"
     )
-    VALUES (:title, :message, :details, :control, :term, :phase, :validated, now(), :aprobar, :visualiza, :reproceso, :descarga)
+    VALUES (:title, :message, :details, :control, :term, :phase, :validated, now(), :aprobar, :visualiza, :reproceso, :descarga, :area)
     RETURNING "FTN_ID_NOTIFICACION"
     """), {
         "title": title,
@@ -192,7 +192,8 @@ def notify(
         "aprobar": aprobar,
         "visualiza": visualiza,
         "reproceso": reproceso,
-        "descarga": descarga
+        "descarga": descarga,
+        "area": area,
     }).fetchone()
 
     for user in users.fetchall():
@@ -205,11 +206,13 @@ def notify(
         })
 
 
-def truncate_table(conn: Connection, table: str, term: int = None) -> None:
+def truncate_table(conn: Connection, table: str, term: int = None, area: int = None) -> None:
     try:
         print(f"Truncating {table}...")
         if term:
-            conn.execute(text(f'DELETE FROM "{table}" WHERE "FCN_ID_PERIODO" = :term'), {"term": term})
+            if area:
+                conn.execute(text(f'DELETE FROM "{table}" WHERE "FCN_ID_PERIODO" = :term and "FCN_ID_AREA" = :area'), {"term": term, "area": area})
+            else: conn.execute(text(f'DELETE FROM "{table}" WHERE "FCN_ID_PERIODO" = :term'), {"term": term})
         else:
             conn.execute(text(f'TRUNCATE TABLE "{table}"'))
         print(f"Truncated {table}!")
