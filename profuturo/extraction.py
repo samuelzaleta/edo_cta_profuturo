@@ -1,6 +1,8 @@
 from pyspark.sql import SparkSession, DataFrame as SparkDataFrame
 from pyspark.sql.functions import lit
-from sqlalchemy import text, Connection, Row, RowMapping, Compiled
+from sqlalchemy.sql.compiler import Compiled
+from sqlalchemy.engine import Row, RowMapping, Connection
+from sqlalchemy import text
 from pandas import DataFrame as PandasDataFrame
 from typing import Dict, Any, List, Callable, Sequence, Union
 from datetime import datetime, date, time

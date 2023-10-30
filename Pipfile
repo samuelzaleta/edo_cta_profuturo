@@ -6,12 +6,12 @@ name = "pypi"
 [packages]
 psycopg2 = "*"
 pandas = "*"
-sqlalchemy = "*"
-oracledb = "*"
+sqlalchemy = "~=1.4"
 profuturo = {editable = true, path = "."}
 jaydebeapi = "*"
 python-dotenv = "*"
 polars = {extras = ["connectorx", "pandas", "pyarrow"], version = "*"}
+cx-oracle = "*"
 
 [dev-packages]
 pyspark = "*"

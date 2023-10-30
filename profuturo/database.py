@@ -1,12 +1,12 @@
 from typing import Union, Callable
 from pyspark.sql import DataFrameReader, DataFrameWriter
 from sqlalchemy.exc import OperationalError
-from sqlalchemy import Engine
+from sqlalchemy.engine import Engine
 from contextlib import ExitStack, contextmanager
 from .exceptions import ProfuturoException
 import jaydebeapi
 import sqlalchemy
-import oracledb
+import cx_Oracle
 import psycopg2
 import os
 
@@ -29,21 +29,29 @@ def use_pools(phase: int, *pools: Engine):
         yield conns
 
 
-def get_mit_conn() -> oracledb.Connection:
-    return oracledb.connect(
-        host=os.getenv("MIT_HOST"),
-        port=int(os.getenv("MIT_PORT")),
+def get_mit_conn() -> cx_Oracle.Connection:
+    dsn = cx_Oracle.makedsn(
+        os.getenv("MIT_HOST"),
+        int(os.getenv("MIT_PORT")),
         service_name=os.getenv("MIT_DATABASE"),
+    )
+
+    return cx_Oracle.connect(
+        dsn=dsn,
         user=os.getenv("MIT_USER"),
         password=os.getenv("MIT_PASSWORD"),
     )
 
 
-def get_buc_conn() -> oracledb.Connection:
-    return oracledb.connect(
-        host=os.getenv("BUC_HOST"),
-        port=int(os.getenv("BUC_PORT")),
+def get_buc_conn() -> cx_Oracle.Connection:
+    dsn = cx_Oracle.makedsn(
+        os.getenv("BUC_HOST"),
+        int(os.getenv("BUC_PORT")),
         service_name=os.getenv("BUC_DATABASE"),
+    )
+
+    return cx_Oracle.connect(
+        dsn=dsn,
         user=os.getenv("BUC_USER"),
         password=os.getenv("BUC_PASSWORD"),
     )
@@ -78,19 +86,19 @@ def get_integrity_conn(database: str):
 
 
 def get_mit_pool():
-    oracledb.init_oracle_client()
+    cx_Oracle.init_oracle_client()
 
     return sqlalchemy.create_engine(
-        "oracle+oracledb://",
+        "oracle+cx_oracle://",
         creator=get_mit_conn,
     )
 
 
 def get_buc_pool():
-    oracledb.init_oracle_client()
+    cx_Oracle.init_oracle_client()
 
     return sqlalchemy.create_engine(
-        "oracle+oracledb://",
+        "oracle+cx_oracle://",
         creator=get_buc_conn,
     )
 

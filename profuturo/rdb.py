@@ -1,7 +1,6 @@
 from types import ModuleType
 from jaydebeapi import Connection as DBConnection
-from sqlalchemy import Connection
-from sqlalchemy.engine import default
+from sqlalchemy.engine import default, Connection
 
 
 class RdbJayDeBeApiDialect(default.DefaultDialect):
@@ -9,7 +8,7 @@ class RdbJayDeBeApiDialect(default.DefaultDialect):
     driver = "jaydebeapi"
 
     @classmethod
-    def import_dbapi(cls) -> ModuleType:
+    def dbapi(cls) -> ModuleType:
         import jaydebeapi
 
         return jaydebeapi
