@@ -1,5 +1,5 @@
 from sqlalchemy.engine import Engine, Connection
-from sqlalchemy import text
+from sqlalchemy import text, delete, column, table, literal
 from datetime import time, timedelta
 from contextlib import contextmanager
 from dotenv import load_dotenv
@@ -207,16 +207,18 @@ def notify(
         })
 
 
-def truncate_table(conn: Connection, table: str, term: int = None, area: int = None) -> None:
+def truncate_table(conn: Connection, table_name: str, term: int = None, area: int = None) -> None:
     try:
-        print(f"Truncating {table}...")
+        print(f"Truncating {table_name}...")
+
+        statement = delete(table(table_name)).where(literal(1) == literal(1))
         if term:
-            if area:
-                conn.execute(text(f'DELETE FROM "{table}" WHERE "FCN_ID_PERIODO" = :term and "FCN_ID_AREA" = :area'), {"term": term, "area": area})
-            else: conn.execute(text(f'DELETE FROM "{table}" WHERE "FCN_ID_PERIODO" = :term'), {"term": term})
-        else:
-            conn.execute(text(f'TRUNCATE TABLE "{table}"'))
-        print(f"Truncated {table}!")
+            statement.where(column("FCN_ID_PERIODO") == literal(term))
+        if area:
+            statement.where(column("FCN_ID_AREA") == literal(area))
+        conn.execute(statement)
+
+        print(f"Truncated {table_name}!")
     except Exception as e:
         raise ProfuturoException.from_exception(e, term) from e
 

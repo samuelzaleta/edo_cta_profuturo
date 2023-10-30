@@ -118,6 +118,12 @@ def get_postgres_pool():
     )
 
 
+def get_bigquery_pool() -> Engine:
+    return sqlalchemy.create_engine(
+        "bigquery://"
+    )
+
+
 def configure_mit_spark(connection: SparkConnection, table: str, reading: bool) -> SparkConnection:
     host = os.getenv("MIT_HOST")
     port = int(os.getenv("MIT_PORT"))

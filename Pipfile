@@ -12,6 +12,7 @@ jaydebeapi = "*"
 python-dotenv = "*"
 polars = {extras = ["connectorx", "pandas", "pyarrow"], version = "*"}
 cx-oracle = "*"
+sqlalchemy-bigquery = {extras = ["bqstorage"], version = "*"}
 
 [dev-packages]
 pyspark = "*"
