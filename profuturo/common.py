@@ -192,7 +192,8 @@ def notify(
         "aprobar": aprobar,
         "visualiza": visualiza,
         "reproceso": reproceso,
-        "descarga": descarga
+        "descarga": descarga,
+        "area": area
     }).fetchone()
 
     for user in users.fetchall():
