@@ -177,9 +177,9 @@ def notify(
         "FTB_CIFRAS_CONTROL", "FCN_ID_PERIODO", "FCN_ID_FASE",
         "FTB_CIFRAS_CONTROL_VALIDADAS", "FTD_FECHA_CREACION",
         "FTB_APROBAR", "FTB_VISUALIZA_CIFRAS", "FTB_REPROCESO",
-        "FTB_DESCARGA"
+        "FTB_DESCARGA", "FCN_ID_AREA"
     )
-    VALUES (:title, :message, :details, :control, :term, :phase, :validated, now(), :aprobar, :visualiza, :reproceso, :descarga)
+    VALUES (:title, :message, :details, :control, :term, :phase, :validated, now(), :aprobar, :visualiza, :reproceso, :descarga, :area)
     RETURNING "FTN_ID_NOTIFICACION"
     """), {
         "title": title,
