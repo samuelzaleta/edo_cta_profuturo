@@ -1,9 +1,9 @@
 from profuturo.common import register_time, define_extraction, notify
 from profuturo.database import get_postgres_pool
-from profuturo.movements import extract_movements_mit
+from profuturo.movements import extract_movements_mit, extract_movements_integrity
 from profuturo.extraction import extract_terms
 from profuturo.reporters import HtmlReporter
-from sqlalchemy import text, Connection
+from sqlalchemy import text
 import sys
 
 html_reporter = HtmlReporter()
@@ -20,10 +20,9 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
     start_month = term["start_month"]
     end_month = term["end_month"]
 
-    postgres: Connection
     with register_time(postgres_pool, phase, term_id, user, area):
         records = postgres.execute(text("""
-        SELECT mr."FTN_ID_SOLICITUD_REPROCESO", mr."FCN_ID_MUESTRA", mp."FTN_ID_MOVIMIENTO_PROFUTURO"
+        SELECT mr."FTN_ID_SOLICITUD_REPROCESO", mr."FCN_ID_MUESTRA", mp."FTN_ID_MOVIMIENTO_PROFUTURO", mp."FTC_ORIGEN"
         FROM "GESTOR"."TCGESPRO_MUESTRA_SOL_RE_CONSAR" mr
             INNER JOIN "GESTOR"."TTGESPRO_MOV_PROFUTURO_CONSAR" mpc ON mr."FCN_ID_MOVIMIENTO_CONSAR" = mpc."FCN_ID_MOVIMIENTO_CONSAR"
             INNER JOIN "GESTOR"."TCGESPRO_MOVIMIENTO_PROFUTURO" mp ON mpc."FCN_ID_MOVIMIENTO_PROFUTURO" = mp."FTN_ID_MOVIMIENTO_PROFUTURO"
@@ -36,19 +35,11 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
 
         reprocess = [record[0] for record in records]
         samples = [record[1] for record in records]
-        movements = [record[2] for record in records]
+        movements_mit = [record[2] for record in filter(lambda record: record[3] == "MIT", records)]
+        movements_integrity = [record[2] for record in filter(lambda record: record[3] == "INTEGRITY", records)]
 
-        postgres.execute(text("""
-        DELETE FROM "HECHOS"."TTHECHOS_MOVIMIENTO"
-        WHERE "FCN_ID_PERIODO" = :term
-          AND "FCN_ID_CONCEPTO_MOVIMIENTO" = ANY(:movements)
-        """), {"term": term_id, "movements": movements})
-
-        for table_name in ["TTAFOGRAL_MOV_AVOL", "TTAFOGRAL_MOV_RCV", "TTAFOGRAL_MOV_COMP"]:
-            extract_movements_mit(table_name, term_id, start_month, end_month, True, movements)
-
-        for table_name in ["TTAFOGRAL_MOV_BONO", "TTAFOGRAL_MOV_GOB", "TTAFOGRAL_MOV_SAR", "TTAFOGRAL_MOV_VIV"]:
-            extract_movements_mit(table_name, term_id, start_month, end_month, False, movements)
+        extract_movements_mit(postgres, term_id, start_month, end_month, movements_mit)
+        extract_movements_integrity(postgres, term_id, start_month, end_month, movements_integrity)
 
         postgres.execute(text("""
         UPDATE "GESTOR"."TCGESPRO_MUESTRA_SOL_RE_CONSAR"

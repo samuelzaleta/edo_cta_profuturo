@@ -155,17 +155,20 @@ def configure_buc_spark(connection: SparkConnection, table: str, reading: bool) 
 
 
 def configure_integrity_spark(database: str) -> SparkConnectionConfigurator:
-    host = '130.40.30.144'
-    port = int(1730)
-    user = 'SIEFORE'
-    password = 'SIEFORE2019'
+    def creator(connection, table, reading):
+        host = os.getenv("INTEGRITY_HOST")
+        port = os.getenv("INTEGRITY_PORT")
+        user = os.getenv("INTEGRITY_USER")
+        password = os.getenv("INTEGRITY_PASSWORD")
 
-    return lambda connection, table, reading: configure_jdbc_spark(connection, table, reading) \
-        .option("url", f"jdbc:rdbThin://{host}:{port}/mexico$base:{database}@transaction=readonly") \
-        .option("driver", "oracle.rdb.jdbc.rdbThin.Driver") \
-        .option("oracle.jdbc.timezoneAsRegion", False) \
-        .option("user", user) \
-        .option("password", password)
+        return configure_jdbc_spark(connection, table, reading) \
+            .option("url", f"jdbc:rdbThin://{host}:{port}/mexico$base:{database}@transaction=readonly") \
+            .option("driver", "oracle.rdb.jdbc.rdbThin.Driver") \
+            .option("oracle.jdbc.timezoneAsRegion", False) \
+            .option("user", user) \
+            .option("password", password)
+
+    return creator
 
 
 def configure_postgres_spark(connection: SparkConnection, table: str, reading: bool) -> SparkConnection:
