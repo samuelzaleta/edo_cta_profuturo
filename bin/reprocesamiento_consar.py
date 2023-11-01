@@ -1,5 +1,5 @@
 from profuturo.common import register_time, define_extraction, notify
-from profuturo.database import get_postgres_pool
+from profuturo.database import get_postgres_pool, get_integrity_pool
 from profuturo.movements import extract_movements_mit, extract_movements_integrity
 from profuturo.extraction import extract_terms
 from profuturo.reporters import HtmlReporter
@@ -41,11 +41,11 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
         extract_movements_mit(postgres, term_id, start_month, end_month, movements_mit)
         extract_movements_integrity(postgres, term_id, start_month, end_month, movements_integrity)
 
-        postgres.execute(text("""
-        UPDATE "GESTOR"."TCGESPRO_MUESTRA_SOL_RE_CONSAR"
-        SET "FTC_STATUS" = 'Reprocesado'
-        WHERE "FTN_ID_SOLICITUD_REPROCESO" = ANY(:reprocess)
-        """), {"reprocess": reprocess})
+        # postgres.execute(text("""
+        # UPDATE "GESTOR"."TCGESPRO_MUESTRA_SOL_RE_CONSAR"
+        # SET "FTC_STATUS" = 'Reprocesado'
+        # WHERE "FTN_ID_SOLICITUD_REPROCESO" = ANY(:reprocess)
+        # """), {"reprocess": reprocess})
 
         # postgres.execute(text("""
         # DELETE FROM "GESTOR"."TCGESPRO_MUESTRA"

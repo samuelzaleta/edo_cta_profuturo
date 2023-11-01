@@ -69,7 +69,7 @@ def extract_movements_integrity(
     for table_name, monpes in normal_tables.items():
         _extract_table_movements_integrity(table_name, term, start, end, lambda df: _transform_mov(df, switches), monpes, movements)
 
-    for table_name, monpes in {"MOV_RCV": [1, 2, 3, 4, 7, 8]}:
+    for table_name, monpes in {"MOV_RCV": [1, 2, 3, 4, 7, 8]}.items():
         _extract_table_movements_integrity(table_name, term, start, end, lambda df: _transform_rcv(df, switches), monpes, movements)
 
 
@@ -134,7 +134,7 @@ def _extract_table_movements_integrity(
         .where(column("CSIE1_CODMOV").in_(movements))
 
     for number in monpes:
-        query.add_columns(f"CSIE1_MONPES_{number}")
+        query.add_columns(column(f"CSIE1_MONPES_{number}"))
 
     extract_dataset_spark(
         configure_integrity_spark("cierren"),
