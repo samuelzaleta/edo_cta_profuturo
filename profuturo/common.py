@@ -1,4 +1,5 @@
-from sqlalchemy import text, Engine, Connection
+from sqlalchemy import text
+from sqlalchemy.engine import Engine, Connection
 from datetime import time, timedelta
 from contextlib import contextmanager
 from dotenv import load_dotenv
