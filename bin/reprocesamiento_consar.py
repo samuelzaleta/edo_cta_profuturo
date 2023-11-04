@@ -54,11 +54,97 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
         # """), {"samples": samples, "term": term_id})
 
         # Cifras de control
+        report_mit_1 = html_reporter.generate(
+            postgres,
+            """
+            SELECT I."FTC_GENERACION" AS GENERACION,
+                   I."FTC_VIGENCIA" AS VIGENCIA,
+                   I."FTC_TIPO_CLIENTE" AS TIPO_CLIENTE,
+                   I."FTC_ORIGEN" AS ORIGEN,
+                   MC."FTC_DESCRIPCION" AS CONSAR,
+                   COUNT(DISTINCT M."FCN_CUENTA") AS CLIENTES,
+                   SUM(M."FTF_MONTO_PESOS") AS IMPORTE
+            FROM "TTHECHOS_MOVIMIENTO" M
+                INNER JOIN "TCHECHOS_CLIENTE" I ON M."FCN_CUENTA" = I."FCN_CUENTA"
+                INNER JOIN "TTGESPRO_MOV_PROFUTURO_CONSAR" PC ON M."FCN_ID_CONCEPTO_MOVIMIENTO" = PC."FCN_ID_MOVIMIENTO_PROFUTURO"
+                INNER JOIN "TCDATMAE_MOVIMIENTO_CONSAR" MC ON PC."FCN_ID_MOVIMIENTO_CONSAR" = MC."FTN_ID_MOVIMIENTO_CONSAR"
+            WHERE M."FCN_ID_PERIODO" = :term
+              AND M."FCN_ID_CONCEPTO_MOVIMIENTO" = ANY(:movements)
+            GROUP BY I."FTC_GENERACION", I."FTC_VIGENCIA", I."FTC_TIPO_CLIENTE", I."FTC_ORIGEN", MC."FTC_DESCRIPCION"
+            """,
+            ["Tipo Generación", "Vigencia", "Tipo Cliente", "Indicador Afiliación", "CONSAR"],
+            ["Registros", "Importe"],
+            params={"term": term_id, "movements": movements_mit},
+        )
+        report_mit_2 = html_reporter.generate(
+            postgres,
+            """
+            --movimientos postgres
+            SELECT g."FTC_PERIODO" AS PERIODO,
+                   s."FTC_DESCRIPCION" AS SIEFORE,
+                   sb."FCC_VALOR" AS SUBCUENTA,
+                   m."FCN_ID_TIPO_MOVIMIENTO",
+                   ROUND(cast(SUM (m."FTF_MONTO_PESOS") as numeric(16,2)),2) as MONTO_PESOS
+            FROM "HECHOS"."TTHECHOS_MOVIMIENTO" m
+                INNER JOIN "MAESTROS"."TCDATMAE_SIEFORE" s ON m."FCN_ID_SIEFORE" = s."FTN_ID_SIEFORE"
+                --INNER JOIN "GESTOR"."TCGESPRO_MOVIMIENTO_PROFUTURO" mp ON mp."FTN_ID_MOVIMIENTO_PROFUTURO" = m."FCN_ID_CONCEPTO_MOVIMIENTO"
+                INNER JOIN "MAESTROS"."TCDATMAE_TIPO_SUBCUENTA" sb ON m."FCN_ID_TIPO_SUBCTA" = sb."FTN_ID_TIPO_SUBCTA"
+                INNER JOIN "GESTOR"."TCGESPRO_PERIODO" g ON g."FTN_ID_PERIODO" = m."FCN_ID_PERIODO"
+            WHERE m."FCN_ID_PERIODO" = :term
+              AND m."FCN_ID_CONCEPTO_MOVIMIENTO" = ANY(:movements)
+            GROUP BY g."FTC_PERIODO", s."FTC_DESCRIPCION", sb."FCC_VALOR", m."FCN_ID_TIPO_MOVIMIENTO"
+            ORDER BY s."FTC_DESCRIPCION", sb."FCC_VALOR"
+            """,
+            ["PERIODO", "SIEFORE", "SUBCUENTA"],
+            ["MONTO_PESOS"],
+            params={"term": term_id, "movements": movements_mit},
+        )
+        report_integrity = html_reporter.generate(
+            postgres,
+            """
+            --movimientos postgres
+            SELECT g."FTC_PERIODO" AS PERIODO,
+                   m."CVE_SIEFORE" AS SIEFORE_INTEGRITY,
+                   m."SUBCUENTA" AS SUBCUENTA,
+                   round(cast(sum(m."MONTO") as numeric(16, 2)), 2) AS MONTO_PESOS
+            FROM "HECHOS"."TTHECHOS_MOVIMIENTOS_INTEGRITY" m
+                -- LEFT JOIN "MAESTROS"."TCDATMAE_SIEFORE" s ON m."FCN_ID_SIEFORE" = s."FTN_ID_SIEFORE"
+                -- INNER JOIN "GESTOR"."TCGESPRO_MOVIMIENTO_PROFUTURO" mp ON mp."FTN_ID_MOVIMIENTO_PROFUTURO" = m."FCN_ID_CONCEPTO_MOVIMIENTO"
+                LEFT JOIN "MAESTROS"."TCDATMAE_TIPO_SUBCUENTA" sb ON m."SUBCUENTA" = sb."FTN_ID_TIPO_SUBCTA"
+                INNER JOIN "GESTOR"."TCGESPRO_PERIODO" g ON g."FTN_ID_PERIODO" = m."FCN_ID_PERIODO"
+            WHERE m."FCN_ID_PERIODO" = :term
+              AND m."CSIE1_CODMOV" = ANY(:movements)
+            GROUP BY g."FTC_PERIODO", m."CVE_SIEFORE", m."SUBCUENTA"
+            """,
+            ["PERIODO", "SIEFORE", "SUBCUENTA"],
+            ["MONTO_PESOS"],
+            params={"term": term_id, "movements": movements_integrity},
+        )
+
         notify(
             postgres,
-            f"Reprocesamiento Consar",
+            "Reproceso Movimientos MIT",
             phase,
             area,
             term=term_id,
-            message=f"Se han generado las cifras de control para reprocesamiento consar exitosamente para el periodo {time_period}",
+            message=f"Se han generado las cifras de control para movimientos exitosamente para el periodo",
+            details=report_mit_1,
+        )
+        notify(
+            postgres,
+            "Reproceso Movimientos MIT",
+            phase,
+            area,
+            term=term_id,
+            message=f"Se han generado las cifras de control para movimientos exitosamente para el periodo",
+            details=report_mit_2,
+        )
+        notify(
+            postgres,
+            "Reproceso Movimientos Integrity",
+            phase,
+            area,
+            term=term_id,
+            message="Se han generado las cifras de control para movimientos integrity exitosamente",
+            details=report_integrity,
         )
