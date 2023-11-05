@@ -33,12 +33,12 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
           -- AND pa."FTB_ESTATUS" = true
         """)).all()
 
-        reprocess = [record[0] for record in records]
-        samples = [record[1] for record in records]
-        movements_mit = [record[2] for record in filter(lambda record: record[3] == "MIT", records)]
-        movements_integrity = [record[2] for record in filter(lambda record: record[3] == "INTEGRITY", records)]
+        reprocess = list({record[0] for record in records})
+        samples = list({record[1] for record in records})
+        movements_mit = list({record[2] for record in filter(lambda record: record[3] == "MIT", records)})
+        movements_integrity = list({record[2] for record in filter(lambda record: record[3] == "INTEGRITY", records)})
 
-        extract_movements_mit(postgres, term_id, start_month, end_month, movements_mit)
+        # extract_movements_mit(postgres, term_id, start_month, end_month, movements_mit)
         extract_movements_integrity(postgres, term_id, start_month, end_month, movements_integrity)
 
         # postgres.execute(text("""

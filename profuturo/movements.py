@@ -5,10 +5,10 @@ from profuturo.rdb import RdbJayDeBeApiDialect
 from sqlalchemy.dialects.oracle.base import OracleDialect
 from sqlalchemy.engine import Connection
 from sqlalchemy import text, select, table, column, literal
+from pyspark.sql.functions import when, lit
+from pyspark.sql import DataFrame
 from typing import Callable, List
 from datetime import datetime
-from pandas import DataFrame
-import numpy as np
 
 
 def extract_movements_mit(
@@ -129,8 +129,8 @@ def _extract_table_movements_integrity(
             column("CSIE1_FECPAG"), column("CSIE1_FECPRO"),
         ) \
         .select_from(table(table_name)) \
-        .where(column("CSIE1_FECCON") >= literal(20230101)) \
-        .where(column("CSIE1_FECCON") <= literal(20230131)) \
+        .where(column("CSIE1_FECCON") >= 20230101) \
+        .where(column("CSIE1_FECCON") <= 20230131) \
         .where(column("CSIE1_CODMOV").in_(movements))
 
     for number in monpes:
@@ -148,31 +148,29 @@ def _extract_table_movements_integrity(
 
 def _transform_rcv(df: DataFrame, switches) -> DataFrame:
     # Transformaciones adicionales de MOV_RCV
-    df["CSIE1_CODMOV"] = np.where(
+    df.withColumn("CSIE1_CODMOV", when(
         (df["CSIE1_CODMOV"] >= 114) & (df["CSIE1_NSSEMP"] == "INT. RET08"),
-        117,
-        df["CSIE1_CODMOV"],
-    )
-    df["CSIE1_CODMOV"] = np.where(
+        117
+    ).otherwise(df("CSIE1_CODMOV")))
+    df.withColumn("CSIE1_CODMOV", when(
         (df["CSIE1_CODMOV"] >= 114) & (df["CSIE1_NSSEMP"] == "INT. CYVTRA"),
-        117,
-        df["CSIE1_CODMOV"],
-    )
+        117
+    ).otherwise(df["CSIE1_CODMOV"]))
 
     return _transform_mov(df, switches)
 
 
 def _transform_mov(df: DataFrame, switches) -> DataFrame:
     # ¿Afiliado o asignado?
-    df["SAL-AFIL-ASIG"] = np.where(df["CSIE1_NUMCUE"] < 7_000_000_000, 1, 2)
+    df.withColumn("SAL-AFIL-ASIG", when(df["CSIE1_NUMCUE"] < 7_000_000_000, 1).otherwise(2))
 
     # Si la SIEFORE es 98, toma el valor de 14
-    df["CVE_SIEFORE"] = np.where(df["CVE_SIEFORE"] == 98, 14, df["CVE_SIEFORE"])
+    df.withColumn("CVE_SIEFORE", when(df["CVE_SIEFORE"] == 98, 14).otherwise(df["CVE_SIEFORE"]))
     # Si la SIEFORE es 99, toma el valor de 15
-    df["CVE_SIEFORE"] = np.where(df["CVE_SIEFORE"] == 99, 15, df["CVE_SIEFORE"])
+    df.withColumn("CVE_SIEFORE", when(df["CVE_SIEFORE"] == 99, 15).otherwise(df["CVE_SIEFORE"]))
 
-    df["SUBCUENTA"] = 0
-    df["MONTO"] = 0
+    df.withColumn("SUBCUENTA", lit(0))
+    df.withColumn("MONTO", lit(0))
     # Extrae los MONPES en base a los switches
     for switch in switches:
         codmov = switch[0]
@@ -182,15 +180,13 @@ def _transform_mov(df: DataFrame, switches) -> DataFrame:
         if monpes not in df.columns:
             continue
 
-        df["SUBCUENTA"] = np.where(
+        df.withColumn("SUBCUENTA", when(
             (df["CSIE1_CODMOV"] == codmov) & (df[monpes] > 0),
             subcuenta,
-            df["SUBCUENTA"],
-        )
-        df["MONTO"] = np.where(
+        ).otherwise(df["SUBCUENTA"]))
+        df.withColumn("MONTO", when(
             (df["CSIE1_CODMOV"] == codmov) & (df[monpes] > 0),
             df[monpes],
-            df["MONTO"]
-        )
+        ).otherwise(df["MONTO"]))
 
     return df
