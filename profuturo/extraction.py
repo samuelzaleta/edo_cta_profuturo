@@ -103,6 +103,9 @@ def extract_dataset(
     limit: int = None,
     transform: Callable[[PandasDataFrame], PandasDataFrame] = None,
 ):
+    if isinstance(query, Compiled):
+        params = query.params
+        query = str(query)
     if params is None:
         params = {}
     if limit is not None:

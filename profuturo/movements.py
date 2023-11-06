@@ -1,14 +1,14 @@
 from profuturo.common import truncate_table
-from profuturo.database import configure_mit_spark, configure_postgres_spark, configure_integrity_spark
-from profuturo.extraction import extract_dataset_spark
+from profuturo.database import configure_mit_spark, configure_postgres_spark
+from profuturo.extraction import extract_dataset_spark, extract_dataset
 from profuturo.rdb import RdbJayDeBeApiDialect
 from sqlalchemy.dialects.oracle.base import OracleDialect
 from sqlalchemy.engine import Connection
 from sqlalchemy import text, select, table, column, literal
-from pyspark.sql.functions import when, lit
 from pyspark.sql import DataFrame
 from typing import Callable, List
 from datetime import datetime
+import numpy as np
 
 
 def extract_movements_mit(
@@ -35,6 +35,7 @@ def extract_movements_mit(
 
 
 def extract_movements_integrity(
+    integrity: Connection,
     postgres: Connection,
     term: int,
     start: datetime,
@@ -67,10 +68,10 @@ def extract_movements_integrity(
         "MOV_BONO_UDI": [1, 3],
     }
     for table_name, monpes in normal_tables.items():
-        _extract_table_movements_integrity(table_name, term, start, end, lambda df: _transform_mov(df, switches), monpes, movements)
+        _extract_table_movements_integrity(integrity, postgres, table_name, term, start, end, lambda df: _transform_mov(df, switches), monpes, movements)
 
     for table_name, monpes in {"MOV_RCV": [1, 2, 3, 4, 7, 8]}.items():
-        _extract_table_movements_integrity(table_name, term, start, end, lambda df: _transform_rcv(df, switches), monpes, movements)
+        _extract_table_movements_integrity(integrity, postgres, table_name, term, start, end, lambda df: _transform_rcv(df, switches), monpes, movements)
 
 
 def _extract_table_movements_mit(table_name: str, term: int, start: datetime, end: datetime, with_reference: bool, movements=None):
@@ -107,6 +108,8 @@ def _extract_table_movements_mit(table_name: str, term: int, start: datetime, en
 
 
 def _extract_table_movements_integrity(
+    integrity: Connection,
+    postgres: Connection,
     table_name: str,
     term: int,
     start: datetime,
@@ -136,9 +139,9 @@ def _extract_table_movements_integrity(
     for number in monpes:
         query.add_columns(column(f"CSIE1_MONPES_{number}"))
 
-    extract_dataset_spark(
-        configure_integrity_spark("cierren"),
-        configure_postgres_spark,
+    extract_dataset(
+        integrity,
+        postgres,
         query.compile(dialect=RdbJayDeBeApiDialect(), compile_kwargs={"render_postcompile": True}),
         table='"HECHOS"."TTHECHOS_MOVIMIENTOS_INTEGRITY"',
         term=term,
@@ -148,29 +151,31 @@ def _extract_table_movements_integrity(
 
 def _transform_rcv(df: DataFrame, switches) -> DataFrame:
     # Transformaciones adicionales de MOV_RCV
-    df.withColumn("CSIE1_CODMOV", when(
+    df["CSIE1_CODMOV"] = np.where(
         (df["CSIE1_CODMOV"] >= 114) & (df["CSIE1_NSSEMP"] == "INT. RET08"),
-        117
-    ).otherwise(df("CSIE1_CODMOV")))
-    df.withColumn("CSIE1_CODMOV", when(
+        117,
+        df["CSIE1_CODMOV"],
+    )
+    df["CSIE1_CODMOV"] = np.where(
         (df["CSIE1_CODMOV"] >= 114) & (df["CSIE1_NSSEMP"] == "INT. CYVTRA"),
-        117
-    ).otherwise(df["CSIE1_CODMOV"]))
+        117,
+        df["CSIE1_CODMOV"],
+    )
 
     return _transform_mov(df, switches)
 
 
 def _transform_mov(df: DataFrame, switches) -> DataFrame:
     # ¿Afiliado o asignado?
-    df.withColumn("SAL-AFIL-ASIG", when(df["CSIE1_NUMCUE"] < 7_000_000_000, 1).otherwise(2))
+    df["SAL-AFIL-ASIG"] = np.where(df["CSIE1_NUMCUE"] < 7_000_000_000, 1, 2)
 
     # Si la SIEFORE es 98, toma el valor de 14
-    df.withColumn("CVE_SIEFORE", when(df["CVE_SIEFORE"] == 98, 14).otherwise(df["CVE_SIEFORE"]))
+    df["CVE_SIEFORE"] = np.where(df["CVE_SIEFORE"] == 98, 14, df["CVE_SIEFORE"])
     # Si la SIEFORE es 99, toma el valor de 15
-    df.withColumn("CVE_SIEFORE", when(df["CVE_SIEFORE"] == 99, 15).otherwise(df["CVE_SIEFORE"]))
+    df["CVE_SIEFORE"] = np.where(df["CVE_SIEFORE"] == 99, 15, df["CVE_SIEFORE"])
 
-    df.withColumn("SUBCUENTA", lit(0))
-    df.withColumn("MONTO", lit(0))
+    df["SUBCUENTA"] = 0
+    df["MONTO"] = 0
     # Extrae los MONPES en base a los switches
     for switch in switches:
         codmov = switch[0]
@@ -180,13 +185,15 @@ def _transform_mov(df: DataFrame, switches) -> DataFrame:
         if monpes not in df.columns:
             continue
 
-        df.withColumn("SUBCUENTA", when(
+        df["SUBCUENTA"] = np.where(
             (df["CSIE1_CODMOV"] == codmov) & (df[monpes] > 0),
             subcuenta,
-        ).otherwise(df["SUBCUENTA"]))
-        df.withColumn("MONTO", when(
+            df["SUBCUENTA"],
+        )
+        df["MONTO"] = np.where(
             (df["CSIE1_CODMOV"] == codmov) & (df[monpes] > 0),
             df[monpes],
-        ).otherwise(df["MONTO"]))
+            df["MONTO"]
+        )
 
     return df

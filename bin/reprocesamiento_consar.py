@@ -1,6 +1,6 @@
 from profuturo.common import register_time, define_extraction, notify
 from profuturo.database import get_postgres_pool, get_integrity_pool
-from profuturo.movements import extract_movements_mit, extract_movements_integrity
+from profuturo.movements import extract_movements_integrity, extract_movements_mit
 from profuturo.extraction import extract_terms
 from profuturo.reporters import HtmlReporter
 from sqlalchemy import text
@@ -8,12 +8,13 @@ import sys
 
 html_reporter = HtmlReporter()
 postgres_pool = get_postgres_pool()
+integrity_pool = get_integrity_pool("cierren")
 
 phase = int(sys.argv[1])
 user = int(sys.argv[3])
 area = int(sys.argv[4])
 
-with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, _):
+with define_extraction(phase, area, postgres_pool, integrity_pool) as (postgres, integrity):
     term = extract_terms(postgres, phase)
     term_id = term["id"]
     time_period = term["time_period"]
@@ -38,14 +39,14 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
         movements_mit = list({record[2] for record in filter(lambda record: record[3] == "MIT", records)})
         movements_integrity = list({record[2] for record in filter(lambda record: record[3] == "INTEGRITY", records)})
 
-        # extract_movements_mit(postgres, term_id, start_month, end_month, movements_mit)
-        extract_movements_integrity(postgres, term_id, start_month, end_month, movements_integrity)
+        extract_movements_mit(postgres, term_id, start_month, end_month, movements_mit)
+        extract_movements_integrity(integrity, postgres, term_id, start_month, end_month, movements_integrity)
 
-        # postgres.execute(text("""
-        # UPDATE "GESTOR"."TCGESPRO_MUESTRA_SOL_RE_CONSAR"
-        # SET "FTC_STATUS" = 'Reprocesado'
-        # WHERE "FTN_ID_SOLICITUD_REPROCESO" = ANY(:reprocess)
-        # """), {"reprocess": reprocess})
+        postgres.execute(text("""
+        UPDATE "GESTOR"."TCGESPRO_MUESTRA_SOL_RE_CONSAR"
+        SET "FTC_STATUS" = 'Reprocesado'
+        WHERE "FTN_ID_SOLICITUD_REPROCESO" = ANY(:reprocess)
+        """), {"reprocess": reprocess})
 
         # postgres.execute(text("""
         # DELETE FROM "GESTOR"."TCGESPRO_MUESTRA"
