@@ -1,3 +1,6 @@
+from sqlalchemy import text
+from sqlalchemy.engine import Connection
+
 from profuturo.common import define_extraction, register_time, truncate_table, notify
 from profuturo.database import get_postgres_pool, configure_postgres_spark, configure_bigquery_spark
 from profuturo.extraction import _write_spark_dataframe, extract_terms, _get_spark_session, read_table_insert_temp_view
@@ -17,8 +20,23 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
     end_month = term["end_month"]
     spark = _get_spark_session()
 
+    postgres: Connection
     with register_time(postgres_pool, phase, term_id, user, area):
-        read_table_insert_temp_view(configure_postgres_spark, """
+        is_reprocess = postgres.execute(text("""
+        SELECT EXISTS(
+            SELECT 1
+            FROM "GESTOR"."TCGESPRO_MUESTRA_SOL_RE_CONSAR" MR
+                INNER JOIN "GESTOR"."TCGESPRO_MUESTRA" M ON MR."FCN_ID_MUESTRA" = M."FTN_ID_MUESTRA"
+            WHERE M."FCN_ID_PERIODO" = :term
+              AND MR."FTC_STATUS" = 'Reprocesado'
+        )
+        """), {'term': term_id}).fetchone()[0]
+
+        filter_reprocessed_samples = ''
+        if is_reprocess:
+            filter_reprocessed_samples = 'INNER JOIN "GESTOR"."TCGESPRO_MUESTRA_SOL_RE_CONSAR" MR ON M."FTN_ID_MUESTRA" = MR."FCN_ID_MUESTRA"'
+
+        read_table_insert_temp_view(configure_postgres_spark, f"""
         SELECT DISTINCT F."FCN_ID_GENERACION" AS "FTN_ID_GRUPO_SEGMENTACION",
                -- F."FCN_ID_GENERACION",
                'CANDADO' AS "FTC_CANDADO_APERTURA",
@@ -51,8 +69,9 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
             INNER JOIN "GESTOR"."TCGESPRO_PERIODICIDAD" PG ON F."FCN_ID_PERIODICIDAD_GENERACION" = PG."FTN_ID_PERIODICIDAD"
             INNER JOIN "GESTOR"."TCGESPRO_PERIODICIDAD" PA ON F."FCN_ID_PERIODICIDAD_ANVERSO" = PA."FTN_ID_PERIODICIDAD"
             INNER JOIN "GESTOR"."TCGESPRO_PERIODICIDAD" PR ON F."FCN_ID_PERIODICIDAD_REVERSO" = PR."FTN_ID_PERIODICIDAD"
-            INNER JOIN "GESTOR"."TCGESPRO_PERIODO" P ON P."FTN_ID_PERIODO" = 202301 --:term
+            INNER JOIN "GESTOR"."TCGESPRO_PERIODO" P ON P."FTN_ID_PERIODO" = :term
             INNER JOIN "GESTOR"."TCGESPRO_MUESTRA" M ON P."FTN_ID_PERIODO" = M."FCN_ID_PERIODO"
+            {filter_reprocessed_samples}
             INNER JOIN "HECHOS"."TCHECHOS_CLIENTE" I
                 ON M."FCN_ID_PERIODO" = I."FCN_ID_PERIODO"
                AND M."FCN_CUENTA" = I."FCN_CUENTA"
@@ -86,7 +105,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
         -- QUITAR COMMENT CONDICION VALIDA PERO NO ES PERIODO CUATRIMESTRAL
         -- WHERE mod(extract(MONTH FROM to_date(P."FTC_PERIODO", 'MM/YYYY')), PG."FTN_MESES") = 0
         --   AND F."FTB_ESTATUS" = true
-        """, "edoCtaGenerales", params={"term": 202301, "start": start_month, "end": end_month, "user": str(user)})
+        """, "edoCtaGenerales", params={"term": term_id, "start": start_month, "end": end_month, "user": str(user)})
 
         general_df = spark.sql("select * from edoCtaGenerales")
         general_df = general_df.withColumn("FCN_ID_EDOCTA", concat(
@@ -100,7 +119,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
         #general_df = general_df.drop(col("PERIODO"))
         general_df.createOrReplaceTempView("general")
 
-        read_table_insert_temp_view(configure_postgres_spark, """
+        read_table_insert_temp_view(configure_postgres_spark, f"""
         WITH dataset as (
             SELECT DISTINCT F."FCN_ID_FORMATO_ESTADO_CUENTA" AS "FTN_ID_FORMATO",
                    C."FTN_CUENTA" AS "FCN_NUMERO_CUENTA"
@@ -109,8 +128,9 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
             INNER JOIN "GESTOR"."TCGESPRO_PERIODICIDAD" PG ON F."FCN_ID_PERIODICIDAD_GENERACION" = PG."FTN_ID_PERIODICIDAD"
             INNER JOIN "GESTOR"."TCGESPRO_PERIODICIDAD" PA ON F."FCN_ID_PERIODICIDAD_ANVERSO" = PA."FTN_ID_PERIODICIDAD"
             INNER JOIN "GESTOR"."TCGESPRO_PERIODICIDAD" PR ON F."FCN_ID_PERIODICIDAD_REVERSO" = PR."FTN_ID_PERIODICIDAD"
-            INNER JOIN "GESTOR"."TCGESPRO_PERIODO" P ON P."FTN_ID_PERIODO" = 202301 --:term
+            INNER JOIN "GESTOR"."TCGESPRO_PERIODO" P ON P."FTN_ID_PERIODO" = :term
             INNER JOIN "GESTOR"."TCGESPRO_MUESTRA" M ON P."FTN_ID_PERIODO" = M."FCN_ID_PERIODO"
+            {filter_reprocessed_samples}
             INNER JOIN "HECHOS"."TCHECHOS_CLIENTE" I
                 ON M."FCN_ID_PERIODO" = I."FCN_ID_PERIODO"
                AND M."FCN_CUENTA" = I."FCN_CUENTA"
@@ -161,7 +181,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
             INNER JOIN "GESTOR"."TCGESPRO_PERIODO" T ON R."FCN_ID_PERIODO" = T."FTN_ID_PERIODO"
             INNER JOIN "GESTOR"."TTGESPRO_MOV_PROFUTURO_CONSAR" PC ON R."FCN_ID_CONCEPTO_MOVIMIENTO" = PC."FCN_ID_MOVIMIENTO_PROFUTURO"
             INNER JOIN "MAESTROS"."TCDATMAE_MOVIMIENTO_CONSAR" MC ON PC."FCN_ID_MOVIMIENTO_CONSAR" = MC."FTN_ID_MOVIMIENTO_CONSAR"
-            INNER JOIN "GESTOR"."TCGESPRO_PERIODO" PRD ON PRD."FTN_ID_PERIODO" = 202301 -- :term
+            INNER JOIN "GESTOR"."TCGESPRO_PERIODO" PRD ON PRD."FTN_ID_PERIODO" = :term
         -- WHERE mod(extract(MONTH FROM to_date(T."FTC_PERIODO", 'MM/YYYY')), P."FTN_MESES") = 0
         --   AND to_date(T."FTC_PERIODO", 'MM/YYYY') BETWEEN :start - INTERVAL '1 month' * (PG."FTN_MESES" - 1) AND :end
         GROUP BY F."FCN_ID_FORMATO_ESTADO_CUENTA",
@@ -178,7 +198,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
         reverso_df = reverso_df.drop(col("FTN_ID_FORMATO"))
         reverso_df.createOrReplaceTempView("reverso")
 
-        read_table_insert_temp_view(configure_postgres_spark, """
+        read_table_insert_temp_view(configure_postgres_spark, f"""
         WITH dataset AS (
             SELECT DISTINCT F."FCN_ID_FORMATO_ESTADO_CUENTA" AS "FTN_ID_FORMATO",
                    C."FTN_CUENTA" AS "FCN_NUMERO_CUENTA"
@@ -187,8 +207,9 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                 INNER JOIN "GESTOR"."TCGESPRO_PERIODICIDAD" PG ON F."FCN_ID_PERIODICIDAD_GENERACION" = PG."FTN_ID_PERIODICIDAD"
                 INNER JOIN "GESTOR"."TCGESPRO_PERIODICIDAD" PA ON F."FCN_ID_PERIODICIDAD_ANVERSO" = PA."FTN_ID_PERIODICIDAD"
                 INNER JOIN "GESTOR"."TCGESPRO_PERIODICIDAD" PR ON F."FCN_ID_PERIODICIDAD_REVERSO" = PR."FTN_ID_PERIODICIDAD"
-                INNER JOIN "GESTOR"."TCGESPRO_PERIODO" P ON P."FTN_ID_PERIODO" = 202301 -- :term
+                INNER JOIN "GESTOR"."TCGESPRO_PERIODO" P ON P."FTN_ID_PERIODO" = :term
                 INNER JOIN "GESTOR"."TCGESPRO_MUESTRA" M ON P."FTN_ID_PERIODO" = M."FCN_ID_PERIODO"
+                {filter_reprocessed_samples}
                 INNER JOIN "HECHOS"."TCHECHOS_CLIENTE" I
                     ON M."FCN_ID_PERIODO" = I."FCN_ID_PERIODO"
                    AND M."FCN_CUENTA" = I."FCN_CUENTA"
@@ -268,7 +289,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                 INNER JOIN "HECHOS"."TTCALCUL_RENDIMIENTO" R ON D."FCN_NUMERO_CUENTA" = R."FCN_CUENTA"
                 INNER JOIN "GESTOR"."TCGESPRO_PERIODO" T ON R."FCN_ID_PERIODO" = T."FTN_ID_PERIODO"
                 -- INNER JOIN "GESTOR"."TCGESPRO_MUESTRA" MU on MU."FCN_CUENTA" = R."FCN_CUENTA"
-                INNER JOIN "GESTOR"."TCGESPRO_PERIODO" PR ON PR."FTN_ID_PERIODO" = 202301 -- :term
+                INNER JOIN "GESTOR"."TCGESPRO_PERIODO" PR ON PR."FTN_ID_PERIODO" = :term
             GROUP BY D."FCN_NUMERO_CUENTA",
                      C."FTC_AHORRO",
                      C."FTC_DES_CONCEPTO",
@@ -337,17 +358,17 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
         INNER JOIN general C ON C.FCN_NUMERO_CUENTA = R.FCN_NUMERO_CUENTA
         """)
 
-        read_table_insert_temp_view(configure_postgres_spark, """
-        SELECT 
-               "FCN_CUENTA",
+        read_table_insert_temp_view(configure_postgres_spark, f"""
+        SELECT "FCN_CUENTA",
                "FCN_ID_PERIODO",
                -- "FTC_URL_PDF_ORIGEN",
                "FTC_ESTATUS",
                "FCN_ID_USUARIO",
                "FCN_ID_AREA",
                "FTD_FECHAHORA_ALTA"
-        FROM "GESTOR"."TCGESPRO_MUESTRA"
-        WHERE "FCN_ID_PERIODO" = 202301
+        FROM "GESTOR"."TCGESPRO_MUESTRA" M
+            {filter_reprocessed_samples}
+        WHERE "FCN_ID_PERIODO" = :term
         """, "muestras", params={"term": term_id, "user": str(user)})
 
         df = spark.sql("""
