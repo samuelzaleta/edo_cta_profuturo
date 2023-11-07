@@ -189,7 +189,11 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
             g."FTC_PERIODO" AS PERIODO,
             s."FTC_DESCRIPCION" AS SIEFORE,
             sb."FCC_VALOR" AS SUBCUENTA,
-            m."FCN_ID_TIPO_MOVIMIENTO",
+            CASE m."FCN_ID_TIPO_MOVIMIENTO"
+            WHEN 180 THEN 'ABONO'
+            WHEN 181 THEN 'CARGO'
+            WHEN 182 THEN 'RETENCION ISR'
+            END TIPO_MOVIMIENTO,
             ROUND(cast(SUM (m."FTF_MONTO_PESOS") as numeric(16,2)),2) as MONTO_PESOS
             FROM "HECHOS"."TTHECHOS_MOVIMIENTO" m
             INNER JOIN "MAESTROS"."TCDATMAE_SIEFORE" s ON m."FCN_ID_SIEFORE" = s."FTN_ID_SIEFORE"
@@ -202,7 +206,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
             ORDER BY
             s."FTC_DESCRIPCION", sb."FCC_VALOR"
             """,
-            ["PERIODO", "SIEFORE", "SUBCUENTA"],
+            ["PERIODO", "SIEFORE", "SUBCUENTA", "TIPO_MOVIMIENTO"],
             ["MONTO_PESOS"],
             params={"term": term_id},
         )
