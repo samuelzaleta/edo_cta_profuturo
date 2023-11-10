@@ -6,7 +6,6 @@ from profuturo.extraction import extract_terms
 import sys
 from datetime import datetime
 
-print("hola shava")
 html_reporter = HtmlReporter()
 postgres_pool = get_postgres_pool()
 buc_pool = get_buc_pool()
@@ -129,17 +128,13 @@ with define_extraction(phase, area, postgres_pool, buc_pool) as (postgres, buc):
         GROUP BY tmov."FCN_CUENTA", tmov."FCN_ID_TIPO_SUBCTA"
         """
         comision_query = """
-        SELECT 
-        distinct 
-        C."FTN_NUM_CTA_INVDUAL" AS FCN_CUENTA, 
-        S."FCN_ID_TIPO_SUBCTA", 
-        SUM(C."FTF_MONTO_PESOS") AS "FTF_COMISION"
-        FROM CIERREN.TTAFOGRAL_MOV_CMS C
-        INNER JOIN CIERREN.TFCRXGRAL_CONFIG_MOV_ITGY M ON C.FCN_ID_CONCEPTO_MOV = M.FFN_ID_CONCEPTO_MOV
-        INNER JOIN TRAFOGRAL_MOV_SUBCTA S ON M.FRN_ID_MOV_SUBCTA = S.FRN_ID_MOV_SUBCTA
+        SELECT
+        C."FCN_CUENTA",
+        C."FTN_TIPO_SUBCTA",
+        SUM(C."FTF_MONTO_PESOS"::double precision) AS "FTF_COMISION"
+        FROM "HECHOS"."TTHECHOS_COMISION" C
         WHERE C."FTD_FEH_LIQUIDACION" BETWEEN :start_month AND :end_month
-        AND C."FCN_ID_PERIODO" = :term
-        GROUP BY C."FTN_NUM_CTA_INVDUAL", S."FCN_ID_TIPO_SUBCTA"
+        GROUP BY C."FCN_CUENTA", C."FTN_TIPO_SUBCTA"
         """
         truncate_table(postgres, "TTCALCUL_RENDIMIENTO", term=term_id)
 

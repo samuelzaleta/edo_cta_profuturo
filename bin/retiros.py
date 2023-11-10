@@ -2,7 +2,7 @@ from profuturo.common import truncate_table, register_time, define_extraction, n
 from profuturo.database import get_postgres_pool, get_mit_pool, configure_postgres_spark, configure_mit_spark
 from profuturo.extraction import extract_terms, _get_spark_session, read_table_insert_temp_view, _write_spark_dataframe
 from profuturo.reporters import HtmlReporter
-from pyspark.sql.functions import col
+from pyspark.sql.functions import col, lit
 from warnings import filterwarnings
 import sys
 from datetime import datetime
@@ -253,7 +253,10 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
         INNER JOIN TTCRXGRAL ttc
         ON tms.TMN_CVE_NCI = ttc.FCN_ID_SUBPROCESO
         where
-        tms.TMC_DESC_ITGY in ('T97', 'TRU' ,'TED', 'TNP', 'TPP', 'T73', 'TPR', 'TGF', 'TED', 'TPI', 'TPG', 'TRJ', 'TJU', 'TIV', 'TIX', 'TEI', 'TPP', 'RJP', 'TAI', 'TNI', 'TRE', 'PPI', 'RCI', 'TJI')
+        tms.TMC_DESC_ITGY in 
+        ('T73', 'TNP' ,'TPP', 'T97', 'TPR', 'TED', 'RJP', 'TRE', 'TJU', 
+            'TEX', 'TGF', 'TPG', 'TRJ', 'TRU', 'TIV', 'TIX', 'TEI', 'TPI', 
+        'TNI', 'TJI', 'PPI', 'RCI', 'TAI')
         ), DATOS_PAGO AS(
         SELECT
         FTC_FOLIO,
@@ -269,25 +272,21 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
         FROM (
         SELECT
         ttcp.FTC_FOLIO,
-        ttcp.FCC_CVE_BANCO,
         ttcp.FTN_ID_ASOCIADO,
         ttcp.FTN_ISR,
-        thccc.FCN_ID_CAT_CATALOGO,
         thccc.FCC_VALOR,
-        thccc.FCC_DESC,
-        MAX(ttcp.FTN_NUM_REEXP) AS FTN_NUM_REEXP
+        thcccc.FCC_DESC,
+        ttcp.FTN_NUM_REEXP
         FROM BENEFICIOS.TTCRXGRAL_PAGO ttcp
         INNER JOIN CIERREN.TCCRXGRAL_CAT_CATALOGO thccc
         ON ttcp.FCC_CVE_BANCO = thccc.FCN_ID_CAT_CATALOGO
+        INNER JOIN CIERREN.TCCRXGRAL_CAT_CATALOGO thcccc
+        ON ttcp.FCN_TIPO_PAGO = thcccc.FCN_ID_CAT_CATALOGO
         where ttcp.FTD_FEH_CRE BETWEEN to_date('01/03/2023', 'dd/MM/yyyy') AND to_date('31/03/2023', 'dd/MM/yyyy')
-        GROUP BY
-        ttcp.FTC_FOLIO,
-        ttcp.FCC_CVE_BANCO,
-        ttcp.FTN_ID_ASOCIADO,
-        ttcp.FTN_ISR,
-        thccc.FCN_ID_CAT_CATALOGO,
-        thccc.FCC_VALOR,
-        thccc.FCC_DESC
+        and (FTC_FOLIO, FTN_ID_ASOCIADO, FTN_NUM_REEXP) IN (
+        SELECT FTC_FOLIO,FTN_ID_ASOCIADO, MAX(FTN_NUM_REEXP)
+        FROM BENEFICIOS.TTCRXGRAL_PAGO ttcp
+        GROUP BY FTC_FOLIO, FTN_ID_ASOCIADO)
         )
         GROUP BY
         FTC_FOLIO
@@ -416,7 +415,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
         D.FCN_ID_PROCESO,
         D.FCN_ID_SUBPROCESO,
         D.FCN_ID_ESTATUS,
-        (D.FTF_MONTO_LIQUIDADO - P.FTN_ISR -P.FTN_ISR) AS FTF_SALDO_INI,
+        D.FTF_MONTO_LIQUIDADO AS FTF_SALDO_INI,
         CASE FTN_TIPO_AHORRO
         WHEN 0 THEN (D.FTF_MONTO_LIQUIDADO - P.FTN_ISR)
         WHEN 1 THEN D.FTF_MONTO_LIQUIDADO
@@ -434,8 +433,8 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
         D.FTC_TMC_DESC_ITGY,
         D.FTC_TMC_DESC_NCI,
         D.FTN_TMN_CVE_NCI,
-        D.FTN_FEH_INI_PEN,
-        D.FTN_FEH_RES_PEN,
+        coalesce(D.FTN_FEH_INI_PEN, '00010101') AS FTN_FEH_INI_PEN,
+        coalesce(D.FTN_FEH_RES_PEN, '00010101') AS FTN_FEH_RES_PEN,
         D.FTN_TIPO_AHORRO,
         CASE D.FTC_TMC_DESC_ITGY
         WHEN 'RJP' THEN '73'
@@ -448,6 +447,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
         WHEN 'TPR' THEN '73'
         WHEN 'TRE' THEN '73'
         WHEN 'TRJ' THEN '73'
+        WHEN 'TEX' THEN '73'
         WHEN 'PPI' THEN '97'
         WHEN 'RCI' THEN '97'
         WHEN 'T97' THEN '97'
@@ -461,27 +461,28 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
         WHEN 'TNP' THEN '97'
         END ARCHIVO,
         CASE FTC_TMC_DESC_ITGY
-        WHEN 'RJP' THEN 'IMSS'
         WHEN 'T73' THEN 'IMSS'
-        WHEN 'TED' THEN 'IMSS'
-        WHEN 'TGF' THEN 'IMSS'
-        WHEN 'TJU' THEN 'IMSS'
-        WHEN 'TPI' THEN 'IMSS'
+        WHEN 'TNP' THEN 'IMSS'
         WHEN 'TPP' THEN 'IMSS'
+        WHEN 'T97' THEN 'IMSS'
         WHEN 'TPR' THEN 'IMSS'
+        WHEN 'TED' THEN 'IMSS'
+        WHEN 'RJP' THEN 'IMSS'
         WHEN 'TRE' THEN 'IMSS'
-        WHEN 'TRJ' THEN 'IMSS'
+        WHEN 'TJU' THEN 'IMSS'
+        WHEN 'TEX' THEN 'IMSS'
+        WHEN 'TGF' THEN 'IMSS'
+        WHEN 'TPG' THEN 'IMSS'
+        WHEN 'TRU' THEN 'IMSS'
+        WHEN 'TIV' THEN 'IMSS'
+        WHEN 'TIX' THEN 'ISSSTE'
+        WHEN 'TEI' THEN 'ISSSTE'
+        WHEN 'TPI' THEN 'ISSSTE'
+        WHEN 'TNI' THEN 'ISSSTE'
+        WHEN 'TJI' THEN 'ISSSTE'
         WHEN 'PPI' THEN 'ISSSTE'
         WHEN 'RCI' THEN 'ISSSTE'
-        WHEN 'T97' THEN 'ISSSTE'
         WHEN 'TAI' THEN 'ISSSTE'
-        WHEN 'TEI' THEN 'ISSSTE'
-        WHEN 'TIV' THEN 'ISSSTE'
-        WHEN 'TIX' THEN 'ISSSTE'
-        WHEN 'TJI' THEN 'ISSSTE'
-        WHEN 'TNI' THEN 'ISSSTE'
-        WHEN 'TNP' THEN 'ISSSTE'
-        WHEN 'TNP' THEN 'ISSSTE'
         END FTC_LEY_PENSION,
         CASE D.FTC_TMC_DESC_ITGY
         WHEN 'TAI' THEN 'ASEGURADORA'
@@ -506,6 +507,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
         df = spark.sql("""
         SELECT * FROM retiros
         """)
+        df = df.withColumn("FCN_ID_PERIODO", lit(term_id))
 
         _write_spark_dataframe(df, configure_postgres_spark, '"HECHOS"."TTHECHOS_RETIRO"')
 

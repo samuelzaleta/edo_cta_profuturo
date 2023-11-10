@@ -28,8 +28,8 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                SH.FTD_FEH_LIQUIDACION,
                :type AS FTC_TIPO_SALDO,
                MAX(VA.FCD_FEH_ACCION) AS FCD_FEH_ACCION,
-               TRUNC(SUM(SH.FTN_DIA_ACCIONES), 6) AS FTF_DIA_ACCIONES,
-               TRUNC(SUM(SH.FTN_DIA_ACCIONES * TRUNC(VA.FCN_VALOR_ACCION,6)), 2) AS FTF_SALDO_DIA
+               SUM(SH.FTN_DIA_ACCIONES) AS FTF_DIA_ACCIONES,
+               SUM(SH.FTN_DIA_ACCIONES * VA.FCN_VALOR_ACCION) AS FTF_SALDO_DIA
         FROM cierren.thafogral_saldo_historico_v2 SH
         INNER JOIN cierren.TCCRXGRAL_TIPO_SUBCTA R ON R.FCN_ID_TIPO_SUBCTA = SH.FCN_ID_TIPO_SUBCTA
         INNER JOIN (
@@ -83,9 +83,9 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                 TS."FCC_VALOR" AS TIPO_SUBCUENTA,
                 S."FTC_DESCRIPCION_CORTA" AS SIEFORE,
                 --ROUND(SUM(CASE WHEN SH."FTC_TIPO_SALDO" = 'I' THEN SH."FTF_SALDO_DIA" ELSE 0 END)::numeric,2) AS SALDO_INICIAL_PESOS,
-                TRUNC(SUM(CASE WHEN SH."FTC_TIPO_SALDO" = 'F' THEN SH."FTF_SALDO_DIA" ELSE 0 END)::numeric,2)AS SALDO_FINAL_PESOS,
+                SUM(CASE WHEN SH."FTC_TIPO_SALDO" = 'F' THEN SH."FTF_SALDO_DIA" ELSE 0 END) AS SALDO_FINAL_PESOS,
                 --ROUND(SUM(CASE WHEN SH."FTC_TIPO_SALDO" = 'I' THEN SH."FTN_DIA_ACCIONES" ELSE 0 END)::numeric,6) AS SALDO_INICIAL_ACCIONES,
-                TRUNC(SUM(CASE WHEN SH."FTC_TIPO_SALDO" = 'F' THEN SH."FTF_DIA_ACCIONES" ELSE 0 END)::numeric,6) AS SALDO_FINAL_ACCIONES
+                SUM(CASE WHEN SH."FTC_TIPO_SALDO" = 'F' THEN SH."FTF_DIA_ACCIONES" ELSE 0 END) AS SALDO_FINAL_ACCIONES
             FROM "HECHOS"."THHECHOS_SALDO_HISTORICO" SH
             INNER JOIN "HECHOS"."TCHECHOS_CLIENTE" I ON SH."FCN_CUENTA" = I."FCN_CUENTA"
             INNER JOIN "MAESTROS"."TCDATMAE_TIPO_SUBCUENTA" TS ON SH."FCN_ID_TIPO_SUBCTA" = TS."FTN_ID_TIPO_SUBCTA"
@@ -94,7 +94,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
             GROUP BY TS."FCC_VALOR", S."FTC_DESCRIPCION_CORTA",I."FTC_GENERACION" , I."FTC_VIGENCIA", I."FTC_TIPO_CLIENTE", I."FTC_ORIGEN"
             """,
             ["Generación", "Vigencia", "tipo_cliente", "Origen", "Sub cuenta", "SIEFORE"],
-            {"Saldo final en pesos": 2, "Saldo final en acciones": 6},
+            ["Saldo final en pesos", "Saldo final en acciones"],
             params={"term": term_id},
         )
         report2 = html_reporter.generate(
@@ -113,7 +113,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
             GROUP BY TS."FCC_VALOR", S."FTC_DESCRIPCION_CORTA"
             """,
             ["TIPO_SUBCUENTA", "SIEFORE"],
-            {"Saldo final en pesos": 2, "Saldo final en acciones": 6},
+            ["Saldo final en pesos", "Saldo final en acciones"],
             params={"term": term_id},
         )
 
