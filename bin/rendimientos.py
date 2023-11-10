@@ -169,7 +169,7 @@ with define_extraction(phase, area, postgres_pool, buc_pool) as (postgres, buc):
                     "term_id": term_id}
         )
         read_table_insert_temp_view(
-            configure_mit_spark,
+            configure_postgres_spark,
             comision_query,
             "comision",
             params={"start_month ": start_month,
