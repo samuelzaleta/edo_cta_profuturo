@@ -57,6 +57,8 @@ def get_buc_conn() -> cx_Oracle.Connection:
     )
 
 
+
+
 def get_postgres_conn():
     return psycopg2.connect(
         host=os.getenv("POSTGRES_HOST"),
