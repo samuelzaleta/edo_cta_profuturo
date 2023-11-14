@@ -1,5 +1,5 @@
 from profuturo.common import register_time, define_extraction
-from profuturo.database import get_postgres_pool,
+from profuturo.database import get_postgres_pool
 from profuturo.extraction import extract_terms
 from profuturo.reporters import HtmlReporter
 from pyspark.sql import SparkSession
