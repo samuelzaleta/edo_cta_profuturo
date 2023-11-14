@@ -189,9 +189,9 @@ with define_extraction(phase, area, postgres_pool, buc_pool) as (postgres, buc):
                    SUM(COALESCE(cm.FTF_COMISION, 0)) AS FTF_COMISION
             FROM saldoinicial AS si
                 LEFT JOIN abono AS ab ON si.FCN_CUENTA = ab.FCN_CUENTA AND si.FCN_ID_TIPO_SUBCTA = ab.FCN_ID_TIPO_SUBCTA
-                LEFT JOIN comision AS cm ON si.FCN_CUENTA = cm.FCN_CUENTA AND si.FCN_ID_TIPO_SUBCTA = cm.FCN_ID_TIPO_SUBCTA
+                LEFT JOIN comision AS cm ON si.FCN_CUENTA = cm.FCN_CUENTA AND si.FCN_ID_TIPO_SUBCTA = cm.FTN_TIPO_SUBCTA
                 LEFT JOIN cargo AS ca ON si.FCN_CUENTA = ca.FCN_CUENTA AND si.FCN_ID_TIPO_SUBCTA = ca.FCN_ID_TIPO_SUBCTA
-                LEFT JOIN saldofinal AS sf ON si.FCN_CUENTA = sf.FCN_CUENTA AND si.FCN_ID_TIPO_SUBCTA = ca.FCN_ID_TIPO_SUBCTA                   
+                LEFT JOIN saldofinal AS sf ON si.FCN_CUENTA = sf.FCN_CUENTA AND si.FCN_ID_TIPO_SUBCTA = sf.FCN_ID_TIPO_SUBCTA
             GROUP BY si.FCN_CUENTA, sf.FCN_CUENTA, ca.FCN_CUENTA, ab.FCN_CUENTA, cm.FCN_CUENTA,
                      si.FCN_ID_TIPO_SUBCTA, sf.FCN_ID_TIPO_SUBCTA, ca.FCN_ID_TIPO_SUBCTA, ab.FCN_ID_TIPO_SUBCTA
         )
@@ -207,40 +207,6 @@ with define_extraction(phase, area, postgres_pool, buc_pool) as (postgres, buc):
                (ta.FTF_SALDO_FINAL - (ta.FTF_ABONO + ta.FTF_SALDO_INICIAL - ta.FTF_COMISION - ta.FTF_CARGO)) AS FTF_RENDIMIENTO_CALCULADO
         FROM tablon AS ta
         """)
-
-        test_df = spark.sql("""
-        WITH tablon as (
-                SELECT 
-                distinct
-                   COALESCE(si.FCN_CUENTA, sf.FCN_CUENTA, ca.FCN_CUENTA, ab.FCN_CUENTA, cm.FCN_CUENTA) AS FCN_CUENTA, 
-                   COALESCE(si.FCN_ID_TIPO_SUBCTA, sf.FCN_ID_TIPO_SUBCTA, ca.FCN_ID_TIPO_SUBCTA, ab.FCN_ID_TIPO_SUBCTA) AS FCN_ID_TIPO_SUBCTA, 
-                   SUM(COALESCE(si.FTF_SALDO_INICIAL, 0)) AS FTF_SALDO_INICIAL, 
-                   SUM(COALESCE(sf.FTF_SALDO_FINAL, 0)) AS FTF_SALDO_FINAL, 
-                   SUM(COALESCE(ca.FTF_CARGO, 0)) AS FTF_CARGO, 
-                   SUM(COALESCE(ab.FTF_ABONO, 0)) AS FTF_ABONO, 
-                   SUM(COALESCE(cm.FTF_COMISION, 0)) AS FTF_COMISION
-            FROM saldoinicial AS si
-                LEFT JOIN abono AS ab ON si.FCN_CUENTA = ab.FCN_CUENTA AND si.FCN_ID_TIPO_SUBCTA = ab.FCN_ID_TIPO_SUBCTA
-                LEFT JOIN comision AS cm ON si.FCN_CUENTA = cm.FCN_CUENTA AND si.FCN_ID_TIPO_SUBCTA = cm.FCN_ID_TIPO_SUBCTA
-                LEFT JOIN cargo AS ca ON si.FCN_CUENTA = ca.FCN_CUENTA AND si.FCN_ID_TIPO_SUBCTA = ca.FCN_ID_TIPO_SUBCTA
-                LEFT JOIN saldofinal AS sf ON si.FCN_CUENTA = sf.FCN_CUENTA AND si.FCN_ID_TIPO_SUBCTA = ca.FCN_ID_TIPO_SUBCTA
-            GROUP BY si.FCN_CUENTA, sf.FCN_CUENTA, ca.FCN_CUENTA, ab.FCN_CUENTA, cm.FCN_CUENTA,
-                     si.FCN_ID_TIPO_SUBCTA, sf.FCN_ID_TIPO_SUBCTA, ca.FCN_ID_TIPO_SUBCTA, ab.FCN_ID_TIPO_SUBCTA
-        )
-        SELECT COUNT(*) AS num_rows
-        FROM tablon
-        LEFT JOIN comision AS cm ON tablon.FCN_CUENTA = cm.FCN_CUENTA AND tablon.FCN_ID_TIPO_SUBCTA = cm.FCN_ID_TIPO_SUBCTA
-        WHERE cm.FCN_CUENTA IS NULL""")
-        print("-----------------------------------------TABLON")
-        test_df.show()
-
-        test_df2 = spark.sql(f"""
-        SELECT COUNT(*) AS num_rows
-        FROM saldoinicial
-        LEFT JOIN comision AS cm ON si.FCN_CUENTA = cm.FCN_CUENTA AND si.FCN_ID_TIPO_SUBCTA = cm.FCN_ID_TIPO_SUBCTA
-        WHERE cm.FCN_CUENTA IS NULL""")
-        print("-----------------------------saldoinicial")
-        test_df2.show()
         df.show(5)
         _write_spark_dataframe(df, configure_postgres_spark, '"HECHOS"."TTCALCUL_RENDIMIENTO"')
 
