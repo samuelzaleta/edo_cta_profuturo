@@ -1,12 +1,15 @@
 from sqlalchemy import text
 from sqlalchemy.engine import Connection
-
 from profuturo.common import define_extraction, register_time, truncate_table, notify
 from profuturo.database import get_postgres_pool, configure_postgres_spark, configure_bigquery_spark
 from profuturo.extraction import _write_spark_dataframe, extract_terms, _get_spark_session, read_table_insert_temp_view
 from pyspark.sql.functions import concat, col , row_number,lit, current_timestamp
 from pyspark.sql.window import Window
 import sys
+import requests
+
+
+url = "https://procesos-api-service-qa-5flqomrlga-uc.a.run.app/procesos/generarEstadosCuentaPensionados "
 
 postgres_pool = get_postgres_pool()
 phase = int(sys.argv[1])
@@ -389,6 +392,17 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
         #_write_spark_dataframe(anverso_df, configure_bigquery_spark, 'ESTADO_CUENTA.TTMUESTR_ANVERSO')
         #_write_spark_dataframe(general_df, configure_bigquery_spark, 'ESTADO_CUENTA.TTMUESTR_GENERAL')
         _write_spark_dataframe(df, configure_postgres_spark, '"GESTOR"."TCGESPRO_MUESTRA"')
+
+        response = requests.get(url)
+        # Verifica si la petición fue exitosa
+        if response.status_code == 200:
+            # Si la petición fue exitosa, puedes acceder al contenido de la respuesta de la siguiente manera:
+            content = response.content
+            print(content)
+        else:
+            # Si la petición no fue exitosa, puedes imprimir el código de estado para obtener más información
+            print(f"La solicitud no fue exitosa. Código de estado: {response.status_code}")
+
 
         notify(
             postgres,

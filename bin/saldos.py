@@ -29,7 +29,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                :type AS FTC_TIPO_SALDO,
                MAX(VA.FCD_FEH_ACCION) AS FCD_FEH_ACCION,
                SUM(SH.FTN_DIA_ACCIONES) AS FTF_DIA_ACCIONES,
-               SUM(SH.FTN_DIA_ACCIONES * VA.FCN_VALOR_ACCION) AS FTF_SALDO_DIA
+               SUM(ROUND(SH.FTN_DIA_ACCIONES * VA.FCN_VALOR_ACCION,2)) AS FTF_SALDO_DIA
         FROM cierren.thafogral_saldo_historico_v2 SH
         INNER JOIN cierren.TCCRXGRAL_TIPO_SUBCTA R ON R.FCN_ID_TIPO_SUBCTA = SH.FCN_ID_TIPO_SUBCTA
         INNER JOIN (
@@ -43,7 +43,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                   FROM cierren.thafogral_saldo_historico_v2 SHMIN
                   WHERE SHMIN.FTD_FEH_LIQUIDACION > :date
               )
-              -- AND SHMAX.FTN_NUM_CTA_INVDUAL = 10044531
+              -- AND SHMAX.FTN_NUM_CTA_INVDUAL 
               -- AND SHMAX.FCN_ID_TIPO_SUBCTA = 22
               -- AND SHMAX.FCN_ID_SIEFORE = 83
             GROUP BY SHMAX.FTN_NUM_CTA_INVDUAL, SHMAX.FCN_ID_SIEFORE, SHMAX.FCN_ID_TIPO_SUBCTA
@@ -83,9 +83,9 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                 TS."FCC_VALOR" AS TIPO_SUBCUENTA,
                 S."FTC_DESCRIPCION_CORTA" AS SIEFORE,
                 --ROUND(SUM(CASE WHEN SH."FTC_TIPO_SALDO" = 'I' THEN SH."FTF_SALDO_DIA" ELSE 0 END)::numeric,2) AS SALDO_INICIAL_PESOS,
-                SUM(CASE WHEN SH."FTC_TIPO_SALDO" = 'F' THEN SH."FTF_SALDO_DIA" ELSE 0 END) AS SALDO_FINAL_PESOS,
+                TRUNC(SUM(CASE WHEN SH."FTC_TIPO_SALDO" = 'F' THEN SH."FTF_SALDO_DIA" ELSE 0 END):: NUMERIC, 2)AS SALDO_FINAL_PESOS,
                 --ROUND(SUM(CASE WHEN SH."FTC_TIPO_SALDO" = 'I' THEN SH."FTN_DIA_ACCIONES" ELSE 0 END)::numeric,6) AS SALDO_INICIAL_ACCIONES,
-                SUM(CASE WHEN SH."FTC_TIPO_SALDO" = 'F' THEN SH."FTF_DIA_ACCIONES" ELSE 0 END) AS SALDO_FINAL_ACCIONES
+                TRUNC(SUM(CASE WHEN SH."FTC_TIPO_SALDO" = 'F' THEN SH."FTF_DIA_ACCIONES" ELSE 0 END):: NUMERIC, 6) AS SALDO_FINAL_ACCIONES
             FROM "HECHOS"."THHECHOS_SALDO_HISTORICO" SH
             INNER JOIN "HECHOS"."TCHECHOS_CLIENTE" I ON SH."FCN_CUENTA" = I."FCN_CUENTA"
             INNER JOIN "MAESTROS"."TCDATMAE_TIPO_SUBCUENTA" TS ON SH."FCN_ID_TIPO_SUBCTA" = TS."FTN_ID_TIPO_SUBCTA"

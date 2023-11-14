@@ -9,7 +9,7 @@ import sys
 import requests
 
 
-url = "http://104.155.190.173:8080/GeneraRetirosPdf"
+url = "https://procesos-api-service-qa-5flqomrlga-uc.a.run.app/procesos/generarEstadosCuentaRetiros"
 
 postgres_pool = get_postgres_pool()
 phase = int(sys.argv[1])
