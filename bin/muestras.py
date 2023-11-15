@@ -1,4 +1,5 @@
-from sqlalchemy import text, Connection, CursorResult
+from sqlalchemy import text
+from sqlalchemy.engine import Connection, CursorResult
 from profuturo.database import configure_postgres_spark
 from profuturo.extraction import _write_spark_dataframe, _get_spark_session, read_table_insert_temp_view
 from profuturo.common import register_time, define_extraction, truncate_table
