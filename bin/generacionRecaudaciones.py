@@ -28,31 +28,45 @@ def extract_bigquery(table, period):
 
 
 def format_row(row):
+    global general_count
+    global ahorro_count
+    global bono_count
+    global saldo_count
+
+    general_has_data = any(row[column] is not None for column in general_columns)
+    ahorro_has_data = any(row[column] is not None for column in ahorro_columns)
+    bono_has_data = any(row[column] is not None for column in bono_columns)
+    saldo_has_data = any(row[column] is not None for column in saldo_columns)
+
     formatted_data = []
 
-    for column in general_columns:
-        if row[column] is not None and row[column] != '':
-            general_data = [f"{row[column]}" for column in general_columns if row[column] is not None]
-            formatted_data.append("1\n" + "|".join(general_data))
-            break
+    if general_has_data:
+        general_data = [f"{row[column]}" for column in general_columns]
+        formatted_data.append("1\n" + "|".join(general_data))
+        general_count += 1
+    else:
+        formatted_data.append("1\n")
 
-    for column in ahorro_columns:
-        if row[column] is not None and row[column] != '':
-            ahorro_data = [f"{row[column]}" for column in ahorro_columns if row[column] is not None]
-            formatted_data.append("2\n" + "|".join(ahorro_data))
-            break
+    if ahorro_has_data:
+        ahorro_data = [f"{row[column]}" for column in ahorro_columns]
+        formatted_data.append("2\n" + "|".join(ahorro_data))
+        ahorro_count += 1
+    else:
+        formatted_data.append("2\n")
 
-    for column in bono_columns:
-        if row[column] is not None and row[column] != '':
-            bono_data = [f"{row[column]}" for column in bono_columns if row[column] is not None]
-            formatted_data.append("3\n" + "|".join(bono_data))
-            break
+    if bono_has_data:
+        bono_data = [f"{row[column]}" for column in bono_columns]
+        formatted_data.append("3\n" + "|".join(bono_data))
+        bono_count += 1
+    else:
+        formatted_data.append("3\n")
 
-    for column in saldo_columns:
-        if row[column] is not None and row[column] != '':
-            saldo_data = [f"{row[column]}" for column in saldo_columns if row[column] is not None]
-            formatted_data.append("4\n" + "|".join(saldo_data))
-            break
+    if saldo_has_data:
+        saldo_data = [f"{row[column]}" for column in saldo_columns]
+        formatted_data.append("4\n" + "|".join(saldo_data))
+        saldo_count += 1
+    else:
+        formatted_data.append("4\n")
 
     if formatted_data:
         return "\n".join(formatted_data)
@@ -67,6 +81,11 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
     end_month = term["end_month"]
 
     with register_time(postgres_pool, phase, term_id, user, area):
+        general_count = 0
+        ahorro_count = 0
+        bono_count = 0
+        saldo_count = 0
+
         general_columns = ["FCN_FOLIO", "FTC_NOMBRE_COMPLETO", "FTC_CALLE_NUMERO", "FTC_COLONIA", "FTC_DELEGACION",
                            "FTN_CP", "FTC_ENTIDAD_FEDERATIVA", "FTC_RFC", "FTC_NSS", "FTC_CURP",
                            "FTD_FECHA_GRAL_INICIO", "FTD_FECHA_GRAL_FIN", "FTN_ID_FORMATO", "FTN_ID_SIEFORE",
@@ -82,6 +101,8 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
 
         df = df_edo_general.join(df_edo_anverso, 'FCN_ID_EDOCTA')
         data_strings = df.rdd.map(format_row).collect()
+        total_count = sum([general_count, ahorro_count, bono_count, saldo_count])
+        data_strings = data_strings + f"5\n{general_count}|{ahorro_count}|{bono_count}|{saldo_count}|{total_count}|"
 
         with open(f"gs://gestor-edo-cuenta/test_retiros/recaudacion_{term_id}.txt", "w") as f:
             f.write(data_strings)
