@@ -45,7 +45,6 @@ user = int(sys.argv[3])
 area = int(sys.argv[4])
 
 with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, _):
-    postgres: Connection
 
     term = extract_terms(postgres, phase)
     term_id = term["id"]
