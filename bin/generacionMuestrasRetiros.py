@@ -1,10 +1,7 @@
 from profuturo.common import define_extraction, register_time, truncate_table, notify
 from profuturo.database import get_postgres_pool, configure_postgres_spark, configure_bigquery_spark
-from profuturo.extraction import _write_spark_dataframe, extract_terms, extract_dataset_spark, _get_spark_session, read_table_insert_temp_view
-from pyspark.sql.types import StructType, StringType
+from profuturo.extraction import _write_spark_dataframe, extract_terms,  _get_spark_session, read_table_insert_temp_view
 from pyspark.sql.functions import udf, concat, col, current_date , row_number,lit, current_timestamp
-from pyspark.sql.window import Window
-import uuid
 import sys
 import requests
 

@@ -140,6 +140,42 @@ def extract_dataset(
     print(df_pd.info())
 
 
+def extract_dataset_return(
+    origin: Connection,
+    destination: Connection,
+    query: str,
+    term: int = None,
+    params: Dict[str, Any] = None,
+    limit: int = None,
+    transform: Callable[[PandasDataFrame], PandasDataFrame] = None,
+):
+    if isinstance(query, Compiled):
+        params = query.params
+        query = str(query)
+    if params is None:
+        params = {}
+    if limit is not None:
+        query = f"SELECT * FROM ({query}) WHERE ROWNUM <= :limit"
+        params["limit"] = limit
+
+
+    try:
+        df_pd = pd.read_sql_query(text(query), origin, params=params)
+        df_pd = df_pd.rename(columns=str.upper)
+        print("count",df_pd.count())
+
+        if term:
+            df_pd = df_pd.assign(FCN_ID_PERIODO=term)
+            #print(df_pd.info())
+            return df_pd
+        return df_pd
+
+    except Exception as e:
+        raise ProfuturoException.from_exception(e, term) from e
+
+
+
+
 def extract_dataset_write_view_spark(
     origin: Connection,
     query: str,
