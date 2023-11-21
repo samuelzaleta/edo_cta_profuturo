@@ -87,7 +87,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
             distinct
             tsh."FCN_CUENTA"
             , tsh."FCN_ID_TIPO_SUBCTA" 
-            , SUM(tsh."FTF_SALDO_DIA"::double precision) AS "FTF_SALDO_FINAL"
+            , SUM(ROUND(tsh."FTF_SALDO_DIA", 2)) AS "FTF_SALDO_FINAL"
         FROM
             "HECHOS"."THHECHOS_SALDO_HISTORICO" tsh
         WHERE
@@ -101,7 +101,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
             , tsh."FCN_ID_TIPO_SUBCTA"
         """
         cargo_query = """
-        SELECT "FCN_CUENTA", "FCN_ID_TIPO_SUBCTA", SUM("FTF_MONTO_PESOS"::double precision) AS "FTF_CARGO"
+        SELECT "FCN_CUENTA", "FCN_ID_TIPO_SUBCTA", SUM(round("FTF_MONTO_PESOS",2)) AS "FTF_CARGO"
         FROM (
             SELECT DISTINCT "FCN_CUENTA",
                    "FCN_ID_TIPO_SUBCTA",
@@ -117,14 +117,13 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                    "SUBCUENTA",
                    "MONTO"
             FROM "HECHOS"."TTHECHOS_MOVIMIENTOS_INTEGRITY"
-            WHERE "CSIE1_FECCON" BETWEEN TO_CHAR(:start_month, 'yyyymmdd')::int AND TO_CHAR(:end_month, 'yyyymmdd')::int
-              AND "CSIE1_CODMOV"::int <= 500
+            WHERE CAST("CSIE1_CODMOV" AS INT) <= 500
               AND "FCN_ID_PERIODO" = :term_id
         ) AS mov
         GROUP BY "FCN_CUENTA", "FCN_ID_TIPO_SUBCTA"
         """
         abono_query = """
-        SELECT "FCN_CUENTA", "FCN_ID_TIPO_SUBCTA", SUM("FTF_MONTO_PESOS"::double precision) AS "FTF_CARGO"
+        SELECT "FCN_CUENTA", "FCN_ID_TIPO_SUBCTA", SUM(round("FTF_MONTO_PESOS",2)) AS "FTF_ABONO"
         FROM (
             SELECT DISTINCT "FCN_CUENTA",
                    "FCN_ID_TIPO_SUBCTA",
@@ -140,11 +139,10 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                    "SUBCUENTA",
                    "MONTO"
             FROM "HECHOS"."TTHECHOS_MOVIMIENTOS_INTEGRITY"
-            WHERE "CSIE1_FECCON" BETWEEN TO_CHAR(:start_month, 'yyyymmdd')::int AND TO_CHAR(:end_month, 'yyyymmdd')::int
-              AND "CSIE1_CODMOV"::int > 500
+            WHERE CAST("CSIE1_CODMOV" AS INT) > 500
               AND "FCN_ID_PERIODO" = :term_id
         ) AS mov
-        GROUP BY "FCN_CUENTA", "FCN_ID_TIPO_SUBCTA";
+        GROUP BY "FCN_CUENTA", "FCN_ID_TIPO_SUBCTA"
         """
         comision_query = """
         SELECT
@@ -171,6 +169,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                     "end_month": end_month,
                     "term_id": term_id}
         )
+
         read_table_insert_temp_view(
             configure_postgres_spark,
             cargo_query,

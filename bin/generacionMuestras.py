@@ -79,14 +79,14 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
             SELECT M."FCN_CUENTA", PC."FCN_ID_MOVIMIENTO_CONSAR"
             FROM "HECHOS"."TTHECHOS_MOVIMIENTO" M
                 INNER JOIN "GESTOR"."TTGESPRO_MOV_PROFUTURO_CONSAR" PC ON M."FCN_ID_CONCEPTO_MOVIMIENTO" = PC."FCN_ID_MOVIMIENTO_PROFUTURO"
-            WHERE M."FCN_ID_PERIODO" = :term
+             M."FTD_FEH_LIQUIDACION" between :end - INTERVAL '4 MONTH' and :end
             GROUP BY M."FCN_CUENTA", PC."FCN_ID_MOVIMIENTO_CONSAR"
         ) AS CC
         INNER JOIN "GESTOR"."TTGESPRO_CONFIGURACION_MUESTRA_AUTOMATICA" MC ON CC."FCN_ID_MOVIMIENTO_CONSAR" = MC."FCN_ID_MOVIMIENTO_CONSAR"
         WHERE "FCN_CUENTA" IN (SELECT "FCN_CUENTA" FROM "MAESTROS"."TCDATMAE_CLIENTE")
         GROUP BY "FCN_CUENTA"
         ORDER BY sum(1.0 / "FTN_CANTIDAD") DESC
-        """), {'term': term_id})
+        """), {'end': end_month})
         samples = find_samples(cursor)
 
         print(samples)
