@@ -8,13 +8,12 @@ from datetime import datetime
 
 html_reporter = HtmlReporter()
 postgres_pool = get_postgres_pool()
-buc_pool = get_buc_pool()
 
 phase = int(sys.argv[1])
 user = int(sys.argv[3])
 area = int(sys.argv[4])
 
-with define_extraction(phase, area, postgres_pool, buc_pool) as (postgres, buc):
+with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, _):
     term = extract_terms(postgres, phase)
     term_id = term["id"]
     start_month = term["start_month"]
