@@ -21,7 +21,7 @@ area = int(sys.argv[4])
 
 def extract_bigquery(table, period):
     df = spark.read.format('bigquery') \
-        .option('table', f'poc-profuturo-estado-de-cuenta:{table}') \
+        .option('table', f'estado-de-cuenta-service-dev-b:{table}') \
         .load()
     df.filter(df.FCN_ID_PERIODO == period)
     return df
