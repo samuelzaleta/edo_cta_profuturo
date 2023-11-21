@@ -102,30 +102,50 @@ with define_extraction(phase, area, postgres_pool, buc_pool) as (postgres, buc):
             , tsh."FCN_ID_TIPO_SUBCTA"
         """
         cargo_query = """
-        SELECT 
-        distinct 
-        tmov."FCN_CUENTA", 
-        tmov."FCN_ID_TIPO_SUBCTA", 
-        SUM(tmov."FTF_MONTO_PESOS"::double precision) AS "FTF_CARGO"
-        FROM
-            "HECHOS"."TTHECHOS_MOVIMIENTO" tmov
-        WHERE tmov."FTD_FEH_LIQUIDACION" BETWEEN :start_month AND :end_month
-          AND tmov."FCN_ID_TIPO_MOVIMIENTO" = '181'
-          AND tmov."FCN_ID_PERIODO" = :term_id
-        GROUP BY tmov."FCN_CUENTA", tmov."FCN_ID_TIPO_SUBCTA"
+        SELECT "FCN_CUENTA", "FCN_ID_TIPO_SUBCTA", SUM("FTF_MONTO_PESOS"::double precision) AS "FTF_CARGO"
+        FROM (
+            SELECT DISTINCT "FCN_CUENTA",
+                   "FCN_ID_TIPO_SUBCTA",
+                   "FTF_MONTO_PESOS"
+            FROM "HECHOS"."TTHECHOS_MOVIMIENTO"
+            WHERE "FTD_FEH_LIQUIDACION" BETWEEN :start_month AND :end_month
+              AND "FCN_ID_TIPO_MOVIMIENTO" = '181'
+              AND "FCN_ID_PERIODO" = :term_id
+        
+            UNION ALL
+        
+            SELECT DISTINCT "CSIE1_NUMCUE",
+                   "SUBCUENTA",
+                   "MONTO"
+            FROM "HECHOS"."TTHECHOS_MOVIMIENTOS_INTEGRITY"
+            WHERE "CSIE1_FECCON" BETWEEN TO_CHAR(:start_month, 'yyyymmdd')::int AND TO_CHAR(:end_month, 'yyyymmdd')::int
+              AND "CSIE1_CODMOV"::int <= 500
+              AND "FCN_ID_PERIODO" = :term_id
+        ) AS mov
+        GROUP BY "FCN_CUENTA", "FCN_ID_TIPO_SUBCTA"
         """
         abono_query = """
-        SELECT 
-        distinct 
-        tmov."FCN_CUENTA", 
-        tmov."FCN_ID_TIPO_SUBCTA", 
-        SUM(tmov."FTF_MONTO_PESOS"::double precision) AS "FTF_ABONO"
-        FROM
-            "HECHOS"."TTHECHOS_MOVIMIENTO" tmov
-        WHERE tmov."FTD_FEH_LIQUIDACION" BETWEEN :start_month AND :end_month
-          AND tmov."FCN_ID_TIPO_MOVIMIENTO" = '180'
-          AND tmov."FCN_ID_PERIODO" = :term_id
-        GROUP BY tmov."FCN_CUENTA", tmov."FCN_ID_TIPO_SUBCTA"
+        SELECT "FCN_CUENTA", "FCN_ID_TIPO_SUBCTA", SUM("FTF_MONTO_PESOS"::double precision) AS "FTF_CARGO"
+        FROM (
+            SELECT DISTINCT "FCN_CUENTA",
+                   "FCN_ID_TIPO_SUBCTA",
+                   "FTF_MONTO_PESOS"
+            FROM "HECHOS"."TTHECHOS_MOVIMIENTO"
+            WHERE "FTD_FEH_LIQUIDACION" BETWEEN :start_month AND :end_month
+              AND "FCN_ID_TIPO_MOVIMIENTO" = '180'
+              AND "FCN_ID_PERIODO" = :term_id
+        
+            UNION ALL
+        
+            SELECT DISTINCT "CSIE1_NUMCUE",
+                   "SUBCUENTA",
+                   "MONTO"
+            FROM "HECHOS"."TTHECHOS_MOVIMIENTOS_INTEGRITY"
+            WHERE "CSIE1_FECCON" BETWEEN TO_CHAR(:start_month, 'yyyymmdd')::int AND TO_CHAR(:end_month, 'yyyymmdd')::int
+              AND "CSIE1_CODMOV"::int > 500
+              AND "FCN_ID_PERIODO" = :term_id
+        ) AS mov
+        GROUP BY "FCN_CUENTA", "FCN_ID_TIPO_SUBCTA";
         """
         comision_query = """
         SELECT
