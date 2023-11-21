@@ -190,9 +190,9 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
             INNER JOIN "GESTOR"."TCGESPRO_INDICADOR_ESTADO_CUENTA" IEC
                 ON IEC."FTN_ID_INDICADOR_ESTADO_CUENTA" = F."FCN_ID_INDICADOR_AFILIACION"
                AND IEC."FTN_VALOR" = CASE
+                   WHEN I."FTB_PENSION" THEN 1
                    WHEN I."FTC_TIPO_CLIENTE" = 'Afiliado' THEN 714
                    WHEN I."FTC_TIPO_CLIENTE" = 'Asignado' THEN 713
-                   WHEN I."FTB_PENSION" = true THEN 1
                END
             INNER JOIN "GESTOR"."TCGESPRO_INDICADOR_ESTADO_CUENTA" TIEC
                 ON TIEC."FTN_ID_INDICADOR_ESTADO_CUENTA" = F."FCN_ID_INDICADOR_BONO"
@@ -247,9 +247,10 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
             INNER JOIN "GESTOR"."TCGESPRO_INDICADOR_ESTADO_CUENTA" IEC
                 ON IEC."FTN_ID_INDICADOR_ESTADO_CUENTA" = F."FCN_ID_INDICADOR_AFILIACION"
                AND IEC."FTN_VALOR" = CASE
+                   WHEN I."FTB_PENSION" THEN 1
                    WHEN I."FTC_TIPO_CLIENTE" = 'Afiliado' THEN 714
                    WHEN I."FTC_TIPO_CLIENTE" = 'Asignado' THEN 713
-                   WHEN I."FTB_PENSION" = true THEN 1 END
+               END
             INNER JOIN "GESTOR"."TCGESPRO_INDICADOR_ESTADO_CUENTA" TIEC
                 ON TIEC."FTN_ID_INDICADOR_ESTADO_CUENTA" = F."FCN_ID_INDICADOR_BONO"
                AND TIEC."FTN_VALOR" = CASE I."FTB_BONO"
@@ -328,9 +329,10 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                 INNER JOIN "GESTOR"."TCGESPRO_INDICADOR_ESTADO_CUENTA" IEC
                     ON IEC."FTN_ID_INDICADOR_ESTADO_CUENTA" = F."FCN_ID_INDICADOR_AFILIACION"
                    AND IEC."FTN_VALOR" = CASE
+                       WHEN I."FTB_PENSION" THEN 1
                        WHEN I."FTC_TIPO_CLIENTE" = 'Afiliado' THEN 714
                        WHEN I."FTC_TIPO_CLIENTE" = 'Asignado' THEN 713
-                       WHEN I."FTB_PENSION" = true THEN 1 END
+                   END
                 INNER JOIN "GESTOR"."TCGESPRO_INDICADOR_ESTADO_CUENTA" TIEC
                     ON TIEC."FTN_ID_INDICADOR_ESTADO_CUENTA" = F."FCN_ID_INDICADOR_BONO"
                    AND TIEC."FTN_VALOR" = CASE I."FTB_BONO"
