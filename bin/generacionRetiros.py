@@ -3,7 +3,9 @@ from profuturo.database import get_postgres_pool
 from profuturo.extraction import extract_terms
 from profuturo.reporters import HtmlReporter
 from pyspark.sql import SparkSession
+import pyspark.sql.functions as f
 import sys
+
 
 spark = SparkSession \
     .builder \
@@ -49,18 +51,27 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                            "TFN_FON_RETENCION_ISR", "FTC_AFO_ENTIDAD", "FTC_AFO_MEDIO_PAGO", "FTC_AFO_RECURSOS_ENTREGA",
                            "FTD_AFO_FECHA_ENTREGA", "FTC_AFO_RETENCION_ISR", "FTC_INFNVT_ENTIDAD",
                            "FTC_INFNVT_CTA_BANCARIA", "FTC_INFNVT_RECURSOS_ENTREGA", "FTC_INFNVT_FECHA_ENTREGA",
-                           "FTC_INFNVT_RETENCION_ISR", "FTD_FECHA_EMISION", "FTD_FECHA_INICIO_PENSION",
+                           "FTC_INFNVT_RETENCION_ISR", "FTD_FECHA_INICIO_PENSION",
                            "FTN_PENSION_INSTITUTO_SEG", "FTN_SALDO_FINAL"]
-        retiros_general = extract_bigquery('ESTADO_CUENTA.TTMUESTR_RETIRO_GENERAL', term_id)
-        retiros = extract_bigquery('ESTADO_CUENTA.TTMUESTR_RETIRO', term_id)
-
-        df = (retiros_general.join(retiros, 'FCN_NUMERO_CUENTA')
-              .select(retiros_general_columns[0], retiros_columns[1], retiros_general_columns[1:-1], retiros_general[2:-1]))
+        retiros_general = extract_bigquery('ESTADO_CUENTA.TTMUESTR_RETIRO_GENERAL', term_id).select(*retiros_general_columns)
+        retiros = extract_bigquery('ESTADO_CUENTA.TTMUESTR_RETIRO', term_id).select(*retiros_columns)
+        columns = [retiros_general_columns[0]] + [retiros_columns[1]] + retiros_general_columns[1:] + retiros_general_columns[2:]
+        df = retiros_general.join(retiros, 'FCN_NUMERO_CUENTA').drop(retiros['FCN_NUMERO_CUENTA'])
+        df_fecha_emision = df.select("FTD_FECHA_EMISION")
+        left_columns = df.select("FTD_FECHA_INICIO_PENSION", "FTN_PENSION_INSTITUTO_SEG", "FTN_SALDO_FINAL")
+        df.printSchema()
+        df = df.drop("FTD_FECHA_INICIO_PENSION", "FTN_PENSION_INSTITUTO_SEG", "FTN_SALDO_FINAL")
+        df = df.withColumn("FTD_FECHA_EMISION_2", f.lit(df_fecha_emision["FTD_FECHA_EMISION"]))
+        df.printSchema()
+        left_columns.printSchema()
+        df = df.withColumn("FTD_FECHA_INICIO_PENSION", f.lit(left_columns["FTD_FECHA_INICIO_PENSION"]))
+        df = df.withColumn("FTN_PENSION_INSTITUTO_SEG", f.lit(left_columns["FTN_PENSION_INSTITUTO_SEG"]))
+        df = df.withColumn("FTN_SALDO_FINAL", f.lit(left_columns["FTN_SALDO_FINAL"]))
         df.show()
+        df.printSchema()
 
-        df = df.rdd.map(format_data)
-        df.write.text(f"gs://gestor-edo-cuenta/test_retiros/retiros_{term_id}.txt")
-
+        df.write.csv(f"gs://edo_cuenta_profuturo_dev_b/test_retiros/retiros_{term_id}.txt", sep="|")
+        """
         notify(
             postgres,
             f"Generacion de archivos Retiros",
@@ -70,4 +81,4 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
             message=f"Se han exportado retiros para el periodo {time_period}",
             aprobar=False,
             descarga=False
-        )
+        )"""

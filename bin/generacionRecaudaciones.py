@@ -19,11 +19,10 @@ user = int(sys.argv[3])
 area = int(sys.argv[4])
 
 
-def extract_bigquery(table, period):
+def extract_bigquery(table):
     df = spark.read.format('bigquery') \
         .option('table', f'estado-de-cuenta-service-dev-b:{table}') \
         .load()
-    df.filter(df.FCN_ID_PERIODO == period)
     return df
 
 
@@ -96,8 +95,8 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                         "FTF_VALOR_NOMINAL_PESO"]
         saldo_columns = ["FTN_ID_CONCEPTO", "FTC_DESC_CONCEPTO", "FTF_SALDO_TOTAL"]
 
-        df_edo_general = extract_bigquery('ESTADO_CUENTA.TTEDOCTA_GENERAL', term_id)
-        df_edo_anverso = extract_bigquery('ESTADO_CUENTA.TTEDOCTA_ANVERSO', term_id)
+        df_edo_general = extract_bigquery('ESTADO_CUENTA.TTEDOCTA_GENERAL').filter('FCN_ID_PERIODO' == term_id)
+        df_edo_anverso = extract_bigquery('ESTADO_CUENTA.TTEDOCTA_ANVERSO')
 
         df = df_edo_general.join(df_edo_anverso, 'FCN_ID_EDOCTA')
         data_strings = df.rdd.map(format_row).collect()
