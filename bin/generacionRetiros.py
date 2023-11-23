@@ -1,17 +1,13 @@
 from profuturo.common import register_time, define_extraction, notify
-from profuturo.database import get_postgres_pool
-from profuturo.extraction import extract_terms
+from profuturo.database import get_postgres_pool, configure_bigquery_spark
+from profuturo.extraction import extract_terms, _get_spark_session, read_table_insert_temp_view
 from profuturo.reporters import HtmlReporter
 from pyspark.sql import SparkSession
 import pyspark.sql.functions as f
 import sys
 
 
-spark = SparkSession \
-    .builder \
-    .master('yarn') \
-    .appName('spark-bigquery-retiros') \
-    .getOrCreate()
+spark = _get_spark_session()
 
 html_reporter = HtmlReporter()
 postgres_pool = get_postgres_pool()
@@ -42,6 +38,15 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
 
     with register_time(postgres_pool, phase, term_id, user, area):
 
+        read_table_insert_temp_view(configure_bigquery_spark, """
+                        SELECT * FROM ESTADO_CUENTA.TTEDOCTA_RETIRO_GENERAL
+                        """, "retiro_general")
+        read_table_insert_temp_view(configure_bigquery_spark, """
+                        SELECT * FROM ESTADO_CUENTA.TTMUESTR_RETIRO
+                        """, "retiro_general")
+        retiros_general = spark.sql("Select * from retiro_general")
+        retiros = spark.sql("select * from retiro")
+
         retiros_general_columns = ["FCN_NUMERO_CUENTA", "FTC_NOMBRE", "FTC_CALLE_NUMERO", "FTC_COLONIA", "FTC_MUNICIPIO"
             , "FTC_CP", "FTC_ENTIDAD", "FTC_CURP", "FTC_RFC", "FTC_NSS"]
         retiros_columns = ["FCN_NUMERO_CUENTA", "FTD_FECHA_EMISION", "FTN_SDO_INI_AHO_RET", "FTN_SDO_INI_AHO_VIV",
@@ -53,24 +58,38 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                            "FTC_INFNVT_CTA_BANCARIA", "FTC_INFNVT_RECURSOS_ENTREGA", "FTC_INFNVT_FECHA_ENTREGA",
                            "FTC_INFNVT_RETENCION_ISR", "FTD_FECHA_INICIO_PENSION",
                            "FTN_PENSION_INSTITUTO_SEG", "FTN_SALDO_FINAL"]
+
         retiros_general = extract_bigquery('ESTADO_CUENTA.TTMUESTR_RETIRO_GENERAL', term_id).select(*retiros_general_columns)
         retiros = extract_bigquery('ESTADO_CUENTA.TTMUESTR_RETIRO', term_id).select(*retiros_columns)
+
         columns = [retiros_general_columns[0]] + [retiros_columns[1]] + retiros_general_columns[1:] + retiros_general_columns[2:]
+
         df = retiros_general.join(retiros, 'FCN_NUMERO_CUENTA').drop(retiros['FCN_NUMERO_CUENTA'])
+
         df_fecha_emision = df.select("FTD_FECHA_EMISION")
         left_columns = df.select("FTD_FECHA_INICIO_PENSION", "FTN_PENSION_INSTITUTO_SEG", "FTN_SALDO_FINAL")
+        print("DF SCHEMA")
         df.printSchema()
+        print("LEFT_COLUMNS SCHEMA")
+        left_columns.printSchema()
+        print("FECHA_EMISION SCHEMA")
+        df_fecha_emision.printSchema()
+        print("MINI DFS COMPLETED")
+
         df = df.drop("FTD_FECHA_INICIO_PENSION", "FTN_PENSION_INSTITUTO_SEG", "FTN_SALDO_FINAL")
+        print("COLUMNS DROPED")
+        df.printSchema()
+
         df = df.withColumn("FTD_FECHA_EMISION_2", f.lit(df_fecha_emision["FTD_FECHA_EMISION"]))
         df.printSchema()
-        left_columns.printSchema()
+
         df = df.withColumn("FTD_FECHA_INICIO_PENSION", f.lit(left_columns["FTD_FECHA_INICIO_PENSION"]))
         df = df.withColumn("FTN_PENSION_INSTITUTO_SEG", f.lit(left_columns["FTN_PENSION_INSTITUTO_SEG"]))
         df = df.withColumn("FTN_SALDO_FINAL", f.lit(left_columns["FTN_SALDO_FINAL"]))
         df.show()
         df.printSchema()
 
-        df.write.csv(f"gs://edo_cuenta_profuturo_dev_b/test_retiros/retiros_{term_id}.txt", sep="|")
+        df.write.csv(f"gs://edo_cuenta_profuturo_dev_b/test_retiros/retiros_{term_id}", sep="|")
         """
         notify(
             postgres,
