@@ -66,27 +66,13 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
 
         df = retiros_general.join(retiros, 'FCN_NUMERO_CUENTA').drop(retiros['FCN_NUMERO_CUENTA'])
 
-        df_fecha_emision = df.select("FTD_FECHA_EMISION")
-        left_columns = df.select("FTD_FECHA_INICIO_PENSION", "FTN_PENSION_INSTITUTO_SEG", "FTN_SALDO_FINAL")
-        print("DF SCHEMA")
-        df.printSchema()
-        print("LEFT_COLUMNS SCHEMA")
-        left_columns.printSchema()
-        print("FECHA_EMISION SCHEMA")
-        df_fecha_emision.printSchema()
-        print("MINI DFS COMPLETED")
+        df = df.withColumn("FTD_FECHA_EMISION_2", f.lit(df["FTD_FECHA_EMISION"]))
+        df = df.withColumn("FTD_FECHA_INICIO_PENSION_2", f.lit(df["FTD_FECHA_INICIO_PENSION"]))
+        df = df.withColumn("FTN_PENSION_INSTITUTO_SEG_2", f.lit(df["FTN_PENSION_INSTITUTO_SEG"]))
+        df = df.withColumn("FTN_SALDO_FINAL_2", f.lit(df["FTN_SALDO_FINAL"]))
 
         df = df.drop("FTD_FECHA_INICIO_PENSION", "FTN_PENSION_INSTITUTO_SEG", "FTN_SALDO_FINAL")
         print("COLUMNS DROPED")
-        df.printSchema()
-
-        df = df.withColumn("FTD_FECHA_EMISION_2", f.lit(df_fecha_emision["FTD_FECHA_EMISION"]))
-        df.printSchema()
-
-        df = df.withColumn("FTD_FECHA_INICIO_PENSION", f.lit(left_columns["FTD_FECHA_INICIO_PENSION"]))
-        df = df.withColumn("FTN_PENSION_INSTITUTO_SEG", f.lit(left_columns["FTN_PENSION_INSTITUTO_SEG"]))
-        df = df.withColumn("FTN_SALDO_FINAL", f.lit(left_columns["FTN_SALDO_FINAL"]))
-        df.show()
         df.printSchema()
 
         df.write.csv(f"gs://edo_cuenta_profuturo_dev_b/test_retiros/retiros_{term_id}", sep="|")
