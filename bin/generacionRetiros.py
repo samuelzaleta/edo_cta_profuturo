@@ -75,7 +75,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
         print("COLUMNS DROPED")
         df.printSchema()
 
-        df.write.csv(f"gs://edo_cuenta_profuturo_dev_b/test_retiros/retiros_{term_id}", sep="|")
+        df.write.mode("overwrite").csv(f"gs://edo_cuenta_profuturo_dev_b/test_retiros/retiros_{term_id}", sep="|")
         """
         notify(
             postgres,
