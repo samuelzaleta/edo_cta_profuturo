@@ -1,14 +1,19 @@
 from sqlalchemy import text
 from sqlalchemy.engine import Connection, CursorResult
 from profuturo.common import define_extraction, register_time,notify, truncate_table
-from profuturo.database import get_postgres_pool, configure_postgres_spark, configure_bigquery_spark
+from profuturo.database import get_postgres_pool, configure_postgres_spark, configure_bigquery_spark, get_bigquery_pool
 from profuturo.extraction import _write_spark_dataframe, extract_terms, _get_spark_session, read_table_insert_temp_view
 from pyspark.sql.functions import concat, col , row_number,lit, current_timestamp
 from pyspark.sql.window import Window
-import sys
+from pyspark.sql import functions as F
 import requests
+import sys
+import random
+import string
 
 
+
+###################OBTENCIO DE MUESTRAS#######################################
 def find_samples(samples_cursor: CursorResult):
     samples = set()
     i = 0
@@ -39,11 +44,12 @@ def find_samples(samples_cursor: CursorResult):
 url = "https://procesos-api-service-qa-5flqomrlga-uc.a.run.app/procesos/generarEstadosCuentaPensionados"
 
 postgres_pool = get_postgres_pool()
+bigquery_pool = get_bigquery_pool()
 phase = int(sys.argv[1])
 user = int(sys.argv[3])
 area = int(sys.argv[4])
 
-with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, _):
+with define_extraction(phase, area, postgres_pool,bigquery_pool) as (postgres, bigquery):
     term = extract_terms(postgres, phase)
     term_id = term["id"]
     start_month = term["start_month"]
@@ -54,16 +60,23 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
     with register_time(postgres_pool, phase, term_id, user, area):
         truncate_table(postgres, "TCGESPRO_MUESTRA_SOL_RE_CONSAR")
         truncate_table(postgres, "TCGESPRO_MUESTRA", term=term_id)
+        #truncate_table(bigquery,'ESTADO_CUENTA.TTMUESTR_REVERSO')
+        #truncate_table(bigquery,'ESTADO_CUENTA.TTMUESTR_ANVERSO')
+        #truncate_table(bigquery,'ESTADO_CUENTA.TTMUESTR_GENERAL')
         # Extracción
         read_table_insert_temp_view(
             configure_postgres_spark,
             """
-            SELECT "FCN_CUENTA"
-            FROM "HECHOS"."TTHECHOS_CARGA_ARCHIVO"
-            WHERE "FTC_TRAMITE" = :tramite AND "FCN_ID_AREA" = 1
+            SELECT
+            Distinct HC."FCN_CUENTA", CAST(CA."FTC_USUARIO_CARGA" as int) AS FCN_ID_USUARIO
+            FROM "HECHOS"."TTHECHOS_CARGA_ARCHIVO" CA
+            INNER JOIN "HECHOS"."TCHECHOS_CLIENTE" HC
+            ON CA."FCN_CUENTA" = HC."FCN_CUENTA"
+            WHERE "FCN_ID_INDICADOR" = :tramite AND "FCN_ID_AREA" = :area
+            AND CA."FCN_ID_PERIODO" = :term
             """,
             "muestrasManuales",
-            params={"tramite": "MM"}
+            params={"tramite": 32, "user": str(user), "area":area, "term":term_id}
         )
 
         cursor = postgres.execute(text("""
@@ -79,7 +92,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
             SELECT M."FCN_CUENTA", PC."FCN_ID_MOVIMIENTO_CONSAR"
             FROM "HECHOS"."TTHECHOS_MOVIMIENTO" M
                 INNER JOIN "GESTOR"."TTGESPRO_MOV_PROFUTURO_CONSAR" PC ON M."FCN_ID_CONCEPTO_MOVIMIENTO" = PC."FCN_ID_MOVIMIENTO_PROFUTURO"
-             M."FTD_FEH_LIQUIDACION" between :end - INTERVAL '4 MONTH' and :end
+            WHERE M."FTD_FEH_LIQUIDACION" between :end - INTERVAL '4 MONTH' and :end
             GROUP BY M."FCN_CUENTA", PC."FCN_ID_MOVIMIENTO_CONSAR"
         ) AS CC
         INNER JOIN "GESTOR"."TTGESPRO_CONFIGURACION_MUESTRA_AUTOMATICA" MC ON CC."FCN_ID_MOVIMIENTO_CONSAR" = MC."FCN_ID_MOVIMIENTO_CONSAR"
@@ -95,19 +108,27 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
         select *
         from muestrasManuales
         """)
-        record_list = df.collect()
-        records_as_dicts = [record.FCN_CUENTA for record in record_list]
-        records_as_dicts.extend(samples)
-        print(records_as_dicts)
+        df.show()
 
-        filas = [{"FCN_CUENTA": records_as_dict} for records_as_dict in records_as_dicts]
+        # Set of values
+        values_set = samples
 
-        df = spark.createDataFrame(filas)
-        df = df.withColumn("FCN_ID_PERIODO", lit(term_id))
-        df = df.withColumn("FCN_ID_USUARIO", lit(user))
-        df = df.withColumn("FCN_ID_AREA", lit(area))
-        df = df.withColumn("FTC_ESTATUS", lit("Pendiente"))
-        df = df.withColumn("FTD_FECHAHORA_ALTA", lit(current_timestamp()))
+        # Create separate lists for each column
+        values_column = list(values_set)
+        user_list = [int(user)] * len(values_set)
+
+        # Create a DataFrame
+        data = list(zip(values_column, user_list))
+        df1 = spark.createDataFrame(data, ["FCN_CUENTA", "FCN_ID_USUARIO"])
+        df1.show()
+        union_df = df1.union(df)
+        union_df.show()
+
+        union_df = union_df.withColumn("FCN_ID_PERIODO", lit(term_id))
+        union_df = union_df.withColumn("FCN_ID_AREA", lit(area))
+        #df = df.withColumn("FTC_ESTATUS", lit("Pendiente"))
+        union_df = union_df.withColumn("FTD_FECHAHORA_ALTA", lit(current_timestamp()))
+        """
         df = df.withColumn("FTC_URL_PDF_ORIGEN", concat(
             lit("https://storage.googleapis.com/gestor-edo-cuenta/estados_cuenta_archivos/"),
             col("FCN_CUENTA"),
@@ -117,8 +138,9 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
             col("FCN_ID_USUARIO"),
             lit(".pdf"),
         ))
-        _write_spark_dataframe(df, configure_postgres_spark, '"GESTOR"."TCGESPRO_MUESTRA"')
-        df.printSchema()
+        """
+        _write_spark_dataframe(union_df, configure_postgres_spark, '"GESTOR"."TCGESPRO_MUESTRA"')
+        union_df.printSchema()
 
         is_reprocess = postgres.execute(text("""
         SELECT EXISTS(
@@ -134,6 +156,14 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
         if is_reprocess:
             filter_reprocessed_samples = 'INNER JOIN "GESTOR"."TCGESPRO_MUESTRA_SOL_RE_CONSAR" MR ON M."FTN_ID_MUESTRA" = MR."FCN_ID_MUESTRA"'
 
+
+##########################GEENRACIÓN DE MUESTRAS #################################################
+
+        char1 = random.choice(string.ascii_letters).upper()
+        char2 = random.choice(string.ascii_letters).upper()
+        random = char1 + char2
+        print(random)
+
         read_table_insert_temp_view(configure_postgres_spark, f"""
         SELECT DISTINCT F."FCN_ID_GENERACION" AS "FTN_ID_GRUPO_SEGMENTACION",
                -- F."FCN_ID_GENERACION",
@@ -142,11 +172,11 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                M."FCN_ID_PERIODO",
                --CONCAT(SUBSTR(P."FTC_PERIODO", 4), SUBSTR(P."FTC_PERIODO", 1, 2)) AS "PERIODO",
                C."FTN_CUENTA" AS "FCN_NUMERO_CUENTA",
-               (DATE '2023-01-31')::timestamp AS "FTD_FECHA_CORTE",
-               DATE '2023-01-31' - INTERVAL '1 month' * (PR."FTN_MESES" - 1) AS "FTD_FECHA_GRAL_INICIO",
-               (DATE '2023-01-31')::timestamp AS "FTD_FECHA_GRAL_FIN",
-               DATE '2023-01-31' - INTERVAL '1 month' * (PA."FTN_MESES" - 1) AS "FTD_FECHA_MOV_INICIO",
-               (DATE '2023-01-31')::timestamp AS "FTD_FECHA_MOV_FIN",
+               CAST(:end as TIMESTAMP) AS "FTD_FECHA_CORTE",
+               CAST(:end - INTERVAL '1 month' * (PR."FTN_MESES" - 1) AS TIMESTAMP) AS "FTD_FECHA_GRAL_INICIO",
+               CAST(:end as TIMESTAMP)  AS "FTD_FECHA_GRAL_FIN",
+               CAST(:end as TIMESTAMP)  - INTERVAL '1 month' * (PA."FTN_MESES" - 1) AS "FTD_FECHA_MOV_INICIO",
+               CAST(:end as TIMESTAMP)  AS "FTD_FECHA_MOV_FIN",
                0 AS "FTN_ID_SIEFORE",
                '55-60' AS "FTC_DESC_SIEFORE",
                cast(I."FTC_GENERACION" AS varchar) AS "FTC_TIPOGENERACION",
@@ -160,8 +190,8 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                C."FTC_NSS",
                C."FTC_RFC",
                C."FTC_CURP",
-               now() AS "FTD_FECHAHORA_ALTA",
-               '0' AS "FTC_USUARIO_ALTA"
+               --now() AS "FTD_FECHAHORA_ALTA",
+               :user AS "FTC_USUARIO_ALTA"
         FROM "GESTOR"."TTGESPRO_CONFIGURACION_FORMATO_ESTADO_CUENTA" F
             INNER JOIN "GESTOR"."TCGESPRO_FORMATO_ESTADO_CUENTA" FE ON F."FCN_ID_FORMATO_ESTADO_CUENTA" = FE."FTN_ID_FORMATO_ESTADO_CUENTA"
             INNER JOIN "GESTOR"."TCGESPRO_PERIODICIDAD" PG ON F."FCN_ID_PERIODICIDAD_GENERACION" = PG."FTN_ID_PERIODICIDAD"
@@ -213,8 +243,18 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
         ).cast("bigint"))
 
 
-        general_df = general_df.withColumn("FCN_FOLIO", row_number().over(Window.orderBy(lit(0))).cast("string"))
-        #general_df = general_df.drop(col("PERIODO"))
+        general_df = general_df.withColumn("consecutivo", row_number().over(Window.orderBy(lit(0))).cast("string"))
+
+        # Fill the "consecutivo" column with 9-digit values
+        general_df = general_df.withColumn("consecutivo", F.lpad("consecutivo", 9, '0'))
+
+        general_df = general_df.withColumn("FCN_FOLIO",concat(lit(random),
+                                                              col("FCN_ID_PERIODO"),
+                                                              col("FTN_ID_FORMATO"),
+                                                              col("consecutivo")
+                                                              )
+                                           )
+        general_df = general_df.drop(col("consecutivo"))
         general_df.createOrReplaceTempView("general")
 
         read_table_insert_temp_view(configure_postgres_spark, f"""
@@ -271,8 +311,8 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                sum(R."FTF_MONTO_PESOS") AS "FTN_MONTO",
                0 AS "FTN_DIA_COTIZADO",
                cast(0.0 as numeric) as "FTN_SALARIO_BASE",
-               now() AS "FTD_FECHAHORA_ALTA",
-               cast(0 as varchar) AS "FTC_USUARIO_ALTA"
+               --now() AS "FTD_FECHAHORA_ALTA",
+               :user AS FTC_USUARIO_ALTA
         FROM "GESTOR"."TTGESPRO_CONFIGURACION_FORMATO_ESTADO_CUENTA" F
             INNER JOIN "GESTOR"."TCGESPRO_PERIODICIDAD" PG ON F."FCN_ID_PERIODICIDAD_REVERSO" = PG."FTN_ID_PERIODICIDAD"
             INNER JOIN dataset D ON D."FTN_ID_FORMATO" = F."FCN_ID_FORMATO_ESTADO_CUENTA"
@@ -377,7 +417,6 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                    F."FCN_ID_FORMATO_ESTADO_CUENTA" AS "FTN_ID_FORMATO",
                    sum(CASE WHEN R."FCN_ID_TIPO_SUBCTA" = ANY(C."FTA_SUBCUENTAS") THEN R."FTF_ABONO" ELSE 0 END) AS aportaciones,
                    sum(CASE WHEN R."FCN_ID_TIPO_SUBCTA" = ANY(C."FTA_SUBCUENTAS") THEN R."FTF_CARGO" ELSE 0 END) AS retiros,
-                   -- sum(CASE WHEN R."FCN_ID_TIPO_SUBCTA" = ANY(C."FTA_SUBCUENTAS") THEN R."FTF_RENDIMIENTO_CALCULADO" ELSE 0 END) AS rendimientos,
                    sum(CASE WHEN R."FCN_ID_TIPO_SUBCTA" = ANY(C."FTA_SUBCUENTAS") THEN R."FTF_COMISION" ELSE 0 END) AS comisiones,
                    sum(CASE WHEN R."FCN_ID_TIPO_SUBCTA" =  ANY(C."FTA_SUBCUENTAS") AND R."FCN_ID_PERIODO" = (SELECT I."FTN_ID_PERIODO" FROM SaldoIni I) THEN R."FTF_SALDO_INICIAL" ELSE 0 END) AS saldoInicial,
                    sum(CASE WHEN R."FCN_ID_TIPO_SUBCTA" =  ANY(C."FTA_SUBCUENTAS") AND R."FCN_ID_PERIODO" = (SELECT I."FTN_ID_PERIODO" FROM SaldoFin I) THEN R."FTF_SALDO_FINAL" ELSE 0 END) AS saldoFinal
@@ -416,8 +455,8 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                cast(0.0 as numeric(16,2)) AS "FTN_MONTO_PENSION",
                "FTC_SECCION" AS "FTC_SECCION",
                "FTC_AHORRO" AS "FTC_TIPO_AHORRO",
-               now() AS "FTD_FECHAHORA_ALTA",
-               '0' AS "FTC_USUARIO_ALTA"--,
+               --now() AS "FTD_FECHAHORA_ALTA",
+               :user AS FTC_USUARIO_ALTA--,
                -- FTD_FECHA_INICIO",
                -- "FTD_FECHA_FINAL"
         FROM dataset1
@@ -475,7 +514,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
         SELECT 
                m.FCN_CUENTA,
                m.FCN_ID_PERIODO,
-                concat("https://storage.googleapis.com/profuturo-archivos/",g.FCN_FOLIO,".pdf") as FTC_URL_PDF_ORIGEN,
+                concat("https://storage.googleapis.com/edo_cuenta_profuturo_dev_b/profuturo-archivos/",g.FCN_FOLIO,".pdf") as FTC_URL_PDF_ORIGEN,
                m.FTC_ESTATUS,
                m.FCN_ID_USUARIO,
                m.FCN_ID_AREA,
@@ -488,7 +527,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
         _write_spark_dataframe(reverso_df, configure_bigquery_spark, 'ESTADO_CUENTA.TTMUESTR_REVERSO')
         _write_spark_dataframe(anverso_df, configure_bigquery_spark, 'ESTADO_CUENTA.TTMUESTR_ANVERSO')
         _write_spark_dataframe(general_df, configure_bigquery_spark, 'ESTADO_CUENTA.TTMUESTR_GENERAL')
-        _write_spark_dataframe(df, configure_postgres_spark, '"GESTOR"."TCGESPRO_MUESTRA"')
+        #_write_spark_dataframe(df, configure_postgres_spark, '"GESTOR"."TCGESPRO_MUESTRA"')
 
         response = requests.get(url)
         # Verifica si la petición fue exitosa
