@@ -31,12 +31,9 @@ def use_pools(phase: int, *pools: Engine):
 
 def get_mit_conn() -> cx_Oracle.Connection:
     dsn = cx_Oracle.makedsn(
-        '172.22.164.17'#os.getenv("MIT_HOST")
-        ,
-        1521#int(os.getenv("MIT_PORT"))
-        ,
-        service_name= 'mitafore.profuturo-gnp.net'#os.getenv("MIT_DATABASE")
-        ,
+        os.getenv("MIT_HOST"),
+        int(os.getenv("MIT_PORT")),
+        service_name=os.getenv("MIT_DATABASE"),
     )
 
     return cx_Oracle.connect(
@@ -64,21 +61,21 @@ def get_buc_conn() -> cx_Oracle.Connection:
 
 def get_postgres_conn():
     return psycopg2.connect(
-        host='34.85.240.80', #os.getenv("POSTGRES_HOST"),
-        port= 5432,#int(os.getenv("POSTGRES_PORT")),
-        database= 'PROFUTURO',#os.getenv("POSTGRES_DATABASE"),
-        user= 'alexo',#os.getenv("POSTGRES_USER"),
-        password= 'Oxela3210',#os.getenv("POSTGRES_PASSWORD"),
+        host=os.getenv("POSTGRES_HOST"),
+        port=int(os.getenv("POSTGRES_PORT")),
+        database=os.getenv("POSTGRES_DATABASE"),
+        user=os.getenv("POSTGRES_USER"),
+        password=os.getenv("POSTGRES_PASSWORD"),
         options='-c search_path="MAESTROS","GESTOR","HECHOS","RESULTADOS"',
     )
 
 
 def get_integrity_conn(database: str):
     def creator():
-        host = '130.40.30.144' #os.getenv("INTEGRITY_HOST")
-        port = 1714 #os.getenv("INTEGRITY_PORT")
-        user = 'SIEFORE'#os.getenv("INTEGRITY_USER")
-        password = 'SIEFORE2019'#os.getenv("INTEGRITY_PASSWORD")
+        host = os.getenv("INTEGRITY_HOST")
+        port = os.getenv("INTEGRITY_PORT")
+        user = os.getenv("INTEGRITY_USER")
+        password = os.getenv("INTEGRITY_PASSWORD")
 
         return jaydebeapi.connect(
             "oracle.rdb.jdbc.rdbThin.Driver",
@@ -130,11 +127,11 @@ def get_bigquery_pool() -> Engine:
 
 
 def configure_mit_spark(connection: SparkConnection, table: str, reading: bool) -> SparkConnection:
-    host = '130.40.30.160'#os.getenv("MIT_HOST")
-    port = 1521#int(os.getenv("MIT_PORT"))
-    service_name = 'mitafore.profuturo-gnp.net'#os.getenv("MIT_DATABASE")
-    user = 'CIERREN_APP'#os.getenv("MIT_USER")
-    password = 'l90E5$TT'#os.getenv("MIT_PASSWORD")
+    host = os.getenv("MIT_HOST")
+    port = int(os.getenv("MIT_PORT"))
+    service_name = os.getenv("MIT_DATABASE")
+    user = os.getenv("MIT_USER")
+    password = os.getenv("MIT_PASSWORD")
 
     return configure_jdbc_spark(connection, table, reading) \
         .option("url", f"jdbc:oracle:thin:@//{host}:{port}/{service_name}") \
@@ -145,11 +142,11 @@ def configure_mit_spark(connection: SparkConnection, table: str, reading: bool) 
 
 
 def configure_buc_spark(connection: SparkConnection, table: str, reading: bool) -> SparkConnection:
-    host = '130.40.30.160'#os.getenv("BUC_HOST")
-    port = 16161 #int(os.getenv("BUC_PORT"))
-    service_name =  'QA34' #os.getenv("BUC_DATABASE")
-    user = 'CLUNICO' #os.getenv("BUC_USER")
-    password = 'temp4now13' #os.getenv("BUC_PASSWORD")
+    host = os.getenv("BUC_HOST")
+    port = int(os.getenv("BUC_PORT"))
+    service_name = os.getenv("BUC_DATABASE")
+    user = os.getenv("BUC_USER")
+    password = os.getenv("BUC_PASSWORD")
 
     return configure_jdbc_spark(connection, table, reading) \
         .option("url", f"jdbc:oracle:thin:@//{host}:{port}/{service_name}") \
@@ -177,11 +174,11 @@ def configure_integrity_spark(database: str) -> SparkConnectionConfigurator:
 
 
 def configure_postgres_spark(connection: SparkConnection, table: str, reading: bool) -> SparkConnection:
-    host = '34.85.240.80'#os.getenv("POSTGRES_HOST")
-    port = 5432 #int(os.getenv("POSTGRES_PORT"))
-    database ='PROFUTURO' #os.getenv("POSTGRES_DATABASE")
-    user = 'alexo'#os.getenv("POSTGRES_USER")
-    password = 'Oxela3210'#os.getenv("POSTGRES_PASSWORD")
+    host = os.getenv("POSTGRES_HOST")
+    port = int(os.getenv("POSTGRES_PORT"))
+    database = os.getenv("POSTGRES_DATABASE")
+    user = os.getenv("POSTGRES_USER")
+    password = os.getenv("POSTGRES_PASSWORD")
 
     return configure_jdbc_spark(connection, table, reading) \
         .option("url", f"jdbc:postgresql://{host}:{port}/{database}") \
@@ -215,30 +212,30 @@ def configure_jdbc_spark(connection: SparkConnection, table: str, reading: bool)
 
 
 def get_mit_url():
-    host = '172.22.164.17'  # os.getenv("MIT_HOST")
-    port = 1521  # int(os.getenv("MIT_PORT"))
-    service_name = 'mitafore.profuturo-gnp.net'  # os.getenv("MIT_DATABASE")
-    user = 'CIERREN_APP'  # os.getenv("MIT_USER")
-    password = 'l90E5$TT'  # os.getenv("MIT_PASSWORD")
+    host = os.getenv("MIT_HOST")
+    port = int(os.getenv("MIT_PORT"))
+    service_name = os.getenv("MIT_DATABASE")
+    user = os.getenv("MIT_USER")
+    password = os.getenv("MIT_PASSWORD")
 
     return f"oracle://{user}:{password}@{host}:{port}/{service_name}"
 
 
 def get_buc_url():
-    host = '172.22.164.19'  # os.getenv("BUC_HOST")
-    port = 16161  # int(os.getenv("BUC_PORT"))
-    service_name = 'QA34'  # os.getenv("BUC_DATABASE")
-    user = 'CLUNICO'  # os.getenv("BUC_USER")
-    password = 'temp4now13'  # os.getenv("BUC_PASSWORD")
+    host = os.getenv("BUC_HOST")
+    port = int(os.getenv("BUC_PORT"))
+    service_name = os.getenv("BUC_DATABASE")
+    user = os.getenv("BUC_USER")
+    password = os.getenv("BUC_PASSWORD")
 
     return f"oracle://{user}:{password}@{host}:{port}/{service_name}"
 
 
 def get_postgres_url():
-    host = '34.85.240.80'  # os.getenv("POSTGRES_HOST")
-    port = 5432  # int(os.getenv("POSTGRES_PORT"))
-    database = 'PROFUTURO'  # os.getenv("POSTGRES_DATABASE")
-    user = 'alexo'  # os.getenv("POSTGRES_USER")
-    password = 'Oxela3210'  # os.getenv("POSTGRES_PASSWORD")
+    host = os.getenv("POSTGRES_HOST")
+    port = int(os.getenv("POSTGRES_PORT"))
+    database = os.getenv("POSTGRES_DATABASE")
+    user = os.getenv("POSTGRES_USER")
+    password = os.getenv("POSTGRES_PASSWORD")
 
     return f'postgresql://{user}:{password}@{host}:{port}/{database}'
