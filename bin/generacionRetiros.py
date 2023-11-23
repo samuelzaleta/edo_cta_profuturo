@@ -1,8 +1,7 @@
 from profuturo.common import register_time, define_extraction, notify
-from profuturo.database import get_postgres_pool, configure_bigquery_spark
-from profuturo.extraction import extract_terms, _get_spark_session, read_table_insert_temp_view
+from profuturo.database import get_postgres_pool
+from profuturo.extraction import extract_terms, _get_spark_session
 from profuturo.reporters import HtmlReporter
-from pyspark.sql import SparkSession
 import pyspark.sql.functions as f
 import sys
 
@@ -38,15 +37,6 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
 
     with register_time(postgres_pool, phase, term_id, user, area):
 
-        read_table_insert_temp_view(configure_bigquery_spark, """
-                        SELECT * FROM ESTADO_CUENTA.TTEDOCTA_RETIRO_GENERAL
-                        """, "retiro_general")
-        read_table_insert_temp_view(configure_bigquery_spark, """
-                        SELECT * FROM ESTADO_CUENTA.TTMUESTR_RETIRO
-                        """, "retiro_general")
-        retiros_general = spark.sql("Select * from retiro_general")
-        retiros = spark.sql("select * from retiro")
-
         retiros_general_columns = ["FCN_NUMERO_CUENTA", "FTC_NOMBRE", "FTC_CALLE_NUMERO", "FTC_COLONIA", "FTC_MUNICIPIO"
             , "FTC_CP", "FTC_ENTIDAD", "FTC_CURP", "FTC_RFC", "FTC_NSS"]
         retiros_columns = ["FCN_NUMERO_CUENTA", "FTD_FECHA_EMISION", "FTN_SDO_INI_AHO_RET", "FTN_SDO_INI_AHO_VIV",
@@ -76,7 +66,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
         df.printSchema()
 
         df.write.mode("overwrite").csv(f"gs://edo_cuenta_profuturo_dev_b/test_retiros/retiros_{term_id}", sep="|")
-        """
+
         notify(
             postgres,
             f"Generacion de archivos Retiros",
@@ -86,4 +76,4 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
             message=f"Se han exportado retiros para el periodo {time_period}",
             aprobar=False,
             descarga=False
-        )"""
+        )
