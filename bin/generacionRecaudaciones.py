@@ -89,22 +89,26 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                            "FTN_CP", "FTC_ENTIDAD_FEDERATIVA", "FTC_RFC", "FTC_NSS", "FTC_CURP",
                            "FTD_FECHA_GRAL_INICIO", "FTD_FECHA_GRAL_FIN", "FTN_ID_FORMATO", "FTN_ID_SIEFORE",
                            "FTD_FECHA_CORTE", "FTB_PDF_IMPRESO", "FTF_SALDO_SUBTOTAL", "FTF_SALDO_TOTAL", "FTN_PENSION_MENSUAL"]
-        ahorro_columns = ["FTC_DESC_CONCEPTO", "FTF_SALDO_ANTERIOR", "FTF_APORTACION", "FTF_RETIRO", "FTF_RENDIMIENTO",
+        ahorro_columns = ["FTC_CONCEPTO_NEGOCIO", "FTF_SALDO_ANTERIOR", "FTF_APORTACION", "FTF_RETIRO", "FTF_RENDIMIENTO",
                           "FTF_COMISION", "FTF_SALDO_FINAL"]
-        bono_columns = ["FTC_DESC_CONCEPTO", "FTF_VALOR_ACTUAL_UDI", "FTF_VALOR_NOMINAL_UDI", "FTF_VALOR_ACTUAL_PESO",
+        bono_columns = ["FTC_CONCEPTO_NEGOCIO", "FTF_VALOR_ACTUAL_UDI", "FTF_VALOR_NOMINAL_UDI", "FTF_VALOR_ACTUAL_PESO",
                         "FTF_VALOR_NOMINAL_PESO"]
-        saldo_columns = ["FTN_ID_CONCEPTO", "FTC_DESC_CONCEPTO", "FTF_SALDO_TOTAL"]
+        saldo_columns = ["FTN_ID_CONCEPTO", "FTC_CONCEPTO_NEGOCIO", "FTF_SALDO_TOTAL"]
 
         df_edo_general = extract_bigquery('ESTADO_CUENTA.TTEDOCTA_GENERAL').filter('FCN_ID_PERIODO' == term_id)
         df_edo_anverso = extract_bigquery('ESTADO_CUENTA.TTEDOCTA_ANVERSO')
+        df_edo_reverso = extract_bigquery('ESTADO_CUENTA.TTEDOCTA_REVERSO')
 
-        df = df_edo_general.join(df_edo_anverso, 'FCN_ID_EDOCTA')
-        data_strings = df.rdd.map(format_row).collect()
+        df_general_anverso = df_edo_general.join(df_edo_anverso, 'FCN_ID_EDOCTA')
+        data_strings = df_general_anverso.rdd.map(format_row).collect()
         total_count = sum([general_count, ahorro_count, bono_count, saldo_count])
         data_strings = data_strings + f"5\n{general_count}|{ahorro_count}|{bono_count}|{saldo_count}|{total_count}|"
 
-        with open(f"gs://gestor-edo-cuenta/test_retiros/recaudacion_{term_id}.txt", "w") as f:
+        with open(f"gs://gestor-edo-cuenta/test_retiros/recaudacion_{term_id}", "w") as f:
             f.write(data_strings)
+
+        reverso_columns = [""]
+        df_reverso = df_edo_reverso.select()
 
         notify(
             postgres,
