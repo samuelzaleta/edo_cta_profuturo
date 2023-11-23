@@ -41,7 +41,7 @@ def find_samples(samples_cursor: CursorResult):
     raise Exception('Insufficient samples')
 
 
-url = "https://procesos-api-service-qa-5flqomrlga-uc.a.run.app/procesos/generarEstadosCuentaPensionados"
+url = "https://procesos-api-service-dev-e46ynxyutq-uk.a.run.app/procesos/generarEstadosCuentaPensionados"
 
 postgres_pool = get_postgres_pool()
 bigquery_pool = get_bigquery_pool()
