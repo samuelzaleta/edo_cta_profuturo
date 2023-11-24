@@ -84,9 +84,9 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                            "FTC_DESC_CONCEPTO", "FTC_PERIODO_REFERENCIA", "FTN_DIA_COTIZADO", "FTN_SALARIO_BASE",
                            "FTN_MONTO"]
         reverso_data, reverso_count = get_data(1, reverso_columns, df_edo_reverso)
-        ret = df_edo_reverso.filter(f.col("FTC_SECCION") == "RET").select(f.sum("FTC_SECCION")).collect()[0][0]
-        vol = df_edo_reverso.filter(f.col("FTC_SECCION") == "VOL").select(f.sum("FTC_SECCION")).collect()[0][0]
-        viv = df_edo_reverso.filter(f.col("FTC_SECCION") == "VIV").select(f.sum("FTC_SECCION")).collect()
+        ret = df_edo_reverso.filter(f.col("FTC_SECCION") == "RET").count()
+        vol = df_edo_reverso.filter(f.col("FTC_SECCION") == "VOL").count()
+        viv = df_edo_reverso.filter(f.col("FTC_SECCION") == "VIV").count()
         total = df_edo_reverso.count()
         reverso_final_row = f"2\n{ret}|{vol}|{viv}|{total}|"
         final_reverso = reverso_data + reverso_final_row
