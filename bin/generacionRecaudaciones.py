@@ -78,7 +78,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
         final_row = f"5\n{general_count}|{ahorro_count}|{bono_count}|{saldo_count}|{total_count}|"
         data_strings = data_general + data_ahorro, data_bono, data_saldo + final_row
 
-        str_to_gcs(data_strings, "recaudacion_reverso", term_id)
+        str_to_gcs(data_strings, "recaudacion_anverso", term_id)
 
         reverso_columns = ["FCN_NUMERO_CUENTA", "FTN_ID_CONCEPTO", "FTC_SECCION", "FTD_FECHA_MOVIMIENTO",
                            "FTC_DESC_CONCEPTO", "FTC_PERIODO_REFERENCIA", "FTN_DIA_COTIZADO", "FTN_SALARIO_BASE",
