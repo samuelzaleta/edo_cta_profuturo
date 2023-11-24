@@ -121,28 +121,23 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                            "FTN_MONTO"]
         df_reverso = df_edo_reverso.select(*reverso_columns)
         reverso_data = df_reverso.rdd.flatMap(lambda row: [f"{row[column]}" for column in reverso_columns])
-
         reverso_data = reverso_data.collect()
         ret = df_reverso.filter(f.col("FTC_SECCION") == "RET").select(f.sum("FTC_SECCION")).collect()[0][0]
         vol = df_reverso.filter(f.col("FTC_SECCION") == "VOL").select(f.sum("FTC_SECCION")).collect()[0][0]
-        viv = df_reverso.filter(f.col("FTC_SECCION") == "VIV").select(f.sum("FTC_SECCION")).collect()[0][0]
+        viv = df_reverso.filter(f.col("FTC_SECCION") == "VIV").select(f.sum("FTC_SECCION")).collect()
         total = df_reverso.count()
+        reverso_data = [list(reverso_data[i:i + len(reverso_columns)]) for i in
+                        range(0, len(reverso_data), len(reverso_columns))]
+        reverso_data_str = ""
 
-        reverso_data_str = "\n".join(map(lambda row: "|".join(row), reverso_data))
-
-        with open("/tmp/recaudacion_reverso_{term_id}.txt", "w") as tmp_file:
-            tmp_file.write("1\n")
-            tmp_file.write(reverso_data_str)
-            tmp_file.write("\n2\n")
-            tmp_file.write(f"{ret}|{vol}|{viv}|{total}|")
+        for row in reverso_data:
+            reverso_str = "|".join(row[i] for i in range(len(reverso_columns)))
+            reverso_data_str += reverso_str + "\n"
 
         blob = bucket.blob(f"test_retiros/recaudacion_reverso_{term_id}.txt")
         blob.upload_from_filename(f"/tmp/recaudacion_reverso_{term_id}.txt")
-
-        file_contents = blob.download_as_string()
-        additional_data = f"\n2\n{ret}|{vol}|{viv}|{total}|{total}|"
-        file_contents = file_contents.decode("utf-8") + additional_data
-        blob.upload_from_string(file_contents.encode("utf-8"))
+        reverso_data_str = reverso_data_str + f"\n2\n{ret}|{vol}|{viv}|{total}|"
+        blob.upload_from_string(reverso_data_str)
 
 
 
