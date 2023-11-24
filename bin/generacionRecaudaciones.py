@@ -64,20 +64,39 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
         saldo_columns = ["FTN_ID_CONCEPTO", "FTC_CONCEPTO_NEGOCIO", "FTF_SALDO_TOTAL"]
 
         df_edo_general = extract_bigquery('ESTADO_CUENTA.TTEDOCTA_GENERAL').filter(f"FCN_ID_PERIODO == {term_id}")
-        df_edo_anverso = extract_bigquery('ESTADO_CUENTA.TTEDOCTA_ANVERSO')
+        client = df_edo_general.groupBy("FCN_ID_EDOCTA").collect()
+        clients = []
+        client_count = client.count()
+        for i in range(client_count):
+            for elem in client[i][0]:
+                clients.append(elem)
+
+        df_edo_anverso = extract_bigquery('ESTADO_CUENTA.TTEDOCTA_ANVERSO').filter("FTC_SECCION == SDO")
 
         df_edo_reverso = extract_bigquery('ESTADO_CUENTA.TTEDOCTA_REVERSO')
 
         df_general_anverso = df_edo_general.join(df_edo_anverso, 'FCN_ID_EDOCTA')
-        data_general, general_count = get_data(1, general_columns, df_general_anverso)
-        data_ahorro, ahorro_count = get_data(2, ahorro_columns, df_general_anverso)
-        data_bono, bono_count= get_data(3, bono_columns, df_general_anverso)
-        data_saldo, saldo_count = get_data(4, saldo_columns, df_general_anverso)
+        data_strings = ""
+        general_count = 0
+        ahorro_count = 0
+        bono_count = 0
+        saldo_count = 0
+
+        for client in clients:
+            data_general, general_count = get_data(1, general_columns, df_general_anverso)
+            data_ahorro, ahorro_count = get_data(2, ahorro_columns, df_general_anverso)
+            data_bono, bono_count= get_data(3, bono_columns, df_general_anverso)
+            data_saldo, saldo_count = get_data(4, saldo_columns, df_general_anverso)
+            data_strings = data_strings + data_general + data_ahorro + data_bono + data_saldo
+
+            general_count += general_count
+            ahorro_count += ahorro_count
+            bono_count += bono_count
+            saldo_count += saldo_count
 
         total_count = sum([general_count, ahorro_count, bono_count, saldo_count])
         final_row = f"5\n{general_count}|{ahorro_count}|{bono_count}|{saldo_count}|{total_count}|"
-        data_strings = data_general + data_ahorro + data_bono + data_saldo + final_row
-
+        data_strings = data_strings + final_row
         str_to_gcs(data_strings, "recaudacion_anverso", term_id)
 
         reverso_columns = ["FCN_NUMERO_CUENTA", "FTN_ID_CONCEPTO", "FTC_SECCION", "FTD_FECHA_MOVIMIENTO",
