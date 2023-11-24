@@ -109,8 +109,8 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
 
         with open("/tmp/recaudacion_reverso_{term_id}.txt", "w") as tmp_file:
             tmp_file.write(data_strings)
-            blob = bucket.blob(f"test_retiros/recaudacion_reverso_{term_id}.txt")
-            blob.upload_from_filename(f"/tmp/recaudacion_reverso_{term_id}.txt")
+            blob = bucket.blob(f"test_retiros/recaudacion_anverso_{term_id}.txt")
+            blob.upload_from_filename(f"/tmp/recaudacion_anverso_{term_id}.txt")
 
             file_contents = blob.download_as_string()
             file_contents = file_contents.decode("utf-8")
@@ -134,7 +134,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
             tmp_file.write("1\n")
             tmp_file.write(reverso_data_str)
             tmp_file.write("\n2\n")
-            tmp_file.write(f"{ret}|{vol}|{viv}|{total}|{total}|")
+            tmp_file.write(f"{ret}|{vol}|{viv}|{total}|")
 
         blob = bucket.blob(f"test_retiros/recaudacion_reverso_{term_id}.txt")
         blob.upload_from_filename(f"/tmp/recaudacion_reverso_{term_id}.txt")
