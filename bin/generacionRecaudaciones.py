@@ -76,7 +76,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
 
         total_count = sum([general_count, ahorro_count, bono_count, saldo_count])
         final_row = f"5\n{general_count}|{ahorro_count}|{bono_count}|{saldo_count}|{total_count}|"
-        data_strings = data_general + data_ahorro, data_bono, data_saldo + final_row
+        data_strings = data_general + data_ahorro + data_bono + data_saldo + final_row
 
         str_to_gcs(data_strings, "recaudacion_anverso", term_id)
 
