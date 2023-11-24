@@ -128,7 +128,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
         total = df_reverso.count()
         reverso_data = [list(reverso_data[i:i + len(reverso_columns)]) for i in
                         range(0, len(reverso_data), len(reverso_columns))]
-        reverso_data_str = ""
+        reverso_data_str = "1\n"
 
         for row in reverso_data:
             reverso_str = "|".join(row[i] for i in range(len(reverso_columns)))
@@ -136,7 +136,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
 
         blob = bucket.blob(f"test_retiros/recaudacion_reverso_{term_id}.txt")
         blob.upload_from_filename(f"/tmp/recaudacion_reverso_{term_id}.txt")
-        reverso_data_str = reverso_data_str + f"\n2\n{ret}|{vol}|{viv}|{total}|"
+        reverso_data_str = reverso_data_str + f"2\n{ret}|{vol}|{viv}|{total}|"
         blob.upload_from_string(reverso_data_str)
 
 
