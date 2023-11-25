@@ -29,11 +29,11 @@ def extract_bigquery(table):
 
 def get_data(index, columns, df):
     df = df.select(*columns)
-    data = df.rdd.flatMap(lambda row: [f"{row[column]}" for column in reverso_columns]).collect()
+    data = df.rdd.flatMap(lambda row: [f"{row[column]}" for column in columns]).collect()
     data = [list(data[i:i + len(columns)]) for i in range(0, len(data), len(columns))]
     res = f"{index}\n"
     for row in data:
-        data_str = "|".join(row[i] for i in range(len(reverso_columns)))
+        data_str = "|".join(row[i] for i in range(len(columns)))
         res += data_str + "\n"
 
     return res, len(data)
@@ -52,26 +52,24 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
     end_month = term["end_month"]
 
     with register_time(postgres_pool, phase, term_id, user, area):
-
         general_columns = ["FCN_FOLIO", "FTC_NOMBRE_COMPLETO", "FTC_CALLE_NUMERO", "FTC_COLONIA", "FTC_DELEGACION",
                            "FTN_CP", "FTC_ENTIDAD_FEDERATIVA", "FTC_RFC", "FTC_NSS", "FTC_CURP",
                            "FTD_FECHA_GRAL_INICIO", "FTD_FECHA_GRAL_FIN", "FTN_ID_FORMATO", "FTN_ID_SIEFORE",
-                           "FTD_FECHA_CORTE", "FTB_PDF_IMPRESO", "FTF_SALDO_SUBTOTAL", "FTF_SALDO_TOTAL", "FTN_PENSION_MENSUAL"]
-        ahorro_columns = ["FTC_CONCEPTO_NEGOCIO", "FTF_SALDO_ANTERIOR", "FTF_APORTACION", "FTF_RETIRO", "FTF_RENDIMIENTO",
-                          "FTF_COMISION", "FTF_SALDO_FINAL"]
-        bono_columns = ["FTC_CONCEPTO_NEGOCIO", "FTF_VALOR_ACTUAL_UDI", "FTF_VALOR_NOMINAL_UDI", "FTF_VALOR_ACTUAL_PESO",
-                        "FTF_VALOR_NOMINAL_PESO"]
-        saldo_columns = ["FTN_ID_CONCEPTO", "FTC_CONCEPTO_NEGOCIO", "FTF_SALDO_TOTAL"]
+                           "FTD_FECHA_CORTE", "FTB_PDF_IMPRESO", "FTN_SALDO_SUBTOTAL", "FTN_SALDO_TOTAL",
+                           "FTN_PENSION_MENSUAL"]
+        ahorro_columns = ["FTC_CONCEPTO_NEGOCIO", "FTN_SALDO_ANTERIOR", "FTF_APORTACION", "FTN_RETIRO",
+                          "FTN_RENDIMIENTO",
+                          "FTN_COMISION", "FTN_SALDO_FINAL"]
+        bono_columns = ["FTC_CONCEPTO_NEGOCIO", "FTN_VALOR_ACTUAL_UDI", "FTN_VALOR_NOMINAL_UDI",
+                        "FTN_VALOR_ACTUAL_PESO",
+                        "FTN_VALOR_NOMINAL_PESO"]
+        saldo_columns = ["FTC_GRUPO_CONCEPTO", "FTC_CONCEPTO_NEGOCIO", "FTN_SALDO_TOTAL"]
 
         df_edo_general = extract_bigquery('ESTADO_CUENTA.TTEDOCTA_GENERAL').filter(f"FCN_ID_PERIODO == {term_id}")
-        client = df_edo_general.groupBy("FCN_ID_EDOCTA").collect()
-        clients = []
-        client_count = client.count()
-        for i in range(client_count):
-            for elem in client[i][0]:
-                clients.append(elem)
+        clients = df_edo_general.select("FCN_ID_EDOCTA").distinct()
+        clients = clients.toPandas().values.tolist()
 
-        df_edo_anverso = extract_bigquery('ESTADO_CUENTA.TTEDOCTA_ANVERSO').filter("FTC_SECCION == SDO")
+        df_edo_anverso = extract_bigquery('ESTADO_CUENTA.TTEDOCTA_ANVERSO').filter(f.col("FTC_SECCION") == "SDO")
 
         df_edo_reverso = extract_bigquery('ESTADO_CUENTA.TTEDOCTA_REVERSO')
 
@@ -83,9 +81,10 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
         saldo_count = 0
 
         for client in clients:
+            df_general_anverso = df_general_anverso.filter(f.col("FCN_ID_EDOCTA") == client[0])
             data_general, general_count = get_data(1, general_columns, df_general_anverso)
             data_ahorro, ahorro_count = get_data(2, ahorro_columns, df_general_anverso)
-            data_bono, bono_count= get_data(3, bono_columns, df_general_anverso)
+            data_bono, bono_count = get_data(3, bono_columns, df_general_anverso)
             data_saldo, saldo_count = get_data(4, saldo_columns, df_general_anverso)
             data_strings = data_strings + data_general + data_ahorro + data_bono + data_saldo
 
