@@ -50,20 +50,9 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                            "FTN_PENSION_INSTITUTO_SEG", "FTN_SALDO_FINAL"]
 
         retiros_general = extract_bigquery('ESTADO_CUENTA.TTMUESTR_RETIRO_GENERAL', term_id).select(*retiros_general_columns)
-        retiros = extract_bigquery('ESTADO_CUENTA.TTMUESTR_RETIRO', term_id).select(*retiros_columns)
-
-        columns = [retiros_general_columns[0]] + [retiros_columns[1]] + retiros_general_columns[1:] + retiros_general_columns[2:]
+        retiros = extract_bigquery('ESTADO_CUENTA.TTMUESTR_RETIRO', term_id).select(*retiros_columns[:-3], f.col("FTD_FECHA_EMISION").alias("FTD_FECHA_EMISION_2"), *retiros_columns[-3:])
 
         df = retiros_general.join(retiros, 'FCN_NUMERO_CUENTA').drop(retiros['FCN_NUMERO_CUENTA'])
-
-        df = df.withColumn("FTD_FECHA_EMISION_2", f.lit(df["FTD_FECHA_EMISION"]))
-        df = df.withColumn("FTD_FECHA_INICIO_PENSION_2", f.lit(df["FTD_FECHA_INICIO_PENSION"]))
-        df = df.withColumn("FTN_PENSION_INSTITUTO_SEG_2", f.lit(df["FTN_PENSION_INSTITUTO_SEG"]))
-        df = df.withColumn("FTN_SALDO_FINAL_2", f.lit(df["FTN_SALDO_FINAL"]))
-
-        df = df.drop("FTD_FECHA_INICIO_PENSION", "FTN_PENSION_INSTITUTO_SEG", "FTN_SALDO_FINAL")
-        print("COLUMNS DROPED")
-        df.printSchema()
 
         df.write.mode("overwrite").csv(f"gs://edo_cuenta_profuturo_dev_b/test_retiros/retiros_{term_id}", sep="|")
 

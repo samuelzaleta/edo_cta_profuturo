@@ -1,15 +1,13 @@
 from profuturo.common import register_time, define_extraction, notify
 from profuturo.database import get_postgres_pool
-from profuturo.extraction import extract_terms
+from profuturo.extraction import extract_terms, _get_spark_session
 from profuturo.reporters import HtmlReporter
 from pyspark.sql import SparkSession
+from google.cloud import storage
+import pyspark.sql.functions as f
 import sys
 
-spark = SparkSession \
-    .builder \
-    .master('yarn') \
-    .appName('spark-bigquery-recaudaciones') \
-    .getOrCreate()
+spark = _get_spark_session()
 
 html_reporter = HtmlReporter()
 postgres_pool = get_postgres_pool()
@@ -17,6 +15,9 @@ postgres_pool = get_postgres_pool()
 phase = int(sys.argv[1])
 user = int(sys.argv[3])
 area = int(sys.argv[4])
+
+storage_client = storage.Client()
+bucket = storage_client.get_bucket("edo_cuenta_profuturo_dev_b")
 
 
 def extract_bigquery(table):
@@ -26,51 +27,22 @@ def extract_bigquery(table):
     return df
 
 
-def format_row(row):
-    global general_count
-    global ahorro_count
-    global bono_count
-    global saldo_count
+def get_data(index, columns, df):
+    df = df.select(*columns)
+    data = df.rdd.flatMap(lambda row: [f"{row[column]}" for column in columns]).collect()
+    data = [list(data[i:i + len(columns)]) for i in range(0, len(data), len(columns))]
+    res = f"{index}\n"
+    for row in data:
+        data_str = "|".join(row[i] for i in range(len(columns)))
+        res += data_str + "\n"
 
-    general_has_data = any(row[column] is not None for column in general_columns)
-    ahorro_has_data = any(row[column] is not None for column in ahorro_columns)
-    bono_has_data = any(row[column] is not None for column in bono_columns)
-    saldo_has_data = any(row[column] is not None for column in saldo_columns)
+    return res, len(data)
 
-    formatted_data = []
 
-    if general_has_data:
-        general_data = [f"{row[column]}" for column in general_columns]
-        formatted_data.append("1\n" + "|".join(general_data))
-        general_count += 1
-    else:
-        formatted_data.append("1\n")
+def str_to_gcs(data, name, term_id):
+    blob = bucket.blob(f"test_retiros/{name}_{term_id}.txt")
+    blob.upload_from_string(data)
 
-    if ahorro_has_data:
-        ahorro_data = [f"{row[column]}" for column in ahorro_columns]
-        formatted_data.append("2\n" + "|".join(ahorro_data))
-        ahorro_count += 1
-    else:
-        formatted_data.append("2\n")
-
-    if bono_has_data:
-        bono_data = [f"{row[column]}" for column in bono_columns]
-        formatted_data.append("3\n" + "|".join(bono_data))
-        bono_count += 1
-    else:
-        formatted_data.append("3\n")
-
-    if saldo_has_data:
-        saldo_data = [f"{row[column]}" for column in saldo_columns]
-        formatted_data.append("4\n" + "|".join(saldo_data))
-        saldo_count += 1
-    else:
-        formatted_data.append("4\n")
-
-    if formatted_data:
-        return "\n".join(formatted_data)
-    else:
-        return None
 
 with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, _):
     term = extract_terms(postgres, phase)
@@ -80,31 +52,64 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
     end_month = term["end_month"]
 
     with register_time(postgres_pool, phase, term_id, user, area):
+        general_columns = ["FCN_FOLIO", "FTC_NOMBRE_COMPLETO", "FTC_CALLE_NUMERO", "FTC_COLONIA", "FTC_DELEGACION",
+                           "FTN_CP", "FTC_ENTIDAD_FEDERATIVA", "FTC_RFC", "FTC_NSS", "FTC_CURP",
+                           "FTD_FECHA_GRAL_INICIO", "FTD_FECHA_GRAL_FIN", "FTN_ID_FORMATO", "FTN_ID_SIEFORE",
+                           "FTD_FECHA_CORTE", "FTB_PDF_IMPRESO", "FTN_SALDO_SUBTOTAL", "FTN_SALDO_TOTAL",
+                           "FTN_PENSION_MENSUAL"]
+        ahorro_columns = ["FTC_CONCEPTO_NEGOCIO", "FTN_SALDO_ANTERIOR", "FTF_APORTACION", "FTN_RETIRO",
+                          "FTN_RENDIMIENTO",
+                          "FTN_COMISION", "FTN_SALDO_FINAL"]
+        bono_columns = ["FTC_CONCEPTO_NEGOCIO", "FTN_VALOR_ACTUAL_UDI", "FTN_VALOR_NOMINAL_UDI",
+                        "FTN_VALOR_ACTUAL_PESO",
+                        "FTN_VALOR_NOMINAL_PESO"]
+        saldo_columns = ["FTC_GRUPO_CONCEPTO", "FTC_CONCEPTO_NEGOCIO", "FTN_SALDO_TOTAL"]
+
+        df_edo_general = extract_bigquery('ESTADO_CUENTA.TTEDOCTA_GENERAL').filter(f"FCN_ID_PERIODO == {term_id}")
+        clients = df_edo_general.select("FCN_ID_EDOCTA").distinct()
+        clients = clients.toPandas().values.tolist()
+
+        df_edo_anverso = extract_bigquery('ESTADO_CUENTA.TTEDOCTA_ANVERSO').filter(f.col("FTC_SECCION") == "SDO")
+
+        df_edo_reverso = extract_bigquery('ESTADO_CUENTA.TTEDOCTA_REVERSO')
+
+        df_general_anverso = df_edo_general.join(df_edo_anverso, 'FCN_ID_EDOCTA')
+        data_strings = ""
         general_count = 0
         ahorro_count = 0
         bono_count = 0
         saldo_count = 0
 
-        general_columns = ["FCN_FOLIO", "FTC_NOMBRE_COMPLETO", "FTC_CALLE_NUMERO", "FTC_COLONIA", "FTC_DELEGACION",
-                           "FTN_CP", "FTC_ENTIDAD_FEDERATIVA", "FTC_RFC", "FTC_NSS", "FTC_CURP",
-                           "FTD_FECHA_GRAL_INICIO", "FTD_FECHA_GRAL_FIN", "FTN_ID_FORMATO", "FTN_ID_SIEFORE",
-                           "FTD_FECHA_CORTE", "FTB_PDF_IMPRESO", "FTF_SALDO_SUBTOTAL", "FTF_SALDO_TOTAL", "FTN_PENSION_MENSUAL"]
-        ahorro_columns = ["FTC_DESC_CONCEPTO", "FTF_SALDO_ANTERIOR", "FTF_APORTACION", "FTF_RETIRO", "FTF_RENDIMIENTO",
-                          "FTF_COMISION", "FTF_SALDO_FINAL"]
-        bono_columns = ["FTC_DESC_CONCEPTO", "FTF_VALOR_ACTUAL_UDI", "FTF_VALOR_NOMINAL_UDI", "FTF_VALOR_ACTUAL_PESO",
-                        "FTF_VALOR_NOMINAL_PESO"]
-        saldo_columns = ["FTN_ID_CONCEPTO", "FTC_DESC_CONCEPTO", "FTF_SALDO_TOTAL"]
+        for client in clients:
+            df_general_anverso = df_general_anverso.filter(f.col("FCN_ID_EDOCTA") == client[0])
+            data_general, general_count = get_data(1, general_columns, df_general_anverso)
+            data_ahorro, ahorro_count = get_data(2, ahorro_columns, df_general_anverso)
+            data_bono, bono_count = get_data(3, bono_columns, df_general_anverso)
+            data_saldo, saldo_count = get_data(4, saldo_columns, df_general_anverso)
+            data_strings = data_strings + data_general + data_ahorro + data_bono + data_saldo
 
-        df_edo_general = extract_bigquery('ESTADO_CUENTA.TTEDOCTA_GENERAL').filter('FCN_ID_PERIODO' == term_id)
-        df_edo_anverso = extract_bigquery('ESTADO_CUENTA.TTEDOCTA_ANVERSO')
+            general_count += general_count
+            ahorro_count += ahorro_count
+            bono_count += bono_count
+            saldo_count += saldo_count
 
-        df = df_edo_general.join(df_edo_anverso, 'FCN_ID_EDOCTA')
-        data_strings = df.rdd.map(format_row).collect()
         total_count = sum([general_count, ahorro_count, bono_count, saldo_count])
-        data_strings = data_strings + f"5\n{general_count}|{ahorro_count}|{bono_count}|{saldo_count}|{total_count}|"
+        final_row = f"5\n{general_count}|{ahorro_count}|{bono_count}|{saldo_count}|{total_count}|"
+        data_strings = data_strings + final_row
+        str_to_gcs(data_strings, "recaudacion_anverso", term_id)
 
-        with open(f"gs://gestor-edo-cuenta/test_retiros/recaudacion_{term_id}.txt", "w") as f:
-            f.write(data_strings)
+        reverso_columns = ["FCN_NUMERO_CUENTA", "FTN_ID_CONCEPTO", "FTC_SECCION", "FTD_FECHA_MOVIMIENTO",
+                           "FTC_DESC_CONCEPTO", "FTC_PERIODO_REFERENCIA", "FTN_DIA_COTIZADO", "FTN_SALARIO_BASE",
+                           "FTN_MONTO"]
+        reverso_data, reverso_count = get_data(1, reverso_columns, df_edo_reverso)
+        ret = df_edo_reverso.filter(f.col("FTC_SECCION") == "RET").count()
+        vol = df_edo_reverso.filter(f.col("FTC_SECCION") == "VOL").count()
+        viv = df_edo_reverso.filter(f.col("FTC_SECCION") == "VIV").count()
+        total = df_edo_reverso.count()
+        reverso_final_row = f"2\n{ret}|{vol}|{viv}|{total}|"
+        final_reverso = reverso_data + reverso_final_row
+        str_to_gcs(final_reverso, "recaudacion_reverso", term_id)
+
 
         notify(
             postgres,
