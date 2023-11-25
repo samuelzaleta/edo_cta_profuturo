@@ -190,8 +190,7 @@ def configure_postgres_spark(connection: SparkConnection, table: str, reading: b
 
 def configure_bigquery_spark(connection: SparkConnection, table: str, _: bool) -> SparkConnection:
     return connection \
-        .format("bigquery") \
-        .option("temporaryGcsBucket", "dataproc-staging-us-central1-313676594114-h7pphtkf") \
+        .format("bigquery") \        .option("temporaryGcsBucket", "dataproc-staging-us-east4-74534562315-fn2vpmuz") \
         .option("table", table)
 
 
