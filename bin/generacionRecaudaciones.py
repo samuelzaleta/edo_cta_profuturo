@@ -86,12 +86,19 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
             data_ahorro, ahorro_count = get_data(2, ahorro_columns, df_general_anverso)
             data_bono, bono_count = get_data(3, bono_columns, df_general_anverso)
             data_saldo, saldo_count = get_data(4, saldo_columns, df_general_anverso)
-            data_strings = data_strings + data_general + data_ahorro + data_bono + data_saldo
 
-            general_count += general_count
-            ahorro_count += ahorro_count
-            bono_count += bono_count
-            saldo_count += saldo_count
+            if general_count > 0:
+                data_strings += data_general
+                general_count += general_count
+            if ahorro_count > 0:
+                data_strings += data_ahorro
+                ahorro_count += ahorro_count
+            if bono_count > 0:
+                data_strings += data_bono
+                bono_count += bono_count
+            if saldo_count > 0:
+                data_strings += data_saldo
+                saldo_count += saldo_count
 
         total_count = sum([general_count, ahorro_count, bono_count, saldo_count])
         final_row = f"5\n{general_count}|{ahorro_count}|{bono_count}|{saldo_count}|{total_count}|"
