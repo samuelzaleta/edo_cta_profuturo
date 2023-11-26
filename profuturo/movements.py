@@ -48,7 +48,7 @@ def extract_movements_integrity(
         postgres.execute(text("""
         DELETE FROM "HECHOS"."TTHECHOS_MOVIMIENTOS_INTEGRITY"
         WHERE "FCN_ID_PERIODO" = :term
-          AND "CSIE1_CODMOV" = ANY(:movements)
+          AND "CSIE1_CODMOV" = ANY((:movements)::varchar[])
         """), {"term": term, "movements": movements})
 
     # SWITCH
