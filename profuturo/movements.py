@@ -137,13 +137,13 @@ def _extract_table_movements_integrity(
         .where(column("CSIE1_CODMOV").in_(movements))
 
     for number in monpes:
-        query.add_columns(column(f"CSIE1_MONPES_{number}"))
+        query = query.add_columns(column(f"CSIE1_MONPES_{number}"))
 
     extract_dataset(
         integrity,
         postgres,
         query.compile(dialect=RdbJayDeBeApiDialect(), compile_kwargs={"render_postcompile": True}),
-        table='"HECHOS"."TTHECHOS_MOVIMIENTOS_INTEGRITY"',
+        table='TTHECHOS_MOVIMIENTOS_INTEGRITY',
         term=term,
         transform=transform,
     )
