@@ -390,7 +390,7 @@ def _get_spark_session() -> SparkSession:
 
 
 def _create_spark_dataframe(spark: SparkSession, connection_configurator, query: str, params: Dict[str, Any]) -> SparkDataFrame:
-    return connection_configurator(spark.read, f"({_replace_query_params(query, params)}) dataset", True) \
+    return connection_configurator(spark.read, _replace_query_params(query, params), True) \
         .load() \
         .cache()
 
