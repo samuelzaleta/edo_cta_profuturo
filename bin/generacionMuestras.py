@@ -10,6 +10,7 @@ import requests
 import sys
 import random
 import string
+import time
 
 
 
@@ -158,6 +159,10 @@ with define_extraction(phase, area, postgres_pool,bigquery_pool) as (postgres, b
 
 
 ##########################GEENRACIÓN DE MUESTRAS #################################################
+        truncate_table(bigquery,'ESTADO_CUENTA.TTMUESTR_REVERSO',term_id)
+        truncate_table(bigquery, 'ESTADO_CUENTA.TTMUESTR_ANVERSO', term_id)
+        truncate_table(bigquery, 'ESTADO_CUENTA.TTMUESTR_GENERAL', term_id)
+
 
         char1 = random.choice(string.ascii_letters).upper()
         char2 = random.choice(string.ascii_letters).upper()
@@ -529,6 +534,7 @@ with define_extraction(phase, area, postgres_pool,bigquery_pool) as (postgres, b
         _write_spark_dataframe(general_df, configure_bigquery_spark, 'ESTADO_CUENTA.TTMUESTR_GENERAL')
         #_write_spark_dataframe(df, configure_postgres_spark, '"GESTOR"."TCGESPRO_MUESTRA"')
 
+        time.sleep(40)
         response = requests.get(url)
         # Verifica si la petición fue exitosa
         if response.status_code == 200:
