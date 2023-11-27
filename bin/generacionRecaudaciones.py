@@ -2,7 +2,6 @@ from profuturo.common import register_time, define_extraction, notify
 from profuturo.database import get_postgres_pool
 from profuturo.extraction import extract_terms, _get_spark_session
 from profuturo.reporters import HtmlReporter
-from pyspark.sql import SparkSession
 from google.cloud import storage
 import pyspark.sql.functions as f
 import sys
@@ -68,10 +67,8 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
         saldo_columns = ["FTC_GRUPO_CONCEPTO", "FTC_CONCEPTO_NEGOCIO", "FTN_SALDO_TOTAL"]
         cast_columns_general = ["FTN_SALDO_SUBTOTAL", "FTN_SALDO_TOTAL", "FTN_PENSION_MENSUAL"]
         cast_columns_anverso = ["FTF_APORTACION", "FTN_RETIRO", "FTN_RENDIMIENTO", "FTN_COMISION", "FTN_MONTO_PENSION",
-                                "FTN_SALDO_ANTERIOR",
-                                "FTN_SALDO_FINAL", "FTN_VALOR_ACTUAL_PESO", "FTN_VALOR_ACTUAL_UDI",
-                                "FTN_VALOR_NOMINAL_PESO",
-                                "FTN_VALOR_NOMINAL_UDI"]
+                                "FTN_SALDO_ANTERIOR", "FTN_SALDO_FINAL", "FTN_VALOR_ACTUAL_PESO",
+                                "FTN_VALOR_ACTUAL_UDI", "FTN_VALOR_NOMINAL_PESO", "FTN_VALOR_NOMINAL_UDI"]
 
         df_edo_general = extract_bigquery('ESTADO_CUENTA.TTEDOCTA_GENERAL').filter(f"FCN_ID_PERIODO == {term_id}")
         df_anverso = extract_bigquery('ESTADO_CUENTA.TTEDOCTA_ANVERSO')
