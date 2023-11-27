@@ -24,10 +24,15 @@ def extract_bigquery(table):
     df = spark.read.format('bigquery') \
         .option('table', f'estado-de-cuenta-service-dev-b:{table}') \
         .load()
+    df.createOrReplaceTempView('tabla')
+    df = spark.sql("SELECT * FROM tabla")
+    print(f"SE EXTRAIDO EXITOSAMENTE {table}")
     return df
 
 
 def get_data(index, columns, df):
+    if df.count() == 0:
+        print("DATAFRAME VACIO")
     df = df.select(*columns)
     data = df.rdd.flatMap(lambda row: [f"{row[column]}" for column in columns]).collect()
     data = [list(data[i:i + len(columns)]) for i in range(0, len(data), len(columns))]
@@ -35,7 +40,6 @@ def get_data(index, columns, df):
     for row in data:
         data_str = "|".join(row[i] for i in range(len(columns)))
         res += data_str + "\n"
-
     return res, len(data)
 
 
@@ -58,50 +62,55 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                            "FTD_FECHA_CORTE", "FTB_PDF_IMPRESO", "FTN_SALDO_SUBTOTAL", "FTN_SALDO_TOTAL",
                            "FTN_PENSION_MENSUAL"]
         ahorro_columns = ["FTC_CONCEPTO_NEGOCIO", "FTN_SALDO_ANTERIOR", "FTF_APORTACION", "FTN_RETIRO",
-                          "FTN_RENDIMIENTO",
-                          "FTN_COMISION", "FTN_SALDO_FINAL"]
+                          "FTN_RENDIMIENTO", "FTN_COMISION", "FTN_SALDO_FINAL"]
         bono_columns = ["FTC_CONCEPTO_NEGOCIO", "FTN_VALOR_ACTUAL_UDI", "FTN_VALOR_NOMINAL_UDI",
-                        "FTN_VALOR_ACTUAL_PESO",
-                        "FTN_VALOR_NOMINAL_PESO"]
+                        "FTN_VALOR_ACTUAL_PESO", "FTN_VALOR_NOMINAL_PESO"]
         saldo_columns = ["FTC_GRUPO_CONCEPTO", "FTC_CONCEPTO_NEGOCIO", "FTN_SALDO_TOTAL"]
+        cast_columns = ["FTN_SALDO_SUBTOTAL", "FTN_SALDO_TOTAL", "FTN_PENSION_MENSUAL", "FTF_APORTACION",  "FTN_RETIRO",
+                        "FTN_RENDIMIENTO",	"FTN_COMISION", "FTN_MONTO_PENSION", "FTN_SALDO_ANTERIOR",
+                        "FTN_SALDO_FINAL", "FTN_VALOR_ACTUAL_PESO", "FTN_VALOR_ACTUAL_UDI", "FTN_VALOR_NOMINAL_PESO",
+                        "FTN_VALOR_NOMINAL_UDI"]
 
         df_edo_general = extract_bigquery('ESTADO_CUENTA.TTEDOCTA_GENERAL').filter(f"FCN_ID_PERIODO == {term_id}")
-        clients = df_edo_general.select("FCN_ID_EDOCTA").distinct()
-        clients = clients.toPandas().values.tolist()
-
-        df_edo_anverso = extract_bigquery('ESTADO_CUENTA.TTEDOCTA_ANVERSO').filter(f.col("FTC_SECCION") == "SDO")
-
+        df_anverso = extract_bigquery('ESTADO_CUENTA.TTEDOCTA_ANVERSO')
+        df_anverso_general = df_anverso.join(df_edo_general, "FCN_ID_EDOCTA")
+        for cast_column in cast_columns:
+            df_anverso_general = df_anverso_general.withColumn(f"{cast_column}", df_anverso_general[f"{cast_column}"].cast("decimal(16, 2)"))
+        df_anverso_aho = df_anverso_general.filter(f.col("FTC_SECCION").isin(["AHO", "PEN"]))
+        df_anverso_bon = df_anverso_general.filter(f.col("FTC_SECCION") == "BON")
+        df_anverso_sdo = df_anverso_general.filter(f.col("FTC_SECCION") == "SDO")
         df_edo_reverso = extract_bigquery('ESTADO_CUENTA.TTEDOCTA_REVERSO')
 
-        df_general_anverso = df_edo_general.join(df_edo_anverso, 'FCN_ID_EDOCTA')
+        clients = df_anverso_general.select("FCN_ID_EDOCTA").distinct()
+        clients.show()
+        clients = clients.toPandas().values.tolist()
         data_strings = ""
         general_count = 0
         ahorro_count = 0
         bono_count = 0
         saldo_count = 0
 
-        for client in clients:
-            df_general_anverso = df_general_anverso.filter(f.col("FCN_ID_EDOCTA") == client[0])
-            data_general, general_count = get_data(1, general_columns, df_general_anverso)
-            data_ahorro, ahorro_count = get_data(2, ahorro_columns, df_general_anverso)
-            data_bono, bono_count = get_data(3, bono_columns, df_general_anverso)
-            data_saldo, saldo_count = get_data(4, saldo_columns, df_general_anverso)
+        for client in clients[:10]:
+            print("\nGETTING DATA FROM: ", client, client[0], "\n")
+            df_edo_general_temp = df_edo_general.filter(f.col("FCN_ID_EDOCTA") == client[0])
+            df_anverso_aho_temp = df_anverso_aho.filter(f.col("FCN_ID_EDOCTA") == client[0])
+            df_anverso_bon_temp = df_anverso_bon.filter(f.col("FCN_ID_EDOCTA") == client[0])
+            df_anverso_sdo_temp = df_anverso_sdo.filter(f.col("FCN_ID_EDOCTA") == client[0])
 
-            if general_count > 0:
-                data_strings += data_general
+            data_general, general_count = get_data(1, general_columns, df_edo_general_temp)
+            data_ahorro, ahorro_count = get_data(2, ahorro_columns, df_anverso_aho_temp)
+            data_bono, bono_count = get_data(3, bono_columns, df_anverso_bon_temp)
+            data_saldo, saldo_count = get_data(4, saldo_columns, df_anverso_sdo_temp)
+
+            if sum([general_count, ahorro_count, bono_count, saldo_count]) > 0:
+                data_strings += data_general + data_ahorro + data_bono + data_saldo
                 general_count += general_count
-            if ahorro_count > 0:
-                data_strings += data_ahorro
                 ahorro_count += ahorro_count
-            if bono_count > 0:
-                data_strings += data_bono
                 bono_count += bono_count
-            if saldo_count > 0:
-                data_strings += data_saldo
                 saldo_count += saldo_count
 
         total_count = sum([general_count, ahorro_count, bono_count, saldo_count])
-        final_row = f"5\n{general_count}|{ahorro_count}|{bono_count}|{saldo_count}|{total_count}|"
+        final_row = f"5\n{general_count}|{ahorro_count}|{bono_count}|{saldo_count}|{total_count}"
         data_strings = data_strings + final_row
         str_to_gcs(data_strings, "recaudacion_anverso", term_id)
 
@@ -113,10 +122,9 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
         vol = df_edo_reverso.filter(f.col("FTC_SECCION") == "VOL").count()
         viv = df_edo_reverso.filter(f.col("FTC_SECCION") == "VIV").count()
         total = df_edo_reverso.count()
-        reverso_final_row = f"2\n{ret}|{vol}|{viv}|{total}|"
+        reverso_final_row = f"2\n{ret}|{vol}|{viv}|{total}"
         final_reverso = reverso_data + reverso_final_row
         str_to_gcs(final_reverso, "recaudacion_reverso", term_id)
-
 
         notify(
             postgres,
