@@ -1,3 +1,4 @@
+from py4j.java_gateway import java_import
 from sqlalchemy.engine import Engine, Connection
 from sqlalchemy import text, delete, column, table, literal
 from datetime import time, timedelta
@@ -6,15 +7,23 @@ from dotenv import load_dotenv
 from typing import Union
 from .database import use_pools
 from .exceptions import ProfuturoException
+from .extraction import _get_spark_session
 
 
 @contextmanager
 def define_extraction(phase: int, area: int, main_pool: Engine, *pools: Engine):
+    spark = _get_spark_session()
+    gw = spark.sparkContext._gateway
+
     load_dotenv()
+    java_import(gw.jvm, "org.profuturo.rdb.RdbDialect")
+    gw.jvm.org.apache.spark.sql.jdbc.JdbcDialects.registerDialect(gw.jvm.org.profuturo.rdb.RdbDialect())
 
     with notify_exceptions(main_pool, phase, area):
         with use_pools(phase, main_pool, *pools) as pools:
             yield pools
+
+    gw.jvm.org.apache.spark.sql.jdbc.JdbcDialects.unregisterDialect(gw.jvm.org.profuturo.rdb.RdbDialect())
 
 
 @contextmanager

@@ -114,7 +114,7 @@ with define_extraction(phase, area, postgres_pool, integrity_pool) as (postgres,
                 LEFT JOIN "MAESTROS"."TCDATMAE_TIPO_SUBCUENTA" sb ON m."SUBCUENTA" = sb."FTN_ID_TIPO_SUBCTA"
                 INNER JOIN "GESTOR"."TCGESPRO_PERIODO" g ON g."FTN_ID_PERIODO" = m."FCN_ID_PERIODO"
             WHERE m."FCN_ID_PERIODO" = :term
-              AND m."CSIE1_CODMOV" = ANY(:movements)
+              AND m."CSIE1_CODMOV" = ANY((:movements)::varchar[])
             GROUP BY g."FTC_PERIODO", m."CVE_SIEFORE", m."SUBCUENTA"
             """,
             ["PERIODO", "SIEFORE", "SUBCUENTA"],
