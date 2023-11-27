@@ -23,8 +23,9 @@ with define_extraction(phase, area, postgres_pool,bigquery_pool) as (postgres, b
 
     with register_time(postgres_pool, phase, term_id, user, area):
         truncate_table(postgres, 'TCGESPRO_MUESTRA', term=term_id, area=area)
-        #truncate_table(bigquery, 'ESTADO_CUENTA.TTMUESTR_RETIRO_GENERAL')
-        #truncate_table(bigquery, 'ESTADO_CUENTA.TTMUESTR_RETIRO')
+        truncate_table(bigquery, 'ESTADO_CUENTA.TTMUESTR_RETIRO_GENERAL')
+        truncate_table(bigquery, 'ESTADO_CUENTA.TTMUESTR_RETIRO')
+
         read_table_insert_temp_view(configure_postgres_spark, """
                 SELECT
                 DISTINCT
