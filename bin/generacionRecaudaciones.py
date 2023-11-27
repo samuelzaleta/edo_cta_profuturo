@@ -78,7 +78,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
 
         for cast_column in cast_columns_general:
             df_edo_general = df_edo_general.withColumn(f"{cast_column}", df_edo_general[f"{cast_column}"].cast("decimal(16, 2)"))
-        for cast_columns in cast_columns_general:
+        for cast_column in cast_columns_anverso:
             df_anverso = df_anverso.withColumn(f"{cast_column}", df_anverso[f"{cast_column}"].cast("decimal(16, 2)"))
 
         df_anverso_general = df_anverso.join(df_edo_general, "FCN_ID_EDOCTA")
