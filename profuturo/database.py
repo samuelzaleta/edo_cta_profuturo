@@ -188,27 +188,33 @@ def configure_postgres_spark(connection: SparkConnection, table: str, reading: b
         .option("password", password)
 
 
-def configure_bigquery_spark(connection: SparkConnection, table: str, _: bool) -> SparkConnection:
+def configure_bigquery_spark(connection: SparkConnection, table: str, reading: bool) -> SparkConnection:
+    bucket = os.getenv("BIGQUERY_BUCKET")
+
+    if reading:
+        connection = connection.option("query", table) \
+            .option("viewsEnabled", True)
+    else:
+        connection = connection.option("table", table)
+
     return connection \
         .format("bigquery") \
-        .option("temporaryGcsBucket", "dataproc-staging-us-central1-313676594114-h7pphtkf") \
-        .option("table", table)
+        .option("temporaryGcsBucket", bucket)
 
 
 def configure_jdbc_spark(connection: SparkConnection, table: str, reading: bool) -> SparkConnection:
     if reading:
         connection = connection \
-            .option("numPartitions", 80) \
-            .option("fetchsize", 100000)
+            .option("numPartitions", 10) \
+            .option("fetchsize", 100_000) \
+            .option("query", table)
     else:
         connection = connection \
             .option("numPartitions", 20) \
-            .option("fetchsize", 100000) \
-            .option("batchsize", 100000)
+            .option("batchsize", 100_000) \
+            .option("dbtable", table)
 
-    return connection \
-        .format("jdbc") \
-        .option("dbtable", table)
+    return connection .format("jdbc")
 
 
 def get_mit_url():
