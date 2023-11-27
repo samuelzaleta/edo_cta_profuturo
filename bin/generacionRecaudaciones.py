@@ -67,7 +67,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                         "FTN_VALOR_ACTUAL_PESO", "FTN_VALOR_NOMINAL_PESO"]
         saldo_columns = ["FTC_GRUPO_CONCEPTO", "FTC_CONCEPTO_NEGOCIO", "FTN_SALDO_TOTAL"]
         cast_columns = ["FTN_SALDO_SUBTOTAL", "FTN_SALDO_TOTAL", "FTN_PENSION_MENSUAL", "FTF_APORTACION",  "FTN_RETIRO",
-                        "FTN_RENDIMIENTO",	"FTN_COMISION", "FTN_MONTO_PENSION", "FTN_SALDO_ANTERIOR",
+                        "FTN_RENDIMIENTO", "FTN_COMISION", "FTN_MONTO_PENSION", "FTN_SALDO_ANTERIOR",
                         "FTN_SALDO_FINAL", "FTN_VALOR_ACTUAL_PESO", "FTN_VALOR_ACTUAL_UDI", "FTN_VALOR_NOMINAL_PESO",
                         "FTN_VALOR_NOMINAL_UDI"]
 
