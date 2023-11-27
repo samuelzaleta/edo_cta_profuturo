@@ -90,7 +90,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
         bono_count = 0
         saldo_count = 0
 
-        for client in clients[:10]:
+        for client in clients:
             print("\nGETTING DATA FROM: ", client, client[0], "\n")
             df_edo_general_temp = df_edo_general.filter(f.col("FCN_ID_EDOCTA") == client[0])
             df_anverso_aho_temp = df_anverso_aho.filter(f.col("FCN_ID_EDOCTA") == client[0])
