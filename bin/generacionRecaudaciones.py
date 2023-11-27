@@ -66,16 +66,23 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
         bono_columns = ["FTC_CONCEPTO_NEGOCIO", "FTN_VALOR_ACTUAL_UDI", "FTN_VALOR_NOMINAL_UDI",
                         "FTN_VALOR_ACTUAL_PESO", "FTN_VALOR_NOMINAL_PESO"]
         saldo_columns = ["FTC_GRUPO_CONCEPTO", "FTC_CONCEPTO_NEGOCIO", "FTN_SALDO_TOTAL"]
-        cast_columns = ["FTN_SALDO_SUBTOTAL", "FTN_SALDO_TOTAL", "FTN_PENSION_MENSUAL", "FTF_APORTACION",  "FTN_RETIRO",
-                        "FTN_RENDIMIENTO", "FTN_COMISION", "FTN_MONTO_PENSION", "FTN_SALDO_ANTERIOR",
-                        "FTN_SALDO_FINAL", "FTN_VALOR_ACTUAL_PESO", "FTN_VALOR_ACTUAL_UDI", "FTN_VALOR_NOMINAL_PESO",
-                        "FTN_VALOR_NOMINAL_UDI"]
+        cast_columns_general = ["FTN_SALDO_SUBTOTAL", "FTN_SALDO_TOTAL", "FTN_PENSION_MENSUAL"]
+        cast_columns_anverso = ["FTF_APORTACION", "FTN_RETIRO", "FTN_RENDIMIENTO", "FTN_COMISION", "FTN_MONTO_PENSION",
+                                "FTN_SALDO_ANTERIOR",
+                                "FTN_SALDO_FINAL", "FTN_VALOR_ACTUAL_PESO", "FTN_VALOR_ACTUAL_UDI",
+                                "FTN_VALOR_NOMINAL_PESO",
+                                "FTN_VALOR_NOMINAL_UDI"]
 
         df_edo_general = extract_bigquery('ESTADO_CUENTA.TTEDOCTA_GENERAL').filter(f"FCN_ID_PERIODO == {term_id}")
         df_anverso = extract_bigquery('ESTADO_CUENTA.TTEDOCTA_ANVERSO')
+
+        for cast_column in cast_columns_general:
+            df_edo_general = df_edo_general.withColumn(f"{cast_column}", df_edo_general[f"{cast_column}"].cast("decimal(16, 2)"))
+        for cast_columns in cast_columns_general:
+            df_anverso = df_anverso.withColumn(f"{cast_column}", df_anverso[f"{cast_column}"].cast("decimal(16, 2)"))
+
         df_anverso_general = df_anverso.join(df_edo_general, "FCN_ID_EDOCTA")
-        for cast_column in cast_columns:
-            df_anverso_general = df_anverso_general.withColumn(f"{cast_column}", df_anverso_general[f"{cast_column}"].cast("decimal(16, 2)"))
+        df_anverso_general = df_anverso_general.fillna(value="")
         df_anverso_aho = df_anverso_general.filter(f.col("FTC_SECCION").isin(["AHO", "PEN"]))
         df_anverso_bon = df_anverso_general.filter(f.col("FTC_SECCION") == "BON")
         df_anverso_sdo = df_anverso_general.filter(f.col("FTC_SECCION") == "SDO")
