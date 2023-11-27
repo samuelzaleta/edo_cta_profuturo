@@ -59,8 +59,8 @@ with define_extraction(phase, area, postgres_pool,bigquery_pool) as (postgres, b
 
 
     with register_time(postgres_pool, phase, term_id, user, area):
-        truncate_table(postgres, "TCGESPRO_MUESTRA_SOL_RE_CONSAR")
-        truncate_table(postgres, "TCGESPRO_MUESTRA", term=term_id)
+        truncate_table(postgres, "TCGESPRO_MUESTRA_SOL_RE_CONSAR",term=term_id, area=area)
+        truncate_table(postgres, "TCGESPRO_MUESTRA", term=term_id,area=area)
         #truncate_table(bigquery,'ESTADO_CUENTA.TTMUESTR_REVERSO')
         #truncate_table(bigquery,'ESTADO_CUENTA.TTMUESTR_ANVERSO')
         #truncate_table(bigquery,'ESTADO_CUENTA.TTMUESTR_GENERAL')
