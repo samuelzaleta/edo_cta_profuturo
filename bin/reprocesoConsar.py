@@ -40,7 +40,7 @@ with define_extraction(phase, area, postgres_pool, integrity_pool) as (postgres,
         movements_integrity = list({record[2] for record in filter(lambda record: record[3] == "INTEGRITY", records)})
 
         extract_movements_mit(postgres, term_id, start_month, end_month, movements_mit)
-        extract_movements_integrity(integrity, postgres, term_id, start_month, end_month, movements_integrity)
+        extract_movements_integrity(postgres, term_id, start_month, end_month, movements_integrity)
 
         postgres.execute(text("""
         UPDATE "GESTOR"."TCGESPRO_MUESTRA_SOL_RE_CONSAR"
