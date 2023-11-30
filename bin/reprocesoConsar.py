@@ -36,7 +36,6 @@ with define_extraction(phase, area, postgres_pool, integrity_pool) as (postgres,
 
         reprocess = list({record[0] for record in records})
         samples = list({record[1] for record in records})
-        movements_mit = list({record[2] for record in filter(lambda record: record[3] == "MIT", records)})
         movements_integrity = list({record[2] for record in filter(lambda record: record[3] == "INTEGRITY", records)})
         print(movements_integrity, bool(movements_integrity))
         movements_mit = list({record[2] for record in filter(lambda record: record[3] == "MIT", records)})
