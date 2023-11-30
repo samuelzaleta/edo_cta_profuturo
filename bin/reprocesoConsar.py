@@ -38,9 +38,33 @@ with define_extraction(phase, area, postgres_pool, integrity_pool) as (postgres,
         samples = list({record[1] for record in records})
         movements_mit = list({record[2] for record in filter(lambda record: record[3] == "MIT", records)})
         movements_integrity = list({record[2] for record in filter(lambda record: record[3] == "INTEGRITY", records)})
+        print(movements_integrity, bool(movements_integrity))
+        movements_mit = list({record[2] for record in filter(lambda record: record[3] == "MIT", records)})
+        print(movements_mit,bool(movements_integrity))
 
-        extract_movements_mit(postgres, term_id, start_month, end_month, movements_mit)
-        extract_movements_integrity(postgres, term_id, start_month, end_month, movements_integrity)
+        if movements_mit:
+            extract_movements_mit(postgres, term_id, start_month, end_month, movements_mit)
+        else:
+            notify(
+                postgres,
+                "Reproceso Movimientos MIT",
+                phase,
+                area,
+                term=term_id,
+                message=f"Se no se encontraron movimientos mit a reprocesar en los conceptos consar",
+            )
+        if movements_integrity:
+            extract_movements_integrity(postgres, term_id, start_month, end_month, movements_integrity)
+
+        else:
+            notify(
+                postgres,
+                "Reproceso Movimientos MIT",
+                phase,
+                area,
+                term=term_id,
+                message=f"Se no se encontraron movimientos integrity a reprocesar en los conceptos consar",
+            )
 
         postgres.execute(text("""
         UPDATE "GESTOR"."TCGESPRO_MUESTRA_SOL_RE_CONSAR"
