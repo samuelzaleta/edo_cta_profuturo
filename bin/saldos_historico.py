@@ -121,6 +121,45 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                 .withColumn("SAL-SALD-SDOBUD_PESOS", saldosDFfile["value"][760:19]) \
                 .withColumn("TIPO_CAMBIO", saldosDFfile["value"][780:4])
 
+    saldosDFfile2 = saldosDFfile2.withColumn("SAL_SALD_RETS", regexp_replace("SAL_SALD_RETS", ' ', ''))\
+                             .withColumn("SAL_SALD_RET8S", regexp_replace("SAL_SALD_RET8S", ' ', ''))\
+                             .withColumn("SAL-SALD-CYVS", regexp_replace("SAL-SALD-CYVS", ' ', ''))\
+                             .withColumn("SAL-SALD-CYVTS", regexp_replace("SAL-SALD-CYVTS", ' ', ''))\
+                             .withColumn("SAL-SALD-CSOS", regexp_replace("SAL-SALD-CSOS", ' ', ''))\
+                             .withColumn("SAL-SALD-ESTS",regexp_replace("SAL-SALD-ESTS", ' ', ''))\
+                             .withColumn("SAL-SALD-ESPS", regexp_replace("SAL-SALD-ESPS", ' ', ''))\
+                             .withColumn("SAL-SALD-CRES", regexp_replace("SAL-SALD-CRES", ' ', ''))\
+                             .withColumn("SAL-SALD-CREDS", regexp_replace("SAL-SALD-CREDS", ' ', ''))\
+                             .withColumn("SAL-SALD-SARS", regexp_replace("SAL-SALD-SARS", ' ', ''))\
+                             .withColumn("SAL-SALD-AVDS", regexp_replace("SAL-SALD-AVDS", ' ', ''))\
+                             .withColumn("SAL-SALD-AVPS", regexp_replace("SAL-SALD-AVPS", ' ', ''))\
+                             .withColumn("SAL-SALD-AVES", regexp_replace("SAL-SALD-AVES", ' ', ''))\
+                             .withColumn("SAL-SALD-ALPS", regexp_replace("SAL-SALD-ALPS", ' ', ''))\
+                             .withColumn("SAL-SALD-ALPDS", regexp_replace("SAL-SALD-ALPDS", ' ', ''))\
+                             .withColumn("SAL-SALD-ALPES", regexp_replace("SAL-SALD-ALPES", ' ', ''))\
+                             .withColumn("SAL-SALD-SDOV92", regexp_replace("SAL-SALD-SDOV92", ' ', ''))\
+                             .withColumn("SAL-SALD-SDOV97", regexp_replace("SAL-SALD-SDOV97", ' ', ''))\
+                             .withColumn("SAL-SALD-SDOBUD", regexp_replace("SAL-SALD-SDOBUD", ' ', ''))\
+                             .withColumn("SAL_SALD_RETS_PESOS", regexp_replace("SAL_SALD_RETS_PESOS", ' ', ''))\
+                             .withColumn("SAL_SALD_RET8S_PESOS", regexp_replace("SAL_SALD_RET8S_PESOS", ' ', ''))\
+                             .withColumn("SAL-SALD-CYVS_PESOS", regexp_replace("SAL-SALD-CYVS_PESOS", ' ', ''))\
+                             .withColumn("SAL-SALD-CYVTS_PESOS", regexp_replace("SAL-SALD-CYVTS_PESOS", ' ', ''))\
+                             .withColumn("SAL-SALD-CSOS_PESOS", regexp_replace("SAL-SALD-CSOS_PESOS", ' ', ''))\
+                             .withColumn("SAL-SALD-ESTS_PESOS", regexp_replace("SAL-SALD-ESTS_PESOS", ' ', ''))\
+                             .withColumn("SAL-SALD-ESPS_PESOS", regexp_replace("SAL-SALD-ESPS_PESOS", ' ', ''))\
+                             .withColumn("SAL-SALD-CRES_PESOS", regexp_replace("SAL-SALD-CRES_PESOS", ' ', ''))\
+                             .withColumn("SAL-SALD-CREDS_PESOS", regexp_replace("SAL-SALD-CREDS_PESOS", ' ', ''))\
+                             .withColumn("SAL-SALD-SARS_PESOS", regexp_replace("SAL-SALD-SARS_PESOS", ' ', ''))\
+                             .withColumn("SAL-SALD-AVDS_PESOS", regexp_replace("SAL-SALD-AVDS_PESOS", ' ', ''))\
+                             .withColumn("SAL-SALD-AVPS_PESOS", regexp_replace("SAL-SALD-AVPS_PESOS", ' ', ''))\
+                             .withColumn("SAL-SALD-AVES_PESOS", regexp_replace("SAL-SALD-AVES_PESOS", ' ', ''))\
+                             .withColumn("SAL-SALD-ALPS_PESOS", regexp_replace("SAL-SALD-ALPS_PESOS", ' ', ''))\
+                             .withColumn("SAL-SALD-ALPDS_PESOS", regexp_replace("SAL-SALD-ALPDS_PESOS", ' ', ''))\
+                             .withColumn("SAL-SALD-ALPES_PESOS", regexp_replace("SAL-SALD-ALPES_PESOS", ' ', ''))\
+                             .withColumn("SAL-SALD-SDOV92_PESOS", regexp_replace("SAL-SALD-SDOV92_PESOS", ' ', ''))\
+                             .withColumn("SAL-SALD-SDOV97_PESOS", regexp_replace("SAL-SALD-SDOV97_PESOS", ' ', ''))\
+                             .withColumn("SAL-SALD-SDOBUD_PESOS", regexp_replace("SAL-SALD-SDOBUD_PESOS", ' ', ''))
+
     #.withColumn("cuenta", saldosDFfile["value"].cast(IntegerType()))
 
     #print(saldosDFfile2.printSchema())
