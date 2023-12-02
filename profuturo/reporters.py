@@ -67,7 +67,7 @@ class HtmlReporter:
             self._append_row(row)
 
             for j, column_value in enumerate(self._value_columns, len(self._display_columns)):
-                self._current_totals[column_value] = Decimal(self._current_totals.get(column_value, 0)) + Decimal(row[j])
+                self._current_totals[column_value] = Decimal(self._current_totals.get(column_value, 0)) + Decimal(row[j] or 0)
 
     def _append_row(self, row: Row):
         self._html += "<tr>"
@@ -84,7 +84,7 @@ class HtmlReporter:
         for column in value_columns:
             precision = self._precision_columns[column]
 
-            self._html += f'<td style="text-align: right;">{_format_value(Decimal(row[i]), precision)}</td>'
+            self._html += f'<td style="text-align: right;">{_format_value(Decimal(row[i] or 0), precision)}</td>'
             i += 1
 
         self._html += "</tr>"
