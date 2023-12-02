@@ -72,7 +72,7 @@ with define_extraction(phase, area, postgres_pool, bigquery_pool) as (postgres,b
     WHERE "FCN_ID_PERIODO" = :term
     """, '"HECHOS"."TCHECHOS_CLIENTE_INDICADOR"', term=term_id, params={'term': term_id})
 
-    #truncate_table(bigquery, "ESTADO_CUENTA.TTEDOCTA_CLIENTE_INDICADOR", term=term_id)
+    truncate_table(bigquery, "ESTADO_CUENTA.TTEDOCTA_CLIENTE_INDICADOR", term=term_id)
 
     extract_dataset_spark(configure_postgres_spark, configure_bigquery_spark, """
     SELECT "FCN_CUENTA", "FCN_ID_PERIODO", "FCN_ID_INDICADOR", "FTN_EVALUA_INDICADOR", "FTA_EVALUA_INDICADOR"
@@ -98,7 +98,7 @@ with define_extraction(phase, area, postgres_pool, bigquery_pool) as (postgres,b
     """
 
     read_table_insert_temp_view(
-        configure_mit_spark,
+        configure_postgres_spark,
         query,
         "INDICADOR",
         params={"term": term_id}
