@@ -52,9 +52,9 @@ with define_extraction(phase, area, postgres_pool, integrity_pool) as (postgres,
                 term=term_id,
                 message=f"Se no se encontraron movimientos mit a reprocesar en los conceptos consar",
             )
+
         if movements_integrity:
             extract_movements_integrity(postgres, term_id, start_month, end_month, movements_integrity)
-
         else:
             notify(
                 postgres,
