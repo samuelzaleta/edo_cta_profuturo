@@ -1,12 +1,9 @@
 from sqlalchemy import text
-from profuturo.common import register_time, define_extraction, truncate_table, notify
-from profuturo.database import SparkConnectionConfigurator, get_postgres_pool, configure_mit_spark, \
-                               configure_postgres_spark, configure_buc_spark, configure_integrity_spark, \
-                               configure_bigquery_spark, get_bigquery_pool
+from profuturo.common import define_extraction, truncate_table, notify
+from profuturo.database import SparkConnectionConfigurator, get_postgres_pool, configure_mit_spark, configure_postgres_spark, configure_buc_spark, configure_integrity_spark, configure_bigquery_spark, get_bigquery_pool
 from profuturo.extraction import update_indicator_spark, extract_dataset_spark, _get_spark_session
 from profuturo.reporters import HtmlReporter
 from profuturo.extraction import extract_terms, read_table_insert_temp_view
-from datetime import datetime
 import sys
 
 html_reporter = HtmlReporter()
@@ -75,26 +72,24 @@ with define_extraction(phase, area, postgres_pool, bigquery_pool) as (postgres,b
     truncate_table(bigquery, "ESTADO_CUENTA.TTEDOCTA_CLIENTE_INDICADOR", term=term_id)
 
     extract_dataset_spark(configure_postgres_spark, configure_bigquery_spark, """
-    SELECT "FCN_CUENTA", "FCN_ID_PERIODO", "FCN_ID_INDICADOR", "FTN_EVALUA_INDICADOR", "FTA_EVALUA_INDICADOR"
+    SELECT "FCN_CUENTA", "FCN_ID_PERIODO", "FCN_ID_INDICADOR",
+           (("FTN_EVALUA_INDICADOR" & 4) >> 2)::bool AS "FTB_IMPRESION",
+           (("FTN_EVALUA_INDICADOR" & 2) >> 1)::bool AS "FTB_ENVIO",
+           ("FTN_EVALUA_INDICADOR" & 1)::bool AS "FTB_GENERACION"
     FROM "HECHOS"."TCHECHOS_CLIENTE_INDICADOR"
     """, "ESTADO_CUENTA.TTEDOCTA_CLIENTE_INDICADOR")
 
     query = """
-    SELECT 
-    FTC_ENTIDAD_FEDERATIVA,
-    INDICADOR,
-    COUNT(1) NUM_REGISTROS
-    FROM (SELECT
-    COALESCE(MC."FTC_ENTIDAD_FEDERATIVA", 'NO ASIGNADO') AS FTC_ENTIDAD_FEDERATIVA,
-    GI."FTC_DESCRIPCION" AS INDICADOR 
-    FROM "HECHOS"."TCHECHOS_CLIENTE_INDICADOR" CI
-    INNER JOIN "GESTOR"."TCGESPRO_INDICADOR" GI
-    ON GI."FTN_ID_INDICADOR" = CI."FCN_ID_INDICADOR"
-    LEFT JOIN "MAESTROS"."TCDATMAE_CLIENTE" MC
-    ON CI."FCN_CUENTA" = MC."FTN_CUENTA"
-    WHERE CI."FCN_ID_PERIODO" = :term)
-    GROUP BY FTC_ENTIDAD_FEDERATIVA,
-    INDICADOR
+    SELECT FTC_ENTIDAD_FEDERATIVA, INDICADOR, COUNT(1) NUM_REGISTROS
+    FROM (
+        SELECT COALESCE(MC."FTC_ENTIDAD_FEDERATIVA", 'NO ASIGNADO') AS FTC_ENTIDAD_FEDERATIVA,
+               GI."FTC_DESCRIPCION" AS INDICADOR 
+        FROM "HECHOS"."TCHECHOS_CLIENTE_INDICADOR" CI
+            INNER JOIN "GESTOR"."TCGESPRO_INDICADOR" GI ON GI."FTN_ID_INDICADOR" = CI."FCN_ID_INDICADOR"
+            LEFT JOIN "MAESTROS"."TCDATMAE_CLIENTE" MC ON CI."FCN_CUENTA" = MC."FTN_CUENTA"
+        WHERE CI."FCN_ID_PERIODO" = :term
+    ) I
+    GROUP BY FTC_ENTIDAD_FEDERATIVA, INDICADOR
     """
 
     read_table_insert_temp_view(
