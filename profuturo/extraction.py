@@ -16,9 +16,10 @@ import pandas as pd
 import polars as pl
 
 
-def extract_terms(conn: Connection, phase: int) -> Dict[str, Any]:
+def extract_terms(conn: Connection, phase: int, term_id: int = None) -> Dict[str, Any]:
     try:
-        term_id = int(sys.argv[2])
+        term_id = term_id or int(sys.argv[2])
+
         cursor = conn.execute(text("""
         SELECT "FTC_PERIODO"
         FROM "TCGESPRO_PERIODO"
@@ -391,8 +392,7 @@ def _get_spark_session() -> SparkSession:
 
 def _create_spark_dataframe(spark: SparkSession, connection_configurator, query: str, params: Dict[str, Any]) -> SparkDataFrame:
     return connection_configurator(spark.read, _replace_query_params(query, params), True) \
-        .load() \
-        .cache()
+        .load()
 
 
 def _write_spark_dataframe(df: SparkDataFrame, connection_configurator, table: str) -> None:
