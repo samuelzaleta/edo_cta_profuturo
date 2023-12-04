@@ -38,7 +38,6 @@ def extract_terms(conn: Connection, phase: int, term_id: int = None) -> Dict[str
             month_range = calendar.monthrange(year, month)
             start_month = date(year, month, 1)
             end_month = date(year, month, month_range[1])
-            end_saldos = date(year, month + 1,1)
             valor_accion = date(year, month, month_range[1])
             #MENOS UN MES#
             end_saldos_anterior = start_month
@@ -49,7 +48,6 @@ def extract_terms(conn: Connection, phase: int, term_id: int = None) -> Dict[str
                 "start_month": start_month,
                 "end_month": end_month,
                 "valor_accion": valor_accion,
-                "end_saldos": end_saldos,
                 "time_period": time_period,
                 "end_saldos_anterior": end_saldos_anterior,
                 "valor_accion_anterior": valor_accion_anterior,
