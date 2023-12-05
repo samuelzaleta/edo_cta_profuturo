@@ -33,74 +33,37 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
     spark = _get_spark_session()
 
     with register_time(postgres_pool, phase, term_id, user, area):
-        truncate_table(postgres, 'TTHECHOS_RETIRO', term=term_id)
+        #truncate_table(postgres, 'TTHECHOS_RETIRO', term=term_id)
         #truncate_table(postgres, 'TTHECHOS_RETIRO_LIQUIDACIONES', term=term_id)
         #truncate_table(postgres, 'TTHECHOS_RETIRO_SALDOS_INICIALES', term=term_id)
 
-        query_cuentas_bono = """
-        SELECT
-        DISTINCT X.FTN_NUM_CTA_INVDUAL AS FCN_CUENTA,
-        FCC_VALOR_IND AS CUENTA_VIGENTE
-        FROM(
-        SELECT DISTINCT FTN_NUM_CTA_INVDUAL
-        FROM CIERREN.TTAFOGRAL_MOV_BONO
-        WHERE FTD_FEH_LIQUIDACION  between add_months(DATE '2023-01-31', -4) and DATE '2023-01-31' --:start AND :end
-        AND FCN_ID_TIPO_SUBCTA = 14
-    
-        UNION ALL
-    
-        SELECT DISTINCT  SHMAX.FTN_NUM_CTA_INVDUAL
-        FROM cierren.thafogral_saldo_historico_v2 SHMAX
-        WHERE SHMAX.FCN_ID_TIPO_SUBCTA = 14
-              AND SHMAX.FTD_FEH_LIQUIDACION <= (
-                  SELECT MIN(SHMIN.FTD_FEH_LIQUIDACION)
-                  FROM cierren.thafogral_saldo_historico_v2 SHMIN
-                  WHERE SHMIN.FTD_FEH_LIQUIDACION > DATE '2023-01-31' --start
-                )
-        ) x
-        INNER JOIN CIERREN.TTAFOGRAL_IND_CTA_INDV IND
-        ON X.FTN_NUM_CTA_INVDUAL = IND.FTN_NUM_CTA_INVDUAL
-        AND FFN_ID_CONFIG_INDI = 2 AND  FTC_VIGENCIA= 1        
-        """
 
         query_dias_rend_bono = """
-         SELECT RB.FTN_NUM_CTA_INVDUAL, RB.FTD_FEH_VALOR AS FTD_FECHA_REDENCION_BONO,
-                CAST(EXTRACT(DAY FROM RB.FTD_FEH_VALOR - TRUNC(CURRENT_DATE)) AS INTEGER) AS DIAS_PLAZO_NATURALES,
-                COUNT(1) AS DIAS_INHABILIES,
-                CAST(EXTRACT(DAY FROM RB.FTD_FEH_VALOR - TRUNC(CURRENT_DATE)) AS INTEGER)  - COUNT(1) DIA_PLAZO
+        SELECT RB.FTN_NUM_CTA_INVDUAL, RB.FTD_FEH_VALOR AS FTD_FECHA_REDENCION_BONO,
+        CAST(EXTRACT(DAY FROM RB.FTD_FEH_VALOR - TRUNC(:end)) AS INTEGER) AS DIAS_PLAZO_NATURALES
         FROM TTAFOGRAL_OP_INVDUAL RB
-        INNER JOIN TTAFOGRAL_CALENDARIO CAL
-        ON CAL.FTD_FECHA BETWEEN CURRENT_DATE AND RB.FTD_FEH_VALOR AND FTN_DIA_HABIL = 0
         WHERE (RB.FTN_NUM_CTA_INVDUAL, RB.FTD_FEH_VALOR) IN (
-                                        SELECT FTN_NUM_CTA_INVDUAL,
-                                               MAX(FTD_FEH_VALOR)
-                                        FROM TTAFOGRAL_OP_INVDUAL
-                                        GROUP BY FTN_NUM_CTA_INVDUAL)
-        GROUP BY RB.FTN_NUM_CTA_INVDUAL, RB.FTD_FEH_VALOR
-        
+                                SELECT FTN_NUM_CTA_INVDUAL,
+                                       MAX(FTD_FEH_VALOR)
+                                FROM TTAFOGRAL_OP_INVDUAL
+                                GROUP BY FTN_NUM_CTA_INVDUAL)
         """
 
         query_vector = """
         SELECT FTN_PLAZO, FTN_FACTOR FROM TTAFOGRAL_VECTOR
         """
 
-        query_valor_accion_bono = """
-        SELECT FCN_VALOR_ACCION FROM TCAFOGRAL_VALOR_ACCION VA
-        WHERE  VA.FCD_FEH_ACCION = DATE '2023-01-31' --:end
-          AND FCN_ID_SIEFORE = 80
+        query_saldos = """
+        SELECT "FCN_CUENTA", "FTF_DIA_ACCIONES", "FTF_SALDO_DIA"
+        FROM "HECHOS"."THHECHOS_SALDO_HISTORICO"
+        WHERE "FCN_ID_PERIODO" = :term
+        and "FCN_ID_TIPO_SUBCTA"  = 14
         """
 
         read_table_insert_temp_view(
             configure_mit_spark,
-            query_cuentas_bono,
-            "CUENTAS_BONO",
-            params={"end": end_month}
-        )
-
-        read_table_insert_temp_view(
-            configure_mit_spark,
             query_dias_rend_bono,
-            "DIAS_RENDENCION",
+            "DIAS_REDENCION",
             params={"end": end_month}
         )
 
@@ -111,10 +74,35 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
             params={"end": end_month}
         )
 
+
         read_table_insert_temp_view(
-            configure_mit_spark,
-            query_valor_accion_bono,
-            "VALOR_ACCION",
-            params={"end": end_month}
+            configure_postgres_spark,
+            query_saldos,
+            "SALDOS",
+            params={"term": term_id}
         )
+
+        df = spark.sql("""
+            SELECT 
+            S.FCN_CUENTA,
+            S.FTF_DIA_ACCIONES AS FTF_BON_NOM_ACC, 
+            S.FTF_SALDO_DIA AS FTF_BON_NOM_PES,
+            COALESCE(CASE 
+            WHEN S.FTF_DIA_ACCIONES > 0 THEN S.FTF_DIA_ACCIONES * X.FTN_FACTOR END, 0) FTF_BON_ACT_ACC,
+            COALESCE(CASE 
+            WHEN S.FTF_SALDO_DIA > 0 THEN S.FTF_SALDO_DIA * X.FTN_FACTOR END, 0) FTF_BON_ACT_PES
+            FROM (SELECT 
+                    DR.FTN_NUM_CTA_INVDUAL,DR.FTD_FECHA_REDENCION_BONO,
+                    DR.FTN_PLAZO, VT.FTN_FACTOR
+                    FROM DIAS_REDENCION DR
+                        INNER JOIN VECTOR VT
+                        ON VT.FTN_PLAZO = DR.DIAS_PLAZO_NATURALES
+                ) X
+                    INNER JOIN SALDOS S 
+                    ON X.FTN_NUM_CTA_INVDUAL = S.FCN_CUENTA
+        """)
+
+        df = df.withColumn("FCN_ID_PERIODO", lit(term_id))
+
+        _write_spark_dataframe(df, configure_postgres_spark, '"HECHOS"."TCHECHOS_BONO"')
 
