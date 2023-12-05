@@ -33,7 +33,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
     spark = _get_spark_session()
 
     with register_time(postgres_pool, phase, term_id, user, area):
-        #truncate_table(postgres, 'TTHECHOS_RETIRO', term=term_id)
+        truncate_table(postgres, 'TTCALCUL_BONO', term=term_id)
         #truncate_table(postgres, 'TTHECHOS_RETIRO_LIQUIDACIONES', term=term_id)
         #truncate_table(postgres, 'TTHECHOS_RETIRO_SALDOS_INICIALES', term=term_id)
 
@@ -85,15 +85,15 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
         df = spark.sql("""
             SELECT 
             S.FCN_CUENTA,
-            S.FTF_DIA_ACCIONES AS FTF_BON_NOM_ACC, 
-            S.FTF_SALDO_DIA AS FTF_BON_NOM_PES,
+            ROUND(S.FTF_DIA_ACCIONES,6) AS FTF_BON_NOM_ACC, 
+            ROUND(S.FTF_SALDO_DIA,2) AS FTF_BON_NOM_PES,
             COALESCE(CASE 
-            WHEN S.FTF_DIA_ACCIONES > 0 THEN S.FTF_DIA_ACCIONES * X.FTN_FACTOR END, 0) FTF_BON_ACT_ACC,
+            WHEN S.FTF_DIA_ACCIONES > 0 THEN ROUND(S.FTF_DIA_ACCIONES * X.FTN_FACTOR,6) END, 0) FTF_BON_ACT_ACC,
             COALESCE(CASE 
-            WHEN S.FTF_SALDO_DIA > 0 THEN S.FTF_SALDO_DIA * X.FTN_FACTOR END, 0) FTF_BON_ACT_PES
+            WHEN S.FTF_SALDO_DIA > 0 THEN ROUND(S.FTF_SALDO_DIA * X.FTN_FACTOR,2) END, 0) FTF_BON_ACT_PES
             FROM (SELECT 
                     DR.FTN_NUM_CTA_INVDUAL,DR.FTD_FECHA_REDENCION_BONO,
-                    DR.FTN_PLAZO, VT.FTN_FACTOR
+                    DR.DIAS_PLAZO_NATURALES, VT.FTN_FACTOR
                     FROM DIAS_REDENCION DR
                         INNER JOIN VECTOR VT
                         ON VT.FTN_PLAZO = DR.DIAS_PLAZO_NATURALES
@@ -104,5 +104,5 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
 
         df = df.withColumn("FCN_ID_PERIODO", lit(term_id))
 
-        _write_spark_dataframe(df, configure_postgres_spark, '"HECHOS"."TCHECHOS_BONO"')
+        _write_spark_dataframe(df, configure_postgres_spark, '"HECHOS"."TTCALCUL_BONO"')
 
