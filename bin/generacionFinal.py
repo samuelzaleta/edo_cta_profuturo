@@ -1,48 +1,12 @@
-from sqlalchemy.engine import CursorResult
 from profuturo.common import define_extraction, register_time, notify, truncate_table
 from profuturo.database import get_postgres_pool, configure_postgres_spark, configure_bigquery_spark, get_bigquery_pool
-from profuturo.extraction import _write_spark_dataframe, extract_terms, _get_spark_session, read_table_insert_temp_view, \
-    _create_spark_dataframe
-from pyspark.sql.functions import concat, col, row_number, lit, current_timestamp
+from profuturo.extraction import _write_spark_dataframe, extract_terms, _get_spark_session, _create_spark_dataframe
+from pyspark.sql.functions import concat, col, row_number, lit, lpad
 from pyspark.sql.window import Window
-from pyspark.sql import functions as F
-from sqlalchemy import text
-import requests
 import sys
 import random
 import string
-import time
 
-
-################### OBTENCIÓN DE MUESTRAS #######################################
-def find_samples(samples_cursor: CursorResult):
-    samples = set()
-    i = 0
-    for batch in samples_cursor.partitions(50):
-        for record in batch:
-            account = record[0]
-            consars = record[1]
-            i = i + 1
-
-            for consar in consars:
-                if consar not in configurations:
-                    continue
-
-                configurations[consar] = configurations[consar] - 1
-
-                if configurations[consar] == 0:
-                    del configurations[consar]
-
-                samples.add(account)
-
-                if len(configurations) == 0:
-                    print("Cantidad de registros: " + str(i))
-                    return samples
-
-    raise Exception('Insufficient samples')
-
-
-url = "https://procesos-api-service-dev-e46ynxyutq-uk.a.run.app/procesos/generarEstadosCuentaPensionados"
 
 postgres_pool = get_postgres_pool()
 bigquery_pool = get_bigquery_pool()
@@ -58,65 +22,9 @@ with define_extraction(phase, area, postgres_pool, bigquery_pool) as (postgres, 
     spark = _get_spark_session()
 
     with register_time(postgres_pool, phase, term_id, user, area):
-        is_reprocess = postgres.execute(text("""
-        SELECT EXISTS(
-            SELECT 1
-            FROM "GESTOR"."TCGESPRO_MUESTRA_SOL_RE_CONSAR" MR
-                INNER JOIN "GESTOR"."TCGESPRO_MUESTRA" M ON MR."FCN_ID_MUESTRA" = M."FTN_ID_MUESTRA"
-            WHERE M."FCN_ID_PERIODO" = :term
-              AND M."FCN_ID_AREA" = :area
-              AND MR."FTC_STATUS" = 'Reprocesado'
-        )
-        """), {'term': term_id, "area": area}).fetchone()[0]
-
-        print("Reprocess:", is_reprocess)
-        if not is_reprocess:
-            truncate_table(postgres, "TCGESPRO_MUESTRA_SOL_RE_CONSAR")
-            truncate_table(postgres, "TCGESPRO_MUESTRA", term=term_id, area=area)
-
         truncate_table(bigquery, 'ESTADO_CUENTA.TTMUESTR_REVERSO')
         truncate_table(bigquery, 'ESTADO_CUENTA.TTMUESTR_ANVERSO')
         truncate_table(bigquery, 'ESTADO_CUENTA.TTMUESTR_GENERAL')
-
-        cursor = postgres.execute(text("""
-        SELECT "FCN_ID_MOVIMIENTO_CONSAR", "FTN_CANTIDAD"
-        FROM "GESTOR"."TTGESPRO_CONFIGURACION_MUESTRA_AUTOMATICA"
-        """))
-        configurations = {configuration[0]: configuration[1] for configuration in cursor.fetchall()}
-        print("configuracion", configurations)
-
-        cursor = postgres.execute(text("""
-        SELECT "FCN_CUENTA", array_agg(CC."FCN_ID_MOVIMIENTO_CONSAR")
-        FROM (
-            SELECT M."FCN_CUENTA", PC."FCN_ID_MOVIMIENTO_CONSAR"
-            FROM "HECHOS"."TTHECHOS_MOVIMIENTO" M
-                INNER JOIN "GESTOR"."TTGESPRO_MOV_PROFUTURO_CONSAR" PC ON M."FCN_ID_CONCEPTO_MOVIMIENTO" = PC."FCN_ID_MOVIMIENTO_PROFUTURO"
-            WHERE M."FTD_FEH_LIQUIDACION" between :end - INTERVAL '4 MONTH' and :end
-            GROUP BY M."FCN_CUENTA", PC."FCN_ID_MOVIMIENTO_CONSAR"
-        ) AS CC
-        INNER JOIN "GESTOR"."TTGESPRO_CONFIGURACION_MUESTRA_AUTOMATICA" MC ON CC."FCN_ID_MOVIMIENTO_CONSAR" = MC."FCN_ID_MOVIMIENTO_CONSAR"
-        WHERE "FCN_CUENTA" IN (SELECT "FCN_CUENTA" FROM "MAESTROS"."TCDATMAE_CLIENTE")
-        GROUP BY "FCN_CUENTA"
-        ORDER BY sum(1.0 / "FTN_CANTIDAD") DESC
-        """), {'end': end_month})
-        samples = find_samples(cursor)
-
-        print(samples)
-
-        postgres.execute(text("""
-        INSERT INTO "GESTOR"."TCGESPRO_MUESTRA" ("FCN_CUENTA", "FCN_ID_PERIODO", "FCN_ID_USUARIO", "FCN_ID_AREA", "FTD_FECHAHORA_ALTA") 
-        SELECT DISTINCT HC."FCN_CUENTA", :term, CA."FTC_USUARIO_CARGA"::INT, :area, current_timestamp
-        FROM "HECHOS"."TTHECHOS_CARGA_ARCHIVO" CA
-            INNER JOIN "HECHOS"."TCHECHOS_CLIENTE" HC ON CA."FCN_CUENTA" = HC."FCN_CUENTA"
-        WHERE "FCN_ID_INDICADOR" = 32 AND "FCN_ID_AREA" = :area
-          AND CA."FCN_ID_PERIODO" = :term
-        """), {"term": term_id, "area": area})
-
-        filter_reprocessed_samples = ''
-        if is_reprocess:
-            filter_reprocessed_samples = 'INNER JOIN "GESTOR"."TCGESPRO_MUESTRA_SOL_RE_CONSAR" MR ON M."FTN_ID_MUESTRA" = MR."FCN_ID_MUESTRA"'
-
-        ########################## GENERACIÓN DE MUESTRAS #################################################
 
         char1 = random.choice(string.ascii_letters).upper()
         char2 = random.choice(string.ascii_letters).upper()
@@ -128,7 +36,7 @@ with define_extraction(phase, area, postgres_pool, bigquery_pool) as (postgres, 
                -- F."FCN_ID_GENERACION",
                'CANDADO' AS "FTC_CANDADO_APERTURA",
                F."FCN_ID_FORMATO_ESTADO_CUENTA" AS "FTN_ID_FORMATO",
-               M."FCN_ID_PERIODO",
+               :term AS "FCN_ID_PERIODO",
                --CONCAT(SUBSTR(P."FTC_PERIODO", 4), SUBSTR(P."FTC_PERIODO", 1, 2)) AS "PERIODO",
                C."FTN_CUENTA" AS "FCN_NUMERO_CUENTA",
                CAST(:end as TIMESTAMP) AS "FTD_FECHA_CORTE",
@@ -157,12 +65,8 @@ with define_extraction(phase, area, postgres_pool, bigquery_pool) as (postgres, 
             INNER JOIN "GESTOR"."TCGESPRO_PERIODICIDAD" PA ON F."FCN_ID_PERIODICIDAD_ANVERSO" = PA."FTN_ID_PERIODICIDAD"
             INNER JOIN "GESTOR"."TCGESPRO_PERIODICIDAD" PR ON F."FCN_ID_PERIODICIDAD_REVERSO" = PR."FTN_ID_PERIODICIDAD"
             INNER JOIN "GESTOR"."TCGESPRO_PERIODO" P ON P."FTN_ID_PERIODO" = :term
-            INNER JOIN "GESTOR"."TCGESPRO_MUESTRA" M ON P."FTN_ID_PERIODO" = M."FCN_ID_PERIODO"
-            {filter_reprocessed_samples}
             INNER JOIN "HECHOS"."TCHECHOS_CLIENTE" I
-                ON M."FCN_ID_PERIODO" = I."FCN_ID_PERIODO"
-               AND M."FCN_CUENTA" = I."FCN_CUENTA"
-               AND F."FCN_ID_GENERACION" = CASE I."FTC_GENERACION"
+                ON F."FCN_ID_GENERACION" = CASE I."FTC_GENERACION"
                    WHEN 'AFORE' THEN 2
                    WHEN 'TRANSICION' THEN 3
                    WHEN 'MIXTO' THEN 4
@@ -201,7 +105,7 @@ with define_extraction(phase, area, postgres_pool, bigquery_pool) as (postgres, 
         ).cast("bigint"))
         general_df = general_df.withColumn("consecutivo", row_number().over(Window.orderBy(lit(0))).cast("string"))
         # Fill the "consecutivo" column with 9-digit values
-        general_df = general_df.withColumn("consecutivo", F.lpad("consecutivo", 9, '0'))
+        general_df = general_df.withColumn("consecutivo", lpad("consecutivo", 9, '0'))
         general_df = general_df.withColumn("FCN_FOLIO", concat(
             lit(random),
             col("FCN_ID_PERIODO"),
@@ -220,15 +124,12 @@ with define_extraction(phase, area, postgres_pool, bigquery_pool) as (postgres, 
                 INNER JOIN "GESTOR"."TCGESPRO_PERIODICIDAD" PA ON F."FCN_ID_PERIODICIDAD_ANVERSO" = PA."FTN_ID_PERIODICIDAD"
                 INNER JOIN "GESTOR"."TCGESPRO_PERIODICIDAD" PR ON F."FCN_ID_PERIODICIDAD_REVERSO" = PR."FTN_ID_PERIODICIDAD"
                 INNER JOIN "GESTOR"."TCGESPRO_PERIODO" P ON P."FTN_ID_PERIODO" = :term
-                INNER JOIN "GESTOR"."TCGESPRO_MUESTRA" M ON P."FTN_ID_PERIODO" = M."FCN_ID_PERIODO"
-                {filter_reprocessed_samples}
                 INNER JOIN "HECHOS"."TCHECHOS_CLIENTE" I
-                    ON M."FCN_ID_PERIODO" = I."FCN_ID_PERIODO"
-                   AND M."FCN_CUENTA" = I."FCN_CUENTA"
-                   AND F."FCN_ID_GENERACION" = CASE I."FTC_GENERACION"
+                    ON F."FCN_ID_GENERACION" = CASE I."FTC_GENERACION"
                        WHEN 'AFORE' THEN 2
                        WHEN 'TRANSICION' THEN 3
-                       WHEN 'MIXTO' THEN 4 END
+                       WHEN 'MIXTO' THEN 4 
+                   END
                 INNER JOIN "MAESTROS"."TCDATMAE_CLIENTE" C ON I."FCN_CUENTA" = C."FTN_CUENTA"
                 INNER JOIN "GESTOR"."TCGESPRO_INDICADOR_ESTADO_CUENTA" IE
                     ON IE."FTN_ID_INDICADOR_ESTADO_CUENTA" = F."FCN_ID_INDICADOR_CLIENTE"
@@ -236,7 +137,8 @@ with define_extraction(phase, area, postgres_pool, bigquery_pool) as (postgres, 
                        WHEN 'ISSSTE' THEN 67
                        WHEN 'IMSS' THEN 66
                        WHEN 'MIXTO' THEN 69
-                       WHEN 'INDEPENDIENTE' THEN 68 END
+                       WHEN 'INDEPENDIENTE' THEN 68 
+                   END
                 INNER JOIN "GESTOR"."TCGESPRO_INDICADOR_ESTADO_CUENTA" IEC
                     ON IEC."FTN_ID_INDICADOR_ESTADO_CUENTA" = F."FCN_ID_INDICADOR_AFILIACION"
                    AND IEC."FTN_VALOR" = CASE
@@ -248,7 +150,8 @@ with define_extraction(phase, area, postgres_pool, bigquery_pool) as (postgres, 
                     ON TIEC."FTN_ID_INDICADOR_ESTADO_CUENTA" = F."FCN_ID_INDICADOR_BONO"
                    AND TIEC."FTN_VALOR" = CASE I."FTB_BONO"
                        WHEN false THEN  1
-                       WHEN true THEN 2 END
+                       WHEN true THEN 2 
+                   END
             -- QUITAR COMENT  CONDICION VALIDA PERO NO ES PERIODO CUATRIMESTRAL
             WHERE mod(extract(MONTH FROM to_date(P."FTC_PERIODO", 'MM/YYYY')), PG."FTN_MESES") = 0
               AND F."FTB_ESTATUS" = true
@@ -298,12 +201,8 @@ with define_extraction(phase, area, postgres_pool, bigquery_pool) as (postgres, 
                 INNER JOIN "GESTOR"."TCGESPRO_PERIODICIDAD" PA ON F."FCN_ID_PERIODICIDAD_ANVERSO" = PA."FTN_ID_PERIODICIDAD"
                 INNER JOIN "GESTOR"."TCGESPRO_PERIODICIDAD" PR ON F."FCN_ID_PERIODICIDAD_REVERSO" = PR."FTN_ID_PERIODICIDAD"
                 INNER JOIN "GESTOR"."TCGESPRO_PERIODO" P ON P."FTN_ID_PERIODO" = :term
-                INNER JOIN "GESTOR"."TCGESPRO_MUESTRA" M ON P."FTN_ID_PERIODO" = M."FCN_ID_PERIODO"
-                {filter_reprocessed_samples}
                 INNER JOIN "HECHOS"."TCHECHOS_CLIENTE" I
-                    ON M."FCN_ID_PERIODO" = I."FCN_ID_PERIODO"
-                   AND M."FCN_CUENTA" = I."FCN_CUENTA"
-                   AND F."FCN_ID_GENERACION" = CASE I."FTC_GENERACION"
+                    ON F."FCN_ID_GENERACION" = CASE I."FTC_GENERACION"
                        WHEN 'AFORE' THEN 2
                        WHEN 'TRANSICION' THEN 3
                        WHEN 'MIXTO' THEN 4
@@ -387,6 +286,7 @@ with define_extraction(phase, area, postgres_pool, bigquery_pool) as (postgres, 
                      F."FCN_ID_FORMATO_ESTADO_CUENTA",
                      PR."FTC_PERIODO",
                      C."FCN_GENERACION"
+            LIMIT 100000
         )
         SELECT "FCN_CUENTA" AS "FCN_NUMERO_CUENTA",
                -- "PERIODO",
@@ -450,35 +350,15 @@ with define_extraction(phase, area, postgres_pool, bigquery_pool) as (postgres, 
         _write_spark_dataframe(reverso_df, configure_bigquery_spark, 'ESTADO_CUENTA.TTMUESTR_REVERSO')
         _write_spark_dataframe(anverso_df, configure_bigquery_spark, 'ESTADO_CUENTA.TTMUESTR_ANVERSO')
         _write_spark_dataframe(general_df, configure_bigquery_spark, 'ESTADO_CUENTA.TTMUESTR_GENERAL')
-        # _write_spark_dataframe(df, configure_postgres_spark, '"GESTOR"."TCGESPRO_MUESTRA"')
-
-        if is_reprocess:
-            postgres.execute(text("""
-            UPDATE "GESTOR"."TCGESPRO_MUESTRA"
-            SET "FTC_ESTATUS" = null
-            WHERE "FTC_ESTATUS" = 'Reprocesado'
-              AND "FCN_ID_PERIODO" = :term
-              AND "FCN_ID_AREA" = :area
-            """), {"term": term_id, "area": area})
-
-        time.sleep(40)
-        response = requests.get(url)
-        # Verifica si la petición fue exitosa
-        if response.status_code == 200:
-            # Si la petición fue exitosa, puedes acceder al contenido de la respuesta de la siguiente manera:
-            content = response.content
-            print(content)
-        else:
-            # Si la petición no fue exitosa, puedes imprimir el código de estado para obtener más información
-            print(f"La solicitud no fue exitosa. Código de estado: {response.status_code}")
+        # _write_spark_dataframe(df, configure_postgres_sp
 
         notify(
             postgres,
-            "Generacion muestras",
+            "Generacion finales",
             phase,
             area,
             term=term_id,
-            message="Se terminaron de generar las muestras de los estados de cuenta con éxito",
+            message="Se terminaron de generar los estados de cuenta finales con éxito",
             aprobar=False,
             descarga=False,
         )
