@@ -38,7 +38,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                    SHMAX.FCN_ID_TIPO_SUBCTA,
                    MAX(TRUNC(SHMAX.FTD_FEH_LIQUIDACION)) AS FTD_FEH_LIQUIDACION
             FROM cierren.thafogral_saldo_historico_v2 SHMAX
-            WHERE SHMAX.FTD_FEH_LIQUIDACION <= (
+            WHERE SHMAX.FTD_FEH_LIQUIDACION < (
                   SELECT MIN(SHMIN.FTD_FEH_LIQUIDACION)
                   FROM cierren.thafogral_saldo_historico_v2 SHMIN
                   WHERE SHMIN.FTD_FEH_LIQUIDACION > :date
