@@ -44,7 +44,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                   WHERE SHMIN.FTD_FEH_LIQUIDACION > :date
               )
               -- AND SHMAX.FTN_NUM_CTA_INVDUAL 
-              -- AND SHMAX.FCN_ID_TIPO_SUBCTA = 22
+              -- AND SHMAX.FCN_ID_TIPO_SUBCTA = 14
               -- AND SHMAX.FCN_ID_SIEFORE = 83
             GROUP BY SHMAX.FTN_NUM_CTA_INVDUAL, SHMAX.FCN_ID_SIEFORE, SHMAX.FCN_ID_TIPO_SUBCTA
         ) SHMAXIMO ON SH.FTN_NUM_CTA_INVDUAL = SHMAXIMO.FTN_NUM_CTA_INVDUAL
