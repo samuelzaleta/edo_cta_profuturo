@@ -1,3 +1,4 @@
+import codecs
 from profuturo.common import register_time, define_extraction, notify
 from profuturo.database import get_postgres_pool
 from profuturo.extraction import extract_terms, _get_spark_session
@@ -33,12 +34,13 @@ def get_data(index, columns, df):
     if df.count() == 0:
         print("DATAFRAME VACIO")
     df = df.select(*columns)
-    data = df.rdd.flatMap(lambda row: [f"{row[column]}" for column in columns]).collect()
+    data = df.rdd.flatMap(
+        lambda row: [codecs.encode(str(row[column]), "utf-8").decode("utf-8") for column in columns]).collect()
     data = [list(data[i:i + len(columns)]) for i in range(0, len(data), len(columns))]
-    res = f"{index}\n"
+    res = ""
     for row in data:
         data_str = "|".join(row[i] for i in range(len(columns)))
-        res += data_str + "\n"
+        res += f"{index}|" + data_str + "\n"
     return res, len(data)
 
 
@@ -55,8 +57,8 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
     end_month = term["end_month"]
 
     with register_time(postgres_pool, phase, term_id, user, area):
-        general_columns = ["FCN_FOLIO", "FTC_NOMBRE_COMPLETO", "FTC_CALLE_NUMERO", "FTC_COLONIA", "FTC_DELEGACION",
-                           "FTN_CP", "FTC_ENTIDAD_FEDERATIVA", "FTC_RFC", "FTC_NSS", "FTC_CURP",
+        general_columns = ["FCN_NUMERO_CUENTA", "FCN_FOLIO", "FTC_NOMBRE_COMPLETO", "FTC_CALLE_NUMERO", "FTC_COLONIA",
+                           "FTC_DELEGACION", "FTN_CP", "FTC_ENTIDAD_FEDERATIVA", "FTC_RFC", "FTC_NSS", "FTC_CURP",
                            "FTD_FECHA_GRAL_INICIO", "FTD_FECHA_GRAL_FIN", "FTN_ID_FORMATO", "FTN_ID_SIEFORE",
                            "FTD_FECHA_CORTE", "FTB_PDF_IMPRESO", "FTN_SALDO_SUBTOTAL", "FTN_SALDO_TOTAL",
                            "FTN_PENSION_MENSUAL"]
@@ -70,11 +72,18 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                                 "FTN_SALDO_ANTERIOR", "FTN_SALDO_FINAL", "FTN_VALOR_ACTUAL_PESO",
                                 "FTN_VALOR_ACTUAL_UDI", "FTN_VALOR_NOMINAL_PESO", "FTN_VALOR_NOMINAL_UDI"]
 
+        df_indicador = (
+            extract_bigquery('ESTADO_CUENTA.TTEDOCTA_CLIENTE_INDICADOR')
+            .filter((f.col("FTB_IMPRESION") == True) & (f.col("FTB_ENVIO") == False))
+        )
         df_edo_general = extract_bigquery('ESTADO_CUENTA.TTEDOCTA_GENERAL').filter(f"FCN_ID_PERIODO == {term_id}")
+        df_edo_general = df_edo_general.join(df_indicador, df_edo_general.FCN_ID_EDOCTA == df_indicador.FCN_CUENTA, 'left')
+
         df_anverso = extract_bigquery('ESTADO_CUENTA.TTEDOCTA_ANVERSO')
 
         for cast_column in cast_columns_general:
-            df_edo_general = df_edo_general.withColumn(f"{cast_column}", df_edo_general[f"{cast_column}"].cast("decimal(16, 2)"))
+            df_edo_general = df_edo_general.withColumn(f"{cast_column}",
+                                                       df_edo_general[f"{cast_column}"].cast("decimal(16, 2)"))
         for cast_column in cast_columns_anverso:
             df_anverso = df_anverso.withColumn(f"{cast_column}", df_anverso[f"{cast_column}"].cast("decimal(16, 2)"))
 
@@ -83,7 +92,6 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
         df_anverso_aho = df_anverso_general.filter(f.col("FTC_SECCION").isin(["AHO", "PEN"]))
         df_anverso_bon = df_anverso_general.filter(f.col("FTC_SECCION") == "BON")
         df_anverso_sdo = df_anverso_general.filter(f.col("FTC_SECCION") == "SDO")
-        df_edo_reverso = extract_bigquery('ESTADO_CUENTA.TTEDOCTA_REVERSO')
 
         clients = df_anverso_general.select("FCN_ID_EDOCTA").distinct()
         clients.show()
@@ -114,19 +122,29 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                 saldo_count += saldo_count
 
         total_count = sum([general_count, ahorro_count, bono_count, saldo_count])
-        final_row = f"5\n{general_count}|{ahorro_count}|{bono_count}|{saldo_count}|{total_count}"
+        final_row = f"5|{general_count}|{ahorro_count}|{bono_count}|{saldo_count}|{total_count}"
         data_strings = data_strings + final_row
         str_to_gcs(data_strings, "recaudacion_anverso", term_id)
 
         reverso_columns = ["FCN_NUMERO_CUENTA", "FTN_ID_CONCEPTO", "FTC_SECCION", "FTD_FECHA_MOVIMIENTO",
                            "FTC_DESC_CONCEPTO", "FTC_PERIODO_REFERENCIA", "FTN_DIA_COTIZADO", "FTN_SALARIO_BASE",
                            "FTN_MONTO"]
-        reverso_data, reverso_count = get_data(1, reverso_columns, df_edo_reverso)
-        ret = df_edo_reverso.filter(f.col("FTC_SECCION") == "RET").count()
-        vol = df_edo_reverso.filter(f.col("FTC_SECCION") == "VOL").count()
-        viv = df_edo_reverso.filter(f.col("FTC_SECCION") == "VIV").count()
-        total = df_edo_reverso.count()
-        reverso_final_row = f"2\n{ret}|{vol}|{viv}|{total}"
+        cast_columns_reverso = ["FTN_SALARIO_BASE", "FTN_MONTO"]
+
+        df_edo_reverso = extract_bigquery('ESTADO_CUENTA.TTEDOCTA_REVERSO')
+
+        for cast_column in cast_columns_reverso:
+            df_edo_reverso = df_edo_reverso.withColumn(f"{cast_column}",
+                                                       df_edo_reverso[f"{cast_column}"].cast("decimal(16, 2)"))
+        df_reverso_general = df_edo_reverso.join(df_edo_general, "FCN_NUMERO_CUENTA")
+        df_anverso_general = df_anverso_general.fillna(value="")
+
+        reverso_data, reverso_count = get_data(1, reverso_columns, df_reverso_general)
+        ret = df_reverso_general.filter(f.col("FTC_SECCION") == "RET").count()
+        vol = df_reverso_general.filter(f.col("FTC_SECCION") == "VOL").count()
+        viv = df_reverso_general.filter(f.col("FTC_SECCION") == "VIV").count()
+        total = df_reverso_general.count()
+        reverso_final_row = f"2|{ret}|{vol}|{viv}|{total}"
         final_reverso = reverso_data + reverso_final_row
         str_to_gcs(final_reverso, "recaudacion_reverso", term_id)
 
