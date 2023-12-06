@@ -332,36 +332,41 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
             GROUP BY FCN_CUENTA,FTN_TIPO_AHORRO,
                      FTC_TMC_DESC_ITGY, FTD_FEH_CRE
         ), SALDOS_INICIO_MES AS (
-            SELECT SH.FTN_NUM_CTA_INVDUAL AS FCN_CUENTA, 1 AS FTN_TIPO_AHORRO, RET.FTC_TMC_DESC_ITGY, RET.FTD_FEH_CRE,
-                   SUM(ROUND(SH.FTN_DIA_ACCIONES * VA.FCN_VALOR_ACCION, 2)) AS FTF_SALDO_DIA
-            FROM cierren.thafogral_saldo_historico_v2 SH
-                INNER JOIN cierren.TCCRXGRAL_TIPO_SUBCTA R ON R.FCN_ID_TIPO_SUBCTA = SH.FCN_ID_TIPO_SUBCTA
-                INNER JOIN RETIROS RET ON RET.FCN_CUENTA = SH.FTN_NUM_CTA_INVDUAL
-                INNER JOIN (
-                    SELECT SHMAX.FTN_NUM_CTA_INVDUAL, SHMAX.FCN_ID_SIEFORE, SHMAX.FCN_ID_TIPO_SUBCTA,
-                           RET.FTC_TMC_DESC_ITGY, RET.FTD_FEH_CRE,
-                           MAX(TRUNC(SHMAX.FTD_FEH_LIQUIDACION)) AS FTD_FEH_LIQUIDACION
-                    FROM cierren.thafogral_saldo_historico_v2 SHMAX
-                        INNER JOIN RETIROS RET ON RET.FCN_CUENTA = SHMAX.FTN_NUM_CTA_INVDUAL
-                    WHERE SHMAX.FTD_FEH_LIQUIDACION <= DATE '2023-03-01' -- :start
-                      AND SHMAX.FCN_ID_TIPO_SUBCTA IN (15, 16)
-                    GROUP BY SHMAX.FTN_NUM_CTA_INVDUAL, SHMAX.FCN_ID_SIEFORE, SHMAX.FCN_ID_TIPO_SUBCTA,
-                           RET.FTC_TMC_DESC_ITGY, RET.FTD_FEH_CRE
-                ) SHMAXIMO ON SH.FTN_NUM_CTA_INVDUAL = SHMAXIMO.FTN_NUM_CTA_INVDUAL
-                          AND SH.FCN_ID_TIPO_SUBCTA = SHMAXIMO.FCN_ID_TIPO_SUBCTA
-                          AND SH.FCN_ID_SIEFORE = SHMAXIMO.FCN_ID_SIEFORE
-                          AND SH.FTD_FEH_LIQUIDACION = SHMAXIMO.FTD_FEH_LIQUIDACION
-                          AND RET.FTD_FEH_CRE = SHMAXIMO.FTD_FEH_CRE
-                          AND RET.FTC_TMC_DESC_ITGY = SHMAXIMO.FTC_TMC_DESC_ITGY
-                INNER JOIN (
-                    SELECT ROW_NUMBER() OVER(PARTITION BY FCN_ID_SIEFORE, FCN_ID_REGIMEN ORDER BY FCD_FEH_ACCION DESC) AS ROW_NUM,
-                           FCN_ID_SIEFORE, FCN_ID_REGIMEN, FCN_VALOR_ACCION, FCD_FEH_ACCION
-                    FROM cierren.TCAFOGRAL_VALOR_ACCION
-                    WHERE FCD_FEH_ACCION <= DATE '2023-03-01' -- :start
-                ) VA ON SH.FCN_ID_SIEFORE = VA.FCN_ID_SIEFORE
-                    AND R.FCN_ID_REGIMEN = VA.FCN_ID_REGIMEN
-                    AND VA.ROW_NUM = 1
-            GROUP BY SH.FTN_NUM_CTA_INVDUAL, RET.FTC_TMC_DESC_ITGY, RET.FTD_FEH_CRE
+            SELECT FCN_CUENTA, FTN_TIPO_AHORRO, FTC_TMC_DESC_ITGY, FTD_FEH_CRE,
+                   SUM(FTF_SALDO_DIA) AS FTF_SALDO_DIA
+            FROM (
+                SELECT DISTINCT SH.FTN_NUM_CTA_INVDUAL AS FCN_CUENTA, SH.FTD_FEH_LIQUIDACION,
+                       RET.FTD_FEH_CRE, SH.FCN_ID_SIEFORE, SH.FCN_ID_TIPO_SUBCTA, RET.FTC_TMC_DESC_ITGY,
+                       1 FTN_TIPO_AHORRO,
+                       VA.FCD_FEH_ACCION AS FCD_FEH_ACCION, VA.FCN_VALOR_ACCION AS VALOR_ACCION,
+                       SH.FTN_DIA_ACCIONES AS FTF_DIA_ACCIONES,
+                       ROUND(SH.FTN_DIA_ACCIONES * VA.FCN_VALOR_ACCION,2) AS FTF_SALDO_DIA
+                FROM cierren.thafogral_saldo_historico_v2 SH
+                    INNER JOIN RETIROS RET ON SH.FTN_NUM_CTA_INVDUAL = RET.FCN_CUENTA
+                    INNER JOIN cierren.TCCRXGRAL_TIPO_SUBCTA R ON R.FCN_ID_TIPO_SUBCTA = SH.FCN_ID_TIPO_SUBCTA
+                    INNER JOIN (
+                        SELECT DISTINCT SH.FTN_NUM_CTA_INVDUAL, SH.FCN_ID_TIPO_SUBCTA, FTD_FEH_CRE,
+                               RET.FTC_TMC_DESC_ITGY,SH.FCN_ID_SIEFORE,
+                               MAX(TRUNC(SH.FTD_FEH_LIQUIDACION)) AS FTD_FEH_LIQUIDACION
+                        FROM CIERREN.THAFOGRAL_SALDO_HISTORICO_V2 SH
+                            INNER JOIN RETIROS RET ON SH.FTN_NUM_CTA_INVDUAL = RET.FCN_CUENTA
+                        WHERE SH.FTD_FEH_LIQUIDACION < RET.FTD_FEH_CRE
+                          AND SH.FCN_ID_TIPO_SUBCTA  IN (15, 16)
+                        GROUP BY SH.FTN_NUM_CTA_INVDUAL, SH.FCN_ID_TIPO_SUBCTA, SH.FCN_ID_SIEFORE,
+                                 RET.FTC_TMC_DESC_ITGY,
+                                 FTD_FEH_CRE
+                        ) SHMAXIMO ON SH.FTN_NUM_CTA_INVDUAL = SHMAXIMO.FTN_NUM_CTA_INVDUAL
+                              AND SH.FCN_ID_TIPO_SUBCTA = SHMAXIMO.FCN_ID_TIPO_SUBCTA
+                              AND SH.FCN_ID_SIEFORE = SHMAXIMO.FCN_ID_SIEFORE
+                              AND SH.FTD_FEH_LIQUIDACION = SHMAXIMO.FTD_FEH_LIQUIDACION
+                              AND RET.FTD_FEH_CRE = SHMAXIMO.FTD_FEH_CRE
+                              AND RET.FTC_TMC_DESC_ITGY = SHMAXIMO.FTC_TMC_DESC_ITGY
+                    INNER JOIN cierren.TCAFOGRAL_VALOR_ACCION VA
+                        ON VA.FCD_FEH_ACCION = DATE '2023-03-01'
+                       AND SH.FCN_ID_SIEFORE = VA.FCN_ID_SIEFORE AND R.FCN_ID_REGIMEN = VA.FCN_ID_REGIMEN
+            ) X
+            GROUP BY FCN_CUENTA,FTN_TIPO_AHORRO,
+                     FTC_TMC_DESC_ITGY, FTD_FEH_CRE
         ), SALDOS_CHEQUERA AS (
             SELECT FTN_NUM_CTA_INVDUAL AS FCN_CUENTA, FTC_TMC_DESC_ITGY, FTN_TIPO_AHORRO, FTD_FEH_CRE,
                    SUM(PESOS) AS FTF_SALDO_DIA
