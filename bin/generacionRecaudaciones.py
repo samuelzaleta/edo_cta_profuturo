@@ -60,8 +60,8 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
         general_columns = ["FCN_NUMERO_CUENTA", "FCN_FOLIO", "FTC_NOMBRE_COMPLETO", "FTC_CALLE_NUMERO", "FTC_COLONIA",
                            "FTC_DELEGACION", "FTN_CP", "FTC_ENTIDAD_FEDERATIVA", "FTC_RFC", "FTC_NSS", "FTC_CURP",
                            "FTD_FECHA_GRAL_INICIO", "FTD_FECHA_GRAL_FIN", "FTN_ID_FORMATO", "FTN_ID_SIEFORE",
-                           "FTD_FECHA_CORTE", "FTB_PDF_IMPRESO", "FTN_SALDO_SUBTOTAL", "FTN_SALDO_TOTAL",
-                           "FTN_PENSION_MENSUAL"]
+                           "FTD_FECHA_CORTE", None, "FTN_SALDO_SUBTOTAL", "FTN_SALDO_TOTAL",
+                           "FTN_PENSION_MENSUAL", "FTC_TIPO_TRABAJADOR", "FTC_FORMATO"]
         ahorro_columns = ["FTC_CONCEPTO_NEGOCIO", "FTN_SALDO_ANTERIOR", "FTF_APORTACION", "FTN_RETIRO",
                           "FTN_RENDIMIENTO", "FTN_COMISION", "FTN_SALDO_FINAL"]
         bono_columns = ["FTC_CONCEPTO_NEGOCIO", "FTN_VALOR_ACTUAL_UDI", "FTN_VALOR_NOMINAL_UDI",
@@ -71,6 +71,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
         cast_columns_anverso = ["FTF_APORTACION", "FTN_RETIRO", "FTN_RENDIMIENTO", "FTN_COMISION", "FTN_MONTO_PENSION",
                                 "FTN_SALDO_ANTERIOR", "FTN_SALDO_FINAL", "FTN_VALOR_ACTUAL_PESO",
                                 "FTN_VALOR_ACTUAL_UDI", "FTN_VALOR_NOMINAL_PESO", "FTN_VALOR_NOMINAL_UDI"]
+        cast_date_columns_general = ["FTD_FECHA_GRAL_INICIO", "FTD_FECHA_GRAL_FIN", "FTD_FECHA_CORTE"]
 
         df_indicador = (
             extract_bigquery('ESTADO_CUENTA.TTEDOCTA_CLIENTE_INDICADOR')
@@ -86,6 +87,9 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                                                        df_edo_general[f"{cast_column}"].cast("decimal(16, 2)"))
         for cast_column in cast_columns_anverso:
             df_anverso = df_anverso.withColumn(f"{cast_column}", df_anverso[f"{cast_column}"].cast("decimal(16, 2)"))
+
+        for cast_column in cast_date_columns_general:
+            df_edo_general = df_edo_general.withColumn(f"{cast_column}", f.to_date(f.col(f"{cast_column}"), "ddMMyyyy"))
 
         df_anverso_general = df_anverso.join(df_edo_general, "FCN_ID_EDOCTA")
         df_anverso_general = df_anverso_general.fillna(value="")
@@ -128,14 +132,19 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
 
         reverso_columns = ["FCN_NUMERO_CUENTA", "FTN_ID_CONCEPTO", "FTC_SECCION", "FTD_FECHA_MOVIMIENTO",
                            "FTC_DESC_CONCEPTO", "FTC_PERIODO_REFERENCIA", "FTN_DIA_COTIZADO", "FTN_SALARIO_BASE",
-                           "FTN_MONTO"]
+                           "FTN_MONTO", "FTN_SALARIO_BASE", "FTN_DIA_COTIZADO"]
         cast_columns_reverso = ["FTN_SALARIO_BASE", "FTN_MONTO"]
+        cast_date_columns_reverso = ["FTD_FECHA_MOVIMIENTO"]
 
         df_edo_reverso = extract_bigquery('ESTADO_CUENTA.TTEDOCTA_REVERSO')
 
         for cast_column in cast_columns_reverso:
             df_edo_reverso = df_edo_reverso.withColumn(f"{cast_column}",
                                                        df_edo_reverso[f"{cast_column}"].cast("decimal(16, 2)"))
+
+        for cast_column in cast_date_columns_reverso:
+            df_edo_general = df_edo_general.withColumn(f"{cast_column}", f.to_date(f.col(f"{cast_column}"), "ddMMyyyy"))
+
         df_reverso_general = df_edo_reverso.join(df_edo_general, "FCN_NUMERO_CUENTA")
         df_anverso_general = df_anverso_general.fillna(value="")
 
