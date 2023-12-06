@@ -2,7 +2,7 @@ from profuturo.extraction import  _get_spark_session, read_table_insert_temp_vie
 from profuturo.common import define_extraction
 from profuturo.database import get_postgres_pool,configure_postgres_spark_dev
 from datetime import datetime as today
-from pyspark.sql.functions import col
+from pyspark.sql.functions import col, monotonically_increasing_id
 import datetime
 import numpy as np
 import pandas as pd
