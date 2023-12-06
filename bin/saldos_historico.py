@@ -184,6 +184,10 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
             resuSiefore = listaSieforeDF[listaSieforeDF['fcn_code_integrity'].astype(int) == int(df['SAL_SALD_SIEFORE'])]
             id_resuSiefore = resuSiefore['fcn_id_siefore'].values
 
+            if c==0:
+                #Fix para Dataframe que inserta en postgres - Se elimina al final
+                data.append((1,1,0.0,1,1,fecha_liquida, feh_accion, 'F',0.0,hoy,v_historico))
+
             # Busqueda de subcuenta
             if float(df['SAL_SALD_RETS']) > 0 or float(df['SAL_SALD_RETS']) < 0:
                 var = 'SAL-SALD-RETS'

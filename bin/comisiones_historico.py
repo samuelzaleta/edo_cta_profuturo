@@ -107,9 +107,9 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
             cuenta = df['cuenta']
 
             if c == 0:
+                #Fix para Dataframe que inserta en postgres - Se elimina al final
                 data.append((1,1,1,1,1,1,1,0,0.0,fecha_liquida, hoy, v_historico, 1))
-            
-            
+                      
             #Busqueda de subcuenta
             if float(df['COM_RETIRO']) > 0:
                 var = 'COM_RETIRO'
@@ -194,8 +194,6 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                 # idmov = resMov['FTN_ID_MOVIMIENTO_PROFUTURO'].values
                 # data.append((int(df['cuenta']), int(df['periodo']), int(idmov[0]), None, 9486, None, None, 0, float(df[var]), fecha_liquida, hoy, v_historico, int(idSubCta[0])))
                 # c+=1
-                
-
     
     except Exception as error:
         print('error: ')
@@ -212,7 +210,6 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
     columns_insert = ["FCN_CUENTA", "FCN_ID_PERIODO", "FCN_ID_CONCEPTO_MOVIMIENTO", "FCN_ID_MOVIMIENTO", "FCN_ID_TIPO_MOVIMIENTO", "FCN_ID_SIEFORE",
             "FCN_FOLIO", "FTF_MONTO_ACCIONES", "FTF_MONTO_PESOS", "FTD_FEH_LIQUIDACION", "FTD_FECHA_INGESTA", "FTC_EXTRACTOR_INGESTA",
             "FTN_TIPO_SUBCTA"]
-
 
     df_insert = spark.createDataFrame(data, columns_insert)
     df_insert = df_insert.withColumn("row_id", monotonically_increasing_id())
