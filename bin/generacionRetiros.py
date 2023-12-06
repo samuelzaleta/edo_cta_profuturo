@@ -49,13 +49,8 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                            "FTC_INFNVT_CTA_BANCARIA", "FTC_INFNVT_RECURSOS_ENTREGA", "FTC_INFNVT_FECHA_ENTREGA",
                            "FTC_INFNVT_RETENCION_ISR", "FTD_FECHA_INICIO_PENSION",
                            "FTN_PENSION_INSTITUTO_SEG", "FTN_SALDO_FINAL"]
-        df_indicador = (
-            extract_bigquery('ESTADO_CUENTA.TTEDOCTA_CLIENTE_INDICADOR', None)
-            .filter(f.col("FTB_IMPRESION") == True)
-        )
 
         retiros_general = extract_bigquery('ESTADO_CUENTA.TTMUESTR_RETIRO_GENERAL', term_id).select(*retiros_general_columns)
-        retiros_general = retiros_general.join(df_indicador, retiros_general.FCN_ID_EDOCTA == df_indicador.FCN_CUENTA, 'left')
         retiros = (
             extract_bigquery('ESTADO_CUENTA.TTMUESTR_RETIRO', term_id)
             .select(*retiros_columns[:-3], f.col("FTD_FECHA_EMISION")
