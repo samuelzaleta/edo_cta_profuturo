@@ -72,9 +72,9 @@ with define_extraction(phase, area, postgres_pool, bigquery_pool) as (postgres,b
 
         extract_dataset_spark(configure_postgres_spark, configure_bigquery_spark, """
         SELECT "FCN_CUENTA", "FCN_ID_PERIODO", "FCN_ID_INDICADOR",
-        (("FTN_EVALUA_INDICADOR" & 4) >> 2)::bool AS "FTB_IMPRESION", 
-        ("FTN_EVALUA_INDICADOR" & 2) >> 1)::bool AS "FTB_ENVIO",
-         ("FTN_EVALUA_INDICADOR" & 1)::bool AS "FTB_GENERACION"
+               (("FTN_EVALUA_INDICADOR" & 4) >> 2)::bool AS "FTB_IMPRESION",
+               (("FTN_EVALUA_INDICADOR" & 2) >> 1)::bool AS "FTB_ENVIO",
+               ("FTN_EVALUA_INDICADOR" & 1)::bool AS "FTB_GENERACION"
         FROM "HECHOS"."TCHECHOS_CLIENTE_INDICADOR"
         """, "ESTADO_CUENTA.TTEDOCTA_CLIENTE_INDICADOR")
 
@@ -113,7 +113,7 @@ with define_extraction(phase, area, postgres_pool, bigquery_pool) as (postgres,b
             phase,
             area,
             term=term_id,
-            message=f"Se han generado las cifras de control para indicadores} exitosamente para el periodo",
+            message=f"Se han generado las cifras de control para indicadores exitosamente para el periodo",
             details=html_table,
             visualiza=False
         )

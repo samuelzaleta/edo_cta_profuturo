@@ -65,12 +65,6 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
     hoy = today.today()
     print(inicio, hoy)
 
-    #Create PySpark DataFrame from Pandas
-    #columnas = ['periodo', 'servicio','SAL-SALD-SIEFORE','SAL-SALD-RETS','SAL-SALD-RET8S','SAL-SALD-CYVS','SAL-SALD-CYVTS','SAL-SALD-CSOS',
-    #                                   'SAL-SALD-ESTS','SAL-SALD-ESPS','SAL-SALD-CRES','SAL-SALD-CREDS','SAL-SALD-AVDS','SAL-SALD-SARS','SAL-SALD-AVPS','SAL-SALD-AVES',
-    #                                   'SAL-SALD-ALPS','SAL-SALD-ALPDS','SAL-SALD-ALPES','SAL-SALD-SDOV92','SAL-SALD-SDOV97','AL-SALD-SDOBUD']
-
-    #saldosDFfile = spark.read.text("SALDOSTDF_202203_CORTO_2.txt")
     saldosDFfile = spark.read.text("gs://dataproc-spark-dev/SALDOSTDF_202203.TXT")
 
     saldosDFfile.show(2)
@@ -404,5 +398,11 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
     # medir tiempo
     fin = time.time()
     print(fin - inicio)
+
+    df_insert = spark.createDataFrame(data, columns_insert)
+    df_insert = df_insert.withColumn("row_id", monotonically_increasing_id())
+    df_insert = df_insert.filter(df_insert.row_id != 0)
+
+    _write_spark_dataframe(df_insert, postgres_pool, "HECHOS"."THHECHOS_SALDO_HISTORICO")
 
     ##Reporte
