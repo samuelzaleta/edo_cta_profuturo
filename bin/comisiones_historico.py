@@ -204,7 +204,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
         print('registro ' +str(c))
         print(cuenta)
 
-    print('Row insert:')
+    print('Rows to insert:')
     print(c)
 
     #df to insert into "comisiones"
@@ -219,3 +219,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
     df_insert = df_insert.filter(df_insert.row_id != 0)
 
     _write_spark_dataframe(df_insert, postgres_pool, "HECHOS"."TTHECHOS_COMISION")
+
+    fin = time.time()
+    print("Execution time")
+    print(fin - inicio)

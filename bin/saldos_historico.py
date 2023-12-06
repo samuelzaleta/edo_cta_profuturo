@@ -2,7 +2,7 @@ from profuturo.extraction import  _get_spark_session, read_table_insert_temp_vie
 from profuturo.common import define_extraction
 from profuturo.database import get_postgres_pool,configure_postgres_spark_dev
 from datetime import datetime as today
-from pyspark.sql.functions import col
+from pyspark.sql.functions import col, monotonically_increasing_id, regexp_replace
 import datetime
 import numpy as np
 import pandas as pd
@@ -392,17 +392,33 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
         print('registro ' + str(c))
         print(cuenta)
 
-    print('Rows inserted:')
-    print(c)
-    #_write_spark_dataframe(df, configure_postgres_spark_dev, '"HECHOS"."TTHECHOS_RETIRO_SALDOS_INICIALES"')
-    # medir tiempo
-    fin = time.time()
-    print(fin - inicio)
+    
+    columns_insert = ["FCN_CUENTA", 
+                  "FCN_ID_PERIODO", 
+                  "FTF_DIA_ACCIONES", 
+                  "FCN_ID_SIEFORE",
+                  "FCN_ID_TIPO_SUBCTA", 
+                  "FTD_FEH_LIQUIDACION",
+                  "FCD_FEH_ACCION", 
+                  "FTC_TIPO_SALDO", 
+                  "FTF_SALDO_DIA", 
+                  "FTD_FECHA_INGESTA", 
+                  "FTC_EXTRACTOR_INGESTA"]
 
     df_insert = spark.createDataFrame(data, columns_insert)
     df_insert = df_insert.withColumn("row_id", monotonically_increasing_id())
     df_insert = df_insert.filter(df_insert.row_id != 0)
+    df_insert = df_insert.withColumn("FCD_FEH_ACCION", col("FCD_FEH_ACCION").cast(DateType()))
 
     _write_spark_dataframe(df_insert, postgres_pool, "HECHOS"."THHECHOS_SALDO_HISTORICO")
+
+    #to postgres
+    print('Rows inserted:')
+    print(c)
+
+    fin = time.time()
+    print("execution time")
+    print(fin - inicio)
+
 
     ##Reporte
