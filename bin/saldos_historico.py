@@ -5,6 +5,7 @@ from datetime import datetime as today
 from pyspark.sql.types import StringType,IntegerType, DateType, DecimalType, StructType, StructField,TimestampType, DoubleType
 from pyspark.sql.functions import col, monotonically_increasing_id, regexp_replace
 import datetime
+from decimal import Decimal
 import numpy as np
 import pandas as pd
 import psycopg2
@@ -187,42 +188,42 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
 
             if c==0:
                 #Fix para Dataframe que inserta en postgres - Se elimina al final
-                data.append((1,1,0.0,1,1,fecha_liquida, feh_accion, 'F',0.0,hoy,v_historico))
+                data.append((1,1,Decimal(0.0),1,1,fecha_liquida, feh_accion, 'F',Decimal(0.0),hoy,v_historico))
 
             # Busqueda de subcuenta
-            if float(df['SAL_SALD_RETS']) > 0 or float(df['SAL_SALD_RETS']) < 0:
+            if Decimal(df['SAL_SALD_RETS']) > 0 or Decimal(df['SAL_SALD_RETS']) < 0:
                 var = 'SAL-SALD-RETS'
                 resuSbcta = listaSubctaDF[(listaSubctaDF['fcc_var_integrity'] == var) & (
                             listaSubctaDF['fcc_registro'].astype(int) == int(df['service']))]
                 id_postgres = resuSbcta['id_tipo_sbcta'].values
 
-                data.append((int(df['cuenta']), int(df['periodo']), df['SAL_SALD_RETS'], int(id_resuSiefore[0]),
-                             int(id_postgres[0]), fecha_liquida, feh_accion, 'F', df['SAL_SALD_RETS_PESOS'], hoy,
+                data.append((int(df['cuenta']), int(df['periodo']), Decimal(df['SAL_SALD_RETS']), int(id_resuSiefore[0]),
+                             int(id_postgres[0]), fecha_liquida, feh_accion, 'F', Decimal(df['SAL_SALD_RETS_PESOS']), hoy,
                              v_historico))
                 c += 1
 
-            if float(str(df['SAL_SALD_RET8S']).replace(' ', '')) > 0 or float(
+            if Decimal(str(df['SAL_SALD_RET8S']).replace(' ', '')) > 0 or float(
                     str(df['SAL_SALD_RET8S']).replace(' ', '')) < 0:
                 var = 'SAL-SALD-RET8S'
                 resuSbcta = listaSubctaDF[(listaSubctaDF['fcc_var_integrity'] == var) & (
                             listaSubctaDF['fcc_registro'].astype(int) == int(df['service']))]
                 id_postgres = resuSbcta['id_tipo_sbcta'].values
-                data.append((int(df['cuenta']), int(df['periodo']), float(str(df['SAL_SALD_RET8S']).replace(' ', '')),
+                data.append((int(df['cuenta']), int(df['periodo']), Decimal(str(df['SAL_SALD_RET8S']).replace(' ', '')),
                              int(id_resuSiefore[0]), int(id_postgres[0]), fecha_liquida, feh_accion, 'F',
-                             float(str(df['SAL_SALD_RET8S_PESOS']).replace(' ', '')), hoy, v_historico))
+                             Decimal(str(df['SAL_SALD_RET8S_PESOS']).replace(' ', '')), hoy, v_historico))
                 c += 1
 
-            if float(df['SAL-SALD-CYVS']) > 0 or float(df['SAL-SALD-CYVS']) < 0:
+            if Decimal(df['SAL-SALD-CYVS']) > 0 or Decimal(df['SAL-SALD-CYVS']) < 0:
                 var = 'SAL-SALD-CYVS'
                 resuSbcta = listaSubctaDF[(listaSubctaDF['fcc_var_integrity'] == var) & (
                             listaSubctaDF['fcc_registro'].astype(int) == int(df['service']))]
                 id_postgres = resuSbcta['id_tipo_sbcta'].values
-                data.append((int(df['cuenta']), int(df['periodo']), float(df['SAL-SALD-CYVS']), int(id_resuSiefore[0]),
-                             int(id_postgres[0]), fecha_liquida, feh_accion, 'F', float(df['SAL-SALD-CYVS_PESOS']), hoy,
+                data.append((int(df['cuenta']), int(df['periodo']), Decimal(df['SAL-SALD-CYVS']), int(id_resuSiefore[0]),
+                             int(id_postgres[0]), fecha_liquida, feh_accion, 'F', Decimal(df['SAL-SALD-CYVS_PESOS']), hoy,
                              v_historico))
                 c += 1
 
-            if float(df['SAL-SALD-CYVTS']) > 0 or float(df['SAL-SALD-CYVTS']) < 0:
+            if Decimal(df['SAL-SALD-CYVTS']) > 0 or Decimal(df['SAL-SALD-CYVTS']) < 0:
                 var = 'SAL-SALD-CYVTS'
                 # r = ()
                 # i = 0
@@ -231,162 +232,162 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                 resuSbcta = listaSubctaDF[(listaSubctaDF['fcc_var_integrity'] == var) & (
                             listaSubctaDF['fcc_registro'].astype(int) == int(df['service']))]
                 id_postgres = resuSbcta['id_tipo_sbcta'].values
-                data.append((int(df['cuenta']), int(df['periodo']), float(df['SAL-SALD-CYVTS']), int(id_resuSiefore[0]),
-                             int(id_postgres[0]), fecha_liquida, feh_accion, 'F', float(df['SAL-SALD-CYVTS_PESOS']),
+                data.append((int(df['cuenta']), int(df['periodo']), Decimal(df['SAL-SALD-CYVTS']), int(id_resuSiefore[0]),
+                             int(id_postgres[0]), fecha_liquida, feh_accion, 'F', Decimal(df['SAL-SALD-CYVTS_PESOS']),
                              hoy, v_historico))
                 c += 1
 
-            if float(df['SAL-SALD-CSOS']) > 0 or float(df['SAL-SALD-CSOS']) < 0:
+            if Decimal(df['SAL-SALD-CSOS']) > 0 or Decimal(df['SAL-SALD-CSOS']) < 0:
                 var = 'SAL-SALD-CSOS'
                 resuSbcta = listaSubctaDF[(listaSubctaDF['fcc_var_integrity'] == var) & (
                             listaSubctaDF['fcc_registro'].astype(int) == int(df['service']))]
                 id_postgres = resuSbcta['id_tipo_sbcta'].values
-                data.append((int(df['cuenta']), int(df['periodo']), float(df['SAL-SALD-CSOS']), int(id_resuSiefore[0]),
-                             int(id_postgres[0]), fecha_liquida, feh_accion, 'F', float(df['SAL-SALD-CSOS_PESOS']), hoy,
+                data.append((int(df['cuenta']), int(df['periodo']), Decimal(df['SAL-SALD-CSOS']), int(id_resuSiefore[0]),
+                             int(id_postgres[0]), fecha_liquida, feh_accion, 'F', Decimal(df['SAL-SALD-CSOS_PESOS']), hoy,
                              v_historico))
                 c += 1
 
-            if float(df['SAL-SALD-ESTS']) > 0 or float(df['SAL-SALD-ESTS']) < 0:
+            if Decimal(df['SAL-SALD-ESTS']) > 0 or Decimal(df['SAL-SALD-ESTS']) < 0:
                 var = 'SAL-SALD-ESTS'
                 resuSbcta = listaSubctaDF[(listaSubctaDF['fcc_var_integrity'] == var) & (
                             listaSubctaDF['fcc_registro'].astype(int) == int(df['service']))]
                 id_postgres = resuSbcta['id_tipo_sbcta'].values
-                data.append((int(df['cuenta']), int(df['periodo']), float(df['SAL-SALD-ESTS']), int(id_resuSiefore[0]),
-                             int(id_postgres[0]), fecha_liquida, feh_accion, 'F', float(df['SAL-SALD-ESTS_PESOS']), hoy,
+                data.append((int(df['cuenta']), int(df['periodo']), Decimal(df['SAL-SALD-ESTS']), int(id_resuSiefore[0]),
+                             int(id_postgres[0]), fecha_liquida, feh_accion, 'F', Decimal(df['SAL-SALD-ESTS_PESOS']), hoy,
                              v_historico))
                 c += 1
 
-            if float(df['SAL-SALD-ESPS']) > 0 or float(df['SAL-SALD-ESPS']) < 0:
+            if Decimal(df['SAL-SALD-ESPS']) > 0 or Decimal(df['SAL-SALD-ESPS']) < 0:
                 var = 'SAL-SALD-ESPS'
                 resuSbcta = listaSubctaDF[(listaSubctaDF['fcc_var_integrity'] == var) & (
                             listaSubctaDF['fcc_registro'].astype(int) == int(df['service']))]
                 id_postgres = resuSbcta['id_tipo_sbcta'].values
-                data.append((int(df['cuenta']), int(df['periodo']), float(df['SAL-SALD-ESPS']), int(id_resuSiefore[0]),
-                             int(id_postgres[0]), fecha_liquida, feh_accion, 'F', float(df['SAL-SALD-ESPS_PESOS']), hoy,
+                data.append((int(df['cuenta']), int(df['periodo']), Decimal(df['SAL-SALD-ESPS']), int(id_resuSiefore[0]),
+                             int(id_postgres[0]), fecha_liquida, feh_accion, 'F', Decimal(df['SAL-SALD-ESPS_PESOS']), hoy,
                              v_historico))
                 c += 1
 
-            if float(df['SAL-SALD-CRES']) > 0 or float(df['SAL-SALD-CRES']) < 0:
+            if Decimal(df['SAL-SALD-CRES']) > 0 or Decimal(df['SAL-SALD-CRES']) < 0:
                 var = 'SAL-SALD-CRES'
                 resuSbcta = listaSubctaDF[(listaSubctaDF['fcc_var_integrity'] == var) & (
                             listaSubctaDF['fcc_registro'].astype(int) == int(df['service']))]
                 id_postgres = resuSbcta['id_tipo_sbcta'].values
-                data.append((int(df['cuenta']), int(df['periodo']), float(df['SAL-SALD-CRES']), int(id_resuSiefore[0]),
-                             int(id_postgres[0]), fecha_liquida, feh_accion, 'F', float(df['SAL-SALD-CRES_PESOS']), hoy,
+                data.append((int(df['cuenta']), int(df['periodo']), Decimal(df['SAL-SALD-CRES']), int(id_resuSiefore[0]),
+                             int(id_postgres[0]), fecha_liquida, feh_accion, 'F', Decimal(df['SAL-SALD-CRES_PESOS']), hoy,
                              v_historico))
                 c += 1
 
-            if float(df['SAL-SALD-CREDS']) > 0 or float(df['SAL-SALD-CREDS']) < 0:
+            if Decimal(df['SAL-SALD-CREDS']) > 0 or Decimal(df['SAL-SALD-CREDS']) < 0:
                 var = 'SAL-SALD-CREDS'
                 resuSbcta = listaSubctaDF[(listaSubctaDF['fcc_var_integrity'] == var) & (
                             listaSubctaDF['fcc_registro'].astype(int) == int(df['service']))]
                 id_postgres = resuSbcta['id_tipo_sbcta'].values
                 if id_resuSiefore:
-                    data.append((int(df['cuenta']), int(df['periodo']), float(df['SAL-SALD-CREDS']),
+                    data.append((int(df['cuenta']), int(df['periodo']), Decimal(df['SAL-SALD-CREDS']),
                                  int(id_resuSiefore[0]), int(id_postgres[0]), fecha_liquida, feh_accion, 'F',
-                                 float(df['SAL-SALD-CREDS_PESOS']), hoy, v_historico))
+                                 Decimal(df['SAL-SALD-CREDS_PESOS']), hoy, v_historico))
                     c += 1
                 else:
                     print('no subcta' + cuenta + ' - serv' + str(df['service']))
 
-            if float(df['SAL-SALD-SARS']) > 0 or float(df['SAL-SALD-SARS']) < 0:
+            if Decimal(df['SAL-SALD-SARS']) > 0 or Decimal(df['SAL-SALD-SARS']) < 0:
                 var = 'SAL-SALD-SARS'
                 resuSbcta = listaSubctaDF[(listaSubctaDF['fcc_var_integrity'] == var) & (
                             listaSubctaDF['fcc_registro'].astype(int) == int(df['service']))]
                 id_postgres = resuSbcta['id_tipo_sbcta'].values
-                data.append((int(df['cuenta']), int(df['periodo']), float(df['SAL-SALD-SARS']), int(id_resuSiefore[0]),
-                             int(id_postgres[0]), fecha_liquida, feh_accion, 'F', float(df['SAL-SALD-SARS_PESOS']), hoy,
+                data.append((int(df['cuenta']), int(df['periodo']), Decimal(df['SAL-SALD-SARS']), int(id_resuSiefore[0]),
+                             int(id_postgres[0]), fecha_liquida, feh_accion, 'F', Decimal(df['SAL-SALD-SARS_PESOS']), hoy,
                              v_historico))
                 c += 1
 
-            if float(df['SAL-SALD-AVDS']) > 0 or float(df['SAL-SALD-AVDS']) < 0:
+            if Decimal(df['SAL-SALD-AVDS']) > 0 or Decimal(df['SAL-SALD-AVDS']) < 0:
                 var = 'SAL-SALD-AVDS'
                 resuSbcta = listaSubctaDF[(listaSubctaDF['fcc_var_integrity'] == var) & (
                             listaSubctaDF['fcc_registro'].astype(int) == int(df['service']))]
                 id_postgres = resuSbcta['id_tipo_sbcta'].values
-                data.append((int(df['cuenta']), int(df['periodo']), float(df['SAL-SALD-AVDS']), int(id_resuSiefore[0]),
-                             int(id_postgres[0]), fecha_liquida, feh_accion, 'F', float(df['SAL-SALD-AVDS_PESOS']), hoy,
+                data.append((int(df['cuenta']), int(df['periodo']), Decimal(df['SAL-SALD-AVDS']), int(id_resuSiefore[0]),
+                             int(id_postgres[0]), fecha_liquida, feh_accion, 'F', Decimal(df['SAL-SALD-AVDS_PESOS']), hoy,
                              v_historico))
                 c += 1
 
-            if float(df['SAL-SALD-AVPS']) > 0 or float(df['SAL-SALD-AVPS']) < 0:
+            if Decimal(df['SAL-SALD-AVPS']) > 0 or Decimal(df['SAL-SALD-AVPS']) < 0:
                 var = 'SAL-SALD-AVPS'
                 resuSbcta = listaSubctaDF[(listaSubctaDF['fcc_var_integrity'] == var) & (
                             listaSubctaDF['fcc_registro'].astype(int) == int(df['service']))]
                 id_postgres = resuSbcta['id_tipo_sbcta'].values
-                data.append((int(df['cuenta']), int(df['periodo']), float(df['SAL-SALD-AVPS']), int(id_resuSiefore[0]),
-                             int(id_postgres[0]), fecha_liquida, feh_accion, 'F', float(df['SAL-SALD-AVPS_PESOS']), hoy,
+                data.append((int(df['cuenta']), int(df['periodo']), Decimal(df['SAL-SALD-AVPS']), int(id_resuSiefore[0]),
+                             int(id_postgres[0]), fecha_liquida, feh_accion, 'F', Decimal(df['SAL-SALD-AVPS_PESOS']), hoy,
                              v_historico))
                 c += 1
 
-            if float(df['SAL-SALD-AVES']) > 0 or float(df['SAL-SALD-AVES']) < 0:
+            if Decimal(df['SAL-SALD-AVES']) > 0 or Decimal(df['SAL-SALD-AVES']) < 0:
                 var = 'SAL-SALD-AVES'
                 resuSbcta = listaSubctaDF[(listaSubctaDF['fcc_var_integrity'] == var) & (
                             listaSubctaDF['fcc_registro'].astype(int) == int(df['service']))]
                 id_postgres = resuSbcta['id_tipo_sbcta'].values
-                # data.append((int(df['cuenta']),int(df['periodo']),float(df['SAL-SALD-AVES']),int(id_resuSiefore[0]),int(id_postgres[0]),fecha_liquida,feh_accion,'F',float(df['SAL-SALD-AVES']),hoy,None))
+                # data.append((int(df['cuenta']),int(df['periodo']),Decimal(df['SAL-SALD-AVES']),int(id_resuSiefore[0]),int(id_postgres[0]),fecha_liquida,feh_accion,'F',Decimal(df['SAL-SALD-AVES']),hoy,None))
                 c += 1
 
-            if float(df['SAL-SALD-ALPS']) > 0 or float(df['SAL-SALD-ALPS']) < 0:
+            if Decimal(df['SAL-SALD-ALPS']) > 0 or Decimal(df['SAL-SALD-ALPS']) < 0:
                 var = 'SAL-SALD-ALPS'
                 resuSbcta = listaSubctaDF[(listaSubctaDF['fcc_var_integrity'] == var) & (
                             listaSubctaDF['fcc_registro'].astype(int) == int(df['service']))]
                 id_postgres = resuSbcta['id_tipo_sbcta'].values
-                data.append((int(df['cuenta']), int(df['periodo']), float(df['SAL-SALD-ALPS']), int(id_resuSiefore[0]),
-                             int(id_postgres[0]), fecha_liquida, feh_accion, 'F', float(df['SAL-SALD-ALPS_PESOS']), hoy,
+                data.append((int(df['cuenta']), int(df['periodo']), Decimal(df['SAL-SALD-ALPS']), int(id_resuSiefore[0]),
+                             int(id_postgres[0]), fecha_liquida, feh_accion, 'F', Decimal(df['SAL-SALD-ALPS_PESOS']), hoy,
                              v_historico))
                 c += 1
 
-            if float(df['SAL-SALD-ALPDS']) > 0 or float(df['SAL-SALD-ALPDS']) < 0:
+            if Decimal(df['SAL-SALD-ALPDS']) > 0 or Decimal(df['SAL-SALD-ALPDS']) < 0:
                 var = 'SAL-SALD-ALPDS'
                 resuSbcta = listaSubctaDF[(listaSubctaDF['fcc_var_integrity'] == var) & (
                             listaSubctaDF['fcc_registro'].astype(int) == int(df['service']))]
                 id_postgres = resuSbcta['id_tipo_sbcta'].values
-                data.append((int(df['cuenta']), int(df['periodo']), float(df['SAL-SALD-ALPDS']), int(id_resuSiefore[0]),
-                             int(id_postgres[0]), fecha_liquida, feh_accion, 'F', float(df['SAL-SALD-ALPDS_PESOS']),
+                data.append((int(df['cuenta']), int(df['periodo']), Decimal(df['SAL-SALD-ALPDS']), int(id_resuSiefore[0]),
+                             int(id_postgres[0]), fecha_liquida, feh_accion, 'F', Decimal(df['SAL-SALD-ALPDS_PESOS']),
                              hoy, v_historico))
                 c += 1
 
-            if float(df['SAL-SALD-ALPES']) > 0 or float(df['SAL-SALD-ALPES']) < 0:
+            if Decimal(df['SAL-SALD-ALPES']) > 0 or Decimal(df['SAL-SALD-ALPES']) < 0:
                 var = 'SAL-SALD-ALPES'
                 resuSbcta = listaSubctaDF[(listaSubctaDF['fcc_var_integrity'] == var) & (
                             listaSubctaDF['fcc_registro'].astype(int) == int(df['service']))]
                 id_postgres = resuSbcta['id_tipo_sbcta'].values
-                data.append((int(df['cuenta']), int(df['periodo']), float(df['SAL-SALD-ALPES']), int(id_resuSiefore[0]),
-                             int(id_postgres[0]), fecha_liquida, feh_accion, 'F', float(df['SAL-SALD-ALPES_PESOS']),
+                data.append((int(df['cuenta']), int(df['periodo']), Decimal(df['SAL-SALD-ALPES']), int(id_resuSiefore[0]),
+                             int(id_postgres[0]), fecha_liquida, feh_accion, 'F', Decimal(df['SAL-SALD-ALPES_PESOS']),
                              hoy, v_historico))
                 c += 1
 
-            if float(df['SAL-SALD-SDOV92']) > 0 or float(df['SAL-SALD-SDOV92']) < 0:
+            if Decimal(df['SAL-SALD-SDOV92']) > 0 or Decimal(df['SAL-SALD-SDOV92']) < 0:
                 var = 'SAL-SALD-SDOV92'
                 resuSbcta = listaSubctaDF[(listaSubctaDF['fcc_var_integrity'] == var) & (
                             listaSubctaDF['fcc_registro'].astype(int) == int(df['service']))]
                 id_postgres = resuSbcta['id_tipo_sbcta'].values
                 data.append((
-                            int(df['cuenta']), int(df['periodo']), float(df['SAL-SALD-SDOV92']), int(id_resuSiefore[0]),
-                            int(id_postgres[0]), fecha_liquida, feh_accion, 'F', float(df['SAL-SALD-SDOV92_PESOS']),
+                            int(df['cuenta']), int(df['periodo']), Decimal(df['SAL-SALD-SDOV92']), int(id_resuSiefore[0]),
+                            int(id_postgres[0]), fecha_liquida, feh_accion, 'F', Decimal(df['SAL-SALD-SDOV92_PESOS']),
                             hoy, v_historico))
                 c += 1
 
-            if float(df['SAL-SALD-SDOV97']) > 0 or float(df['SAL-SALD-SDOV97']) < 0:
+            if Decimal(df['SAL-SALD-SDOV97']) > 0 or Decimal(df['SAL-SALD-SDOV97']) < 0:
                 var = 'SAL-SALD-SDOV97'
                 resuSbcta = listaSubctaDF[(listaSubctaDF['fcc_var_integrity'] == var) & (
                             listaSubctaDF['fcc_registro'].astype(int) == int(df['service']))]
                 id_postgres = resuSbcta['id_tipo_sbcta'].values
                 data.append((
-                            int(df['cuenta']), int(df['periodo']), float(df['SAL-SALD-SDOV97']), int(id_resuSiefore[0]),
-                            int(id_postgres[0]), fecha_liquida, feh_accion, 'F', float(df['SAL-SALD-SDOV97_PESOS']),
+                            int(df['cuenta']), int(df['periodo']), Decimal(df['SAL-SALD-SDOV97']), int(id_resuSiefore[0]),
+                            int(id_postgres[0]), fecha_liquida, feh_accion, 'F', Decimal(df['SAL-SALD-SDOV97_PESOS']),
                             hoy, v_historico))
                 c += 1
 
-            if float(df['SAL-SALD-SDOBUD']) > 0 or float(df['SAL-SALD-SDOBUD']) < 0:
+            if Decimal(df['SAL-SALD-SDOBUD']) > 0 or Decimal(df['SAL-SALD-SDOBUD']) < 0:
                 var = 'SAL-SALD-SDOBUD'
                 resuSbcta = listaSubctaDF[(listaSubctaDF['fcc_var_integrity'] == var) & (
                             listaSubctaDF['fcc_registro'].astype(int) == int(df['service']))]
                 id_postgres = resuSbcta['id_tipo_sbcta'].values
                 data.append((
-                            int(df['cuenta']), int(df['periodo']), float(df['SAL-SALD-SDOBUD']), int(id_resuSiefore[0]),
-                            int(id_postgres[0]), fecha_liquida, feh_accion, 'F', float(df['SAL-SALD-SDOBUD_PESOS']),
+                            int(df['cuenta']), int(df['periodo']), Decimal(df['SAL-SALD-SDOBUD']), int(id_resuSiefore[0]),
+                            int(id_postgres[0]), fecha_liquida, feh_accion, 'F', Decimal(df['SAL-SALD-SDOBUD_PESOS']),
                             hoy, v_historico))
                 c += 1
 
