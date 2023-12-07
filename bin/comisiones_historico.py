@@ -237,7 +237,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
     df_insert = df_insert.withColumn("FTF_MONTO_ACCIONES", col("FTF_MONTO_ACCIONES").cast(DecimalType(12, 6)))
 
 
-    _write_spark_dataframe(df_insert, postgres_pool, '"HECHOS"."TTHECHOS_COMISION"')
+    _write_spark_dataframe(df_insert, configure_postgres_spark_dev, '"HECHOS"."TTHECHOS_COMISION"')
 
     fin = time.time()
     print("Execution time")
