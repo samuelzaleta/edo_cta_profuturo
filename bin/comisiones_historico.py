@@ -2,7 +2,7 @@ from profuturo.extraction import  _get_spark_session, read_table_insert_temp_vie
 from profuturo.common import define_extraction
 from profuturo.database import get_postgres_pool,configure_postgres_spark_dev
 from datetime import datetime as today
-from pyspark.sql.functions import col
+from pyspark.sql.functions import col, monotonically_increasing_id
 import datetime
 import numpy as np
 import pandas as pd
@@ -204,7 +204,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
         print('registro ' +str(c))
         print(cuenta)
 
-    print('Row insert:')
+    print('Rows to insert:')
     print(c)
 
     #df to insert into "comisiones"
@@ -219,3 +219,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
     df_insert = df_insert.filter(df_insert.row_id != 0)
 
     _write_spark_dataframe(df_insert, postgres_pool, "HECHOS"."TTHECHOS_COMISION")
+
+    fin = time.time()
+    print("Execution time")
+    print(fin - inicio)
