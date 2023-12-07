@@ -20,7 +20,8 @@ def extract_bigquery(table, period):
     df = spark.read.format('bigquery') \
         .option('table', f'estado-de-cuenta-service-dev-b:{table}') \
         .load()
-    df.filter(df.FCN_ID_PERIODO == period)
+    if period:
+        df.filter(df.FCN_ID_PERIODO == period)
     return df
 
 
@@ -50,7 +51,11 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                            "FTN_PENSION_INSTITUTO_SEG", "FTN_SALDO_FINAL"]
 
         retiros_general = extract_bigquery('ESTADO_CUENTA.TTMUESTR_RETIRO_GENERAL', term_id).select(*retiros_general_columns)
-        retiros = extract_bigquery('ESTADO_CUENTA.TTMUESTR_RETIRO', term_id).select(*retiros_columns[:-3], f.col("FTD_FECHA_EMISION").alias("FTD_FECHA_EMISION_2"), *retiros_columns[-3:])
+        retiros = (
+            extract_bigquery('ESTADO_CUENTA.TTMUESTR_RETIRO', term_id)
+            .select(*retiros_columns[:-3], f.col("FTD_FECHA_EMISION")
+                    .alias("FTD_FECHA_EMISION_2"), *retiros_columns[-3:])
+        )
 
         df = retiros_general.join(retiros, 'FCN_NUMERO_CUENTA').drop(retiros['FCN_NUMERO_CUENTA'])
 
