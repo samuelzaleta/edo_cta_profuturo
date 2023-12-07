@@ -222,9 +222,10 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
         StructField("FCN_ID_MOVIMIENTO", IntegerType(), True),
         StructField("FCN_ID_TIPO_MOVIMIENTO", IntegerType(), True),
         StructField("FCN_ID_SIEFORE", IntegerType(), True),
-        StructField("FCN_FOLIO", StringType(), True),
+        StructField("FTC_FOLIO", StringType(), True),
         StructField("FTF_MONTO_ACCIONES", DecimalType(), True),
-        StructField("FTF_SALDO_DIA", DecimalType(), True),
+        StructField("FTF_MONTO_PESOS", DecimalType(), True),
+        StructField("FTD_FEH_LIQUIDACION", TimestampType(), True),
         StructField("FTD_FECHA_INGESTA", TimestampType(), True),
         StructField("FTC_EXTRACTOR_INGESTA", StringType(), True),
         StructField("FTN_TIPO_SUBCTA", IntegerType(), True)
@@ -236,7 +237,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
     df_insert = df_insert.withColumn("FTF_MONTO_ACCIONES", col("FTF_MONTO_ACCIONES").cast(DecimalType(12, 6)))
 
 
-    _write_spark_dataframe(df_insert, postgres_pool, '"HECHOS"."TTHECHOS_COMISION"')
+    _write_spark_dataframe(df_insert, configure_postgres_spark_dev, '"HECHOS"."TTHECHOS_COMISION"')
 
     fin = time.time()
     print("Execution time")
