@@ -91,6 +91,8 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
             WHEN S.FTF_DIA_ACCIONES > 0 THEN ROUND(S.FTF_DIA_ACCIONES * X.FTN_FACTOR,6) END, 0) FTF_BON_ACT_ACC,
             COALESCE(CASE 
             WHEN S.FTF_SALDO_DIA > 0 THEN ROUND(S.FTF_SALDO_DIA * X.FTN_FACTOR,2) END, 0) FTF_BON_ACT_PES
+           ,FTD_FECHA_REDENCION_BONO AS FTD_FEC_RED_BONO,
+            FTN_FACTOR
             FROM (SELECT 
                     DR.FTN_NUM_CTA_INVDUAL,DR.FTD_FECHA_REDENCION_BONO,
                     DR.DIAS_PLAZO_NATURALES, VT.FTN_FACTOR
