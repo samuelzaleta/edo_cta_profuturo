@@ -210,7 +210,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                 id_postgres = resuSbcta['id_tipo_sbcta'].values
                 data.append((int(df['cuenta']), int(df['periodo']), Decimal(str(df['SAL_SALD_RET8S']).replace(' ', '')),
                              int(id_resuSiefore[0]), int(id_postgres[0]), fecha_liquida, feh_accion, 'F',
-                             Decimal(str(df['SAL_SALD_RET8S_PESOS']).replace(' ', '')), hoy, v_historico))
+                             Decimal(df['SAL_SALD_RET8S_PESOS']), hoy, v_historico))
                 c += 1
 
             if Decimal(df['SAL-SALD-CYVS']) > 0 or Decimal(df['SAL-SALD-CYVS']) < 0:
@@ -420,7 +420,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
         StructField("FTD_FEH_LIQUIDACION", DateType(), True),
         StructField("FCD_FEH_ACCION", DateType(), True),
         StructField("FTC_TIPO_SALDO", StringType(), True),
-        StructField("FTF_SALDO_DIA", DoubleType(), True),
+        StructField("FTF_SALDO_DIA", DecimalType(), True),
         StructField("FTD_FECHA_INGESTA", TimestampType(), True),
         StructField("FTC_EXTRACTOR_INGESTA", StringType(), True)
     ])
