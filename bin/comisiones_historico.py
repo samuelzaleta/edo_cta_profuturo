@@ -61,7 +61,8 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                                     FTN_ID_TIPO_SUBCTA as FTN_ID_TIPO_SUBCTA
                                  FROM TIPOSMOVIMIENTOS""").toPandas()
 
-    print(listaSubctaDF)
+    #print(listaSieforeDF)
+    #print(listaSubctaDF)
 
     #medir tiempo ejecucion
     inicio = time.time()
