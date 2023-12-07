@@ -398,18 +398,6 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
         #print(cuenta)
 
 
-    columns_insert = ["FCN_CUENTA",
-                  "FCN_ID_PERIODO",
-                  "FTF_DIA_ACCIONES",
-                  "FCN_ID_SIEFORE",
-                  "FCN_ID_TIPO_SUBCTA",
-                  "FTD_FEH_LIQUIDACION",
-                  "FCD_FEH_ACCION",
-                  "FTC_TIPO_SALDO",
-                  "FTF_SALDO_DIA",
-                  "FTD_FECHA_INGESTA",
-                  "FTC_EXTRACTOR_INGESTA"]
-
     # Define the schema
     schema = StructType([
         StructField("FCN_CUENTA", IntegerType(), True),
@@ -418,7 +406,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
         StructField("FCN_ID_SIEFORE", IntegerType(), True),
         StructField("FCN_ID_TIPO_SUBCTA", IntegerType(), True),
         StructField("FTD_FEH_LIQUIDACION", DateType(), True),
-        StructField("FCD_FEH_ACCION", DateType(), True),
+        StructField("FCD_FEH_ACCION", TimestampType(), True),
         StructField("FTC_TIPO_SALDO", StringType(), True),
         StructField("FTF_SALDO_DIA", DecimalType(), True),
         StructField("FTD_FECHA_INGESTA", TimestampType(), True),
