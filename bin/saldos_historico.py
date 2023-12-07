@@ -2,7 +2,7 @@ from profuturo.extraction import  _get_spark_session, read_table_insert_temp_vie
 from profuturo.common import define_extraction
 from profuturo.database import get_postgres_pool,configure_postgres_spark_dev
 from datetime import datetime as today
-from pyspark.sql.types import StringType,IntegerType, DateType, DecimalType, StructType, StructField,TimestampType, DoubleType
+from pyspark.sql.types import StringType,IntegerType, DateType, DecimalType, StructType, StructField,TimestampType, DoubleType, LongType
 from pyspark.sql.functions import col, monotonically_increasing_id, regexp_replace
 from decimal import Decimal
 import datetime
@@ -408,7 +408,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
 
     # Define the schema
     schema = StructType([
-        StructField("FCN_CUENTA", IntegerType(), True),
+        StructField("FCN_CUENTA", LongType(), True),
         StructField("FCN_ID_PERIODO", IntegerType(), True),
         StructField("FTF_DIA_ACCIONES", DecimalType(), True),
         StructField("FCN_ID_SIEFORE", IntegerType(), True),
