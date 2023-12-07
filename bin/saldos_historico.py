@@ -196,7 +196,6 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                 data.append((int(df['cuenta']), int(df['periodo']), Decimal(df['SAL_SALD_RETS']), int(id_resuSiefore[0]),
                              int(id_postgres[0]), fecha_liquida, feh_accion, 'F', df['SAL_SALD_RETS_PESOS'], hoy,
                              v_historico))
-                print(data)
                 c += 1
 
             if float(str(df['SAL_SALD_RET8S']).replace(' ', '')) > 0 or float(
