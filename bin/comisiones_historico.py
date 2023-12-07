@@ -53,14 +53,14 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                                  FTN_ID_RECORD as ftn_id,
                                  FCN_ID_TIPO_SUBCTA as id_tipo_sbcta,
                                  FCN_REGISTRO as fcc_registro,
-                                 FCC_VAR_INTEGRITY as fcc_var_integrity
+                                 FCC_VAR_INTEGRITY as fcc_var_integrity,
+                                 FCN_CODE_VAR_COMISION as fcn_code_var_comision
                                  FROM TIPOSBCTA""").toPandas()
     listaMovimientosDF= spark.sql("""SELECT 
                                     FTN_ID_MOVIMIENTO_PROFUTURO as FTN_ID_MOVIMIENTO_PROFUTURO,
                                     FTN_ID_TIPO_SUBCTA as FTN_ID_TIPO_SUBCTA
                                  FROM TIPOSMOVIMIENTOS""").toPandas()
 
-    print(listaSieforeDF)
     print(listaSubctaDF)
 
     #medir tiempo ejecucion
