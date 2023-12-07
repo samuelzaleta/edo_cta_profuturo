@@ -2,6 +2,7 @@ from profuturo.extraction import  _get_spark_session, read_table_insert_temp_vie
 from profuturo.common import define_extraction
 from profuturo.database import get_postgres_pool,configure_postgres_spark_dev
 from datetime import datetime as today
+from pyspark.sql.types import StringType,IntegerType, DateType, DecimalType, StructType, StructField,TimestampType, DoubleType
 from pyspark.sql.functions import col, monotonically_increasing_id, regexp_replace
 import datetime
 import numpy as np
@@ -65,7 +66,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
     hoy = today.today()
     print(inicio, hoy)
 
-    saldosDFfile = spark.read.text("gs://dataproc-spark-dev/SALDOSTDF_202203.TXT")
+    saldosDFfile = spark.read.text("gs://dataproc-spark-dev/SALDOSTDF_PESOS_202203.TXT")
 
     saldosDFfile.show(2)
 
@@ -158,7 +159,8 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
 
     #print(saldosDFfile2.printSchema())
     saldosDFfile2.show(2)
-    df =saldosDFfile2.select("SAL_SALD_RETS_PESOS").show()
+
+
 
     saldosDFfile2.printSchema()
 
@@ -176,7 +178,6 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
     try:
 
         for df in saldosDFfile2.collect():
-            print()
             anio = int(df['periodo'][0:4])
             mes = int(df['periodo'][4:6])
             fecha_liquida = last_day_of_month(datetime.date(anio, mes, 1))
@@ -198,7 +199,6 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                 data.append((int(df['cuenta']), int(df['periodo']), df['SAL_SALD_RETS'], int(id_resuSiefore[0]),
                              int(id_postgres[0]), fecha_liquida, feh_accion, 'F', df['SAL_SALD_RETS_PESOS'], hoy,
                              v_historico))
-                print(data)
                 c += 1
 
             if float(str(df['SAL_SALD_RET8S']).replace(' ', '')) > 0 or float(
@@ -393,32 +393,51 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
     except Exception as error:
         print('error: ' + var)
         print(error)
-        print('registro ' + str(c))
-        print(cuenta)
+        #print('registro ' + str(c))
+        #print(cuenta)
 
-    
-    columns_insert = ["FCN_CUENTA", 
-                  "FCN_ID_PERIODO", 
-                  "FTF_DIA_ACCIONES", 
+
+    columns_insert = ["FCN_CUENTA",
+                  "FCN_ID_PERIODO",
+                  "FTF_DIA_ACCIONES",
                   "FCN_ID_SIEFORE",
-                  "FCN_ID_TIPO_SUBCTA", 
+                  "FCN_ID_TIPO_SUBCTA",
                   "FTD_FEH_LIQUIDACION",
-                  "FCD_FEH_ACCION", 
-                  "FTC_TIPO_SALDO", 
-                  "FTF_SALDO_DIA", 
-                  "FTD_FECHA_INGESTA", 
+                  "FCD_FEH_ACCION",
+                  "FTC_TIPO_SALDO",
+                  "FTF_SALDO_DIA",
+                  "FTD_FECHA_INGESTA",
                   "FTC_EXTRACTOR_INGESTA"]
 
-    df_insert = spark.createDataFrame(data, columns_insert)
+    # Define the schema
+    schema = StructType([
+        StructField("FCN_CUENTA", IntegerType(), True),
+        StructField("FCN_ID_PERIODO", IntegerType(), True),
+        StructField("FTF_DIA_ACCIONES", DecimalType(), True),
+        StructField("FCN_ID_SIEFORE", IntegerType(), True),
+        StructField("FCN_ID_TIPO_SUBCTA", IntegerType(), True),
+        StructField("FTD_FEH_LIQUIDACION", DateType(), True),
+        StructField("FCD_FEH_ACCION", DateType(), True),
+        StructField("FTC_TIPO_SALDO", StringType(), True),
+        StructField("FTF_SALDO_DIA", DoubleType(), True),
+        StructField("FTD_FECHA_INGESTA", TimestampType(), True),
+        StructField("FTC_EXTRACTOR_INGESTA", StringType(), True)
+    ])
+
+    df_insert = spark.createDataFrame(data, schema)
     df_insert = df_insert.withColumn("row_id", monotonically_increasing_id())
     df_insert = df_insert.filter(df_insert.row_id != 0)
     df_insert = df_insert.withColumn("FCD_FEH_ACCION", col("FCD_FEH_ACCION").cast(DateType()))
+    df_insert = df_insert.withColumn("FTF_DIA_ACCIONES", col("FTF_DIA_ACCIONES").cast(DecimalType(12, 6)))
 
-    _write_spark_dataframe(df_insert, postgres_pool, "HECHOS"."THHECHOS_SALDO_HISTORICO")
+    print(df_insert.printSchema())
+    df_insert.show(2)
+
+    _write_spark_dataframe(df_insert, configure_postgres_spark_dev, '"HECHOS"."THHECHOS_SALDO_HISTORICO"')
 
     #to postgres
     print('Rows inserted:')
-    print(c)
+    #print(c)
 
     fin = time.time()
     print("execution time")
