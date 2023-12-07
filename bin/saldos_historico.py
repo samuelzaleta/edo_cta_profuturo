@@ -195,6 +195,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                 data.append((int(df['cuenta']), int(df['periodo']), df['SAL_SALD_RETS'], int(id_resuSiefore[0]),
                              int(id_postgres[0]), fecha_liquida, feh_accion, 'F', df['SAL_SALD_RETS_PESOS'], hoy,
                              v_historico))
+                print(data)
                 c += 1
 
             if float(str(df['SAL_SALD_RET8S']).replace(' ', '')) > 0 or float(
@@ -424,7 +425,6 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
     df_insert = df_insert.withColumn("row_id", monotonically_increasing_id())
     df_insert = df_insert.filter(df_insert.row_id != 0)
     df_insert = df_insert.withColumn("FCD_FEH_ACCION", col("FCD_FEH_ACCION").cast(DateType()))
-    df_insert = df_insert.withColumn("FTF_DIA_ACCIONES", col("FTF_DIA_ACCIONES").cast(DecimalType(12, 6)))
 
     print(df_insert.printSchema())
     df_insert.show(2)
