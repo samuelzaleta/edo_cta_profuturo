@@ -33,6 +33,8 @@ def extract_bigquery(table):
 def get_data(index, columns, df):
     if df.count() == 0:
         print("DATAFRAME VACIO")
+    if "vacio" not in df.columns:
+        df = df.withColumn("vacio", f.lit(None))
     df = df.select(*columns)
     data = df.rdd.flatMap(
         lambda row: [codecs.encode(str(row[column]), "utf-8").decode("utf-8") for column in columns]).collect()
@@ -60,7 +62,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
         general_columns = ["FCN_NUMERO_CUENTA", "FCN_FOLIO", "FTC_NOMBRE_COMPLETO", "FTC_CALLE_NUMERO", "FTC_COLONIA",
                            "FTC_DELEGACION", "FTN_CP", "FTC_ENTIDAD_FEDERATIVA", "FTC_RFC", "FTC_NSS", "FTC_CURP",
                            "FTD_FECHA_GRAL_INICIO", "FTD_FECHA_GRAL_FIN", "FTN_ID_FORMATO", "FTN_ID_SIEFORE",
-                           "FTD_FECHA_CORTE", None, "FTN_SALDO_SUBTOTAL", "FTN_SALDO_TOTAL",
+                           "FTD_FECHA_CORTE", "vacio", "FTN_SALDO_SUBTOTAL", "FTN_SALDO_TOTAL",
                            "FTN_PENSION_MENSUAL", "FTC_TIPO_TRABAJADOR", "FTC_FORMATO"]
         ahorro_columns = ["FTC_CONCEPTO_NEGOCIO", "FTN_SALDO_ANTERIOR", "FTF_APORTACION", "FTN_RETIRO",
                           "FTN_RENDIMIENTO", "FTN_COMISION", "FTN_SALDO_FINAL"]
