@@ -1,8 +1,10 @@
 from profuturo.extraction import  _get_spark_session, read_table_insert_temp_view, _write_spark_dataframe
 from profuturo.common import define_extraction
 from profuturo.database import get_postgres_pool,configure_postgres_spark_dev
+from pyspark.sql.types import StringType,IntegerType, DateType, DecimalType, StructType, StructField,TimestampType, DoubleType
 from datetime import datetime as today
-from pyspark.sql.functions import col
+from decimal import Decimal
+from pyspark.sql.functions import col, monotonically_increasing_id
 import datetime
 import numpy as np
 import pandas as pd
@@ -51,15 +53,16 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                                  FTN_ID_RECORD as ftn_id,
                                  FCN_ID_TIPO_SUBCTA as id_tipo_sbcta,
                                  FCN_REGISTRO as fcc_registro,
-                                 FCC_VAR_INTEGRITY as fcc_var_integrity
+                                 FCC_VAR_INTEGRITY as fcc_var_integrity,
+                                 FCN_CODE_VAR_COMISION as fcn_code_var_comision
                                  FROM TIPOSBCTA""").toPandas()
     listaMovimientosDF= spark.sql("""SELECT 
                                     FTN_ID_MOVIMIENTO_PROFUTURO as FTN_ID_MOVIMIENTO_PROFUTURO,
                                     FTN_ID_TIPO_SUBCTA as FTN_ID_TIPO_SUBCTA
                                  FROM TIPOSMOVIMIENTOS""").toPandas()
 
-    print(listaSieforeDF)
-    print(listaSubctaDF)
+    #print(listaSieforeDF)
+    #print(listaSubctaDF)
 
     #medir tiempo ejecucion
     inicio = time.time()
@@ -107,9 +110,9 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
             cuenta = df['cuenta']
 
             if c == 0:
-                data.append((1,1,1,1,1,1,1,0,0.0,fecha_liquida, hoy, v_historico, 1))
-            
-            
+                #Fix para Dataframe que inserta en postgres - Se elimina al final
+                data.append((1,1,1,1,1,1,1,Decimal(0.0),Decimal(0.0),fecha_liquida, hoy, v_historico, 1))
+                      
             #Busqueda de subcuenta
             if float(df['COM_RETIRO']) > 0:
                 var = 'COM_RETIRO'
@@ -136,7 +139,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                 idSubCta = resuSbcta['id_tipo_sbcta'].values
                 resMov = listaMovimientosDF[(listaMovimientosDF['FTN_ID_TIPO_SUBCTA'] == int(idSubCta[0]))]
                 idmov = resMov['FTN_ID_MOVIMIENTO_PROFUTURO'].values
-                data.append((int(df['cuenta']), int(df['periodo']), int(idmov[0]), None, 9486, None, None, 0, float(df[var]), fecha_liquida, hoy, v_historico, int(idSubCta[0])))
+                data.append((int(df['cuenta']), int(df['periodo']), int(idmov[0]), None, 9486, None, None, Decimal(0.0), Decimal(df[var]), fecha_liquida, hoy, v_historico, int(idSubCta[0])))
                 c+=1
 
             #COM_SAR_IS
@@ -155,7 +158,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                 idSubCta = resuSbcta['id_tipo_sbcta'].values
                 resMov = listaMovimientosDF[(listaMovimientosDF['FTN_ID_TIPO_SUBCTA'] == int(idSubCta[0]))]
                 idmov = resMov['FTN_ID_MOVIMIENTO_PROFUTURO'].values
-                data.append((int(df['cuenta']), int(df['periodo']), int(idmov[0]), None, 9486, None, None, 0, float(df[var]), fecha_liquida, hoy, v_historico, int(idSubCta[0])))
+                data.append((int(df['cuenta']), int(df['periodo']), int(idmov[0]), None, 9486, None, None, Decimal(0.0), Decimal(df[var]), fecha_liquida, hoy, v_historico, int(idSubCta[0])))
                 c+=1
             
             if float(df['COM_ACR']) > 0:
@@ -164,7 +167,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                 idSubCta = resuSbcta['id_tipo_sbcta'].values
                 resMov = listaMovimientosDF[(listaMovimientosDF['FTN_ID_TIPO_SUBCTA'] == int(idSubCta[0]))]
                 idmov = resMov['FTN_ID_MOVIMIENTO_PROFUTURO'].values
-                data.append((int(df['cuenta']), int(df['periodo']), int(idmov[0]), None, 9486, None, None, 0, float(df[var]), fecha_liquida, hoy, v_historico, int(idSubCta[0])))
+                data.append((int(df['cuenta']), int(df['periodo']), int(idmov[0]), None, 9486, None, None, Decimal(0.0), Decimal(df[var]), fecha_liquida, hoy, v_historico, int(idSubCta[0])))
                 c+=1
 
             #COM_ALP
@@ -183,7 +186,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                 idSubCta = resuSbcta['id_tipo_sbcta'].values
                 resMov = listaMovimientosDF[(listaMovimientosDF['FTN_ID_TIPO_SUBCTA'] == int(idSubCta[0]))]
                 idmov = resMov['FTN_ID_MOVIMIENTO_PROFUTURO'].values
-                data.append((int(df['cuenta']), int(df['periodo']), int(idmov[0]), None, 9486, None, None, 0, float(df[var]), fecha_liquida, hoy, v_historico, int(idSubCta[0])))
+                data.append((int(df['cuenta']), int(df['periodo']), int(idmov[0]), None, 9486, None, None, Decimal(0.0), Decimal(df[var]), fecha_liquida, hoy, v_historico, int(idSubCta[0])))
                 c+=1
             
             if float(df['COM_AHO_SOL']) > 0:
@@ -194,8 +197,6 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                 # idmov = resMov['FTN_ID_MOVIMIENTO_PROFUTURO'].values
                 # data.append((int(df['cuenta']), int(df['periodo']), int(idmov[0]), None, 9486, None, None, 0, float(df[var]), fecha_liquida, hoy, v_historico, int(idSubCta[0])))
                 # c+=1
-                
-
     
     except Exception as error:
         print('error: ')
@@ -204,18 +205,41 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
         print('registro ' +str(c))
         print(cuenta)
 
-    print('Row insert:')
+    print('Rows to insert:')
     print(c)
 
     #df to insert into "comisiones"
     # Define the column names
-    columns_insert = ["FCN_CUENTA", "FCN_ID_PERIODO", "FCN_ID_CONCEPTO_MOVIMIENTO", "FCN_ID_MOVIMIENTO", "FCN_ID_TIPO_MOVIMIENTO", "FCN_ID_SIEFORE",
-            "FCN_FOLIO", "FTF_MONTO_ACCIONES", "FTF_MONTO_PESOS", "FTD_FEH_LIQUIDACION", "FTD_FECHA_INGESTA", "FTC_EXTRACTOR_INGESTA",
+    columns_insert = ["FCN_CUENTA", "FCN_ID_PERIODO", "FCN_ID_CONCEPTO_MOVIMIENTO",
+                      "FCN_ID_MOVIMIENTO", "FCN_ID_TIPO_MOVIMIENTO", "FCN_ID_SIEFORE",
+            "FCN_FOLIO", "FTF_MONTO_ACCIONES", "FTF_MONTO_PESOS", 
+            "FTD_FEH_LIQUIDACION", "FTD_FECHA_INGESTA", "FTC_EXTRACTOR_INGESTA",
             "FTN_TIPO_SUBCTA"]
 
+    schema = StructType([
+        StructField("FCN_CUENTA", IntegerType(), True),
+        StructField("FCN_ID_PERIODO", IntegerType(), True),
+        StructField("FCN_ID_CONCEPTO_MOVIMIENTO", IntegerType(), True),
+        StructField("FCN_ID_MOVIMIENTO", IntegerType(), True),
+        StructField("FCN_ID_TIPO_MOVIMIENTO", IntegerType(), True),
+        StructField("FCN_ID_SIEFORE", IntegerType(), True),
+        StructField("FTC_FOLIO", StringType(), True),
+        StructField("FTF_MONTO_ACCIONES", DecimalType(), True),
+        StructField("FTF_MONTO_PESOS", DecimalType(), True),
+        StructField("FTD_FEH_LIQUIDACION", DateType(), True),
+        StructField("FTD_FECHA_INGESTA", TimestampType(), True),
+        StructField("FTC_EXTRACTOR_INGESTA", StringType(), True),
+        StructField("FTN_TIPO_SUBCTA", IntegerType(), True)
+    ])
 
-    df_insert = spark.createDataFrame(data, columns_insert)
+    df_insert = spark.createDataFrame(data, schema)
     df_insert = df_insert.withColumn("row_id", monotonically_increasing_id())
     df_insert = df_insert.filter(df_insert.row_id != 0)
+    df_insert = df_insert.withColumn("FTF_MONTO_ACCIONES", col("FTF_MONTO_ACCIONES").cast(DecimalType(12, 6)))
 
-    _write_spark_dataframe(df_insert, postgres_pool, "HECHOS"."TTHECHOS_COMISION")
+
+    _write_spark_dataframe(df_insert, configure_postgres_spark_dev, '"HECHOS"."TTHECHOS_COMISION"')
+
+    fin = time.time()
+    print("Execution time")
+    print(fin - inicio)
