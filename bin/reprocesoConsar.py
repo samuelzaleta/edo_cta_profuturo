@@ -25,10 +25,10 @@ with define_extraction(phase, area, postgres_pool, integrity_pool) as (postgres,
         records = postgres.execute(text("""
         SELECT mr."FTN_ID_SOLICITUD_REPROCESO", mr."FCN_ID_MUESTRA", mp."FTN_ID_MOVIMIENTO_PROFUTURO", mp."FTC_ORIGEN"
         FROM "GESTOR"."TCGESPRO_MUESTRA_SOL_RE_CONSAR" mr
-            INNER JOIN "GESTOR"."TTGESPRO_MOV_PROFUTURO_CONSAR" mpc ON mr."FCN_ID_MOVIMIENTO_CONSAR" = mpc."FCN_ID_MOVIMIENTO_CONSAR"
-            INNER JOIN "GESTOR"."TCGESPRO_MOVIMIENTO_PROFUTURO" mp ON mpc."FCN_ID_MOVIMIENTO_PROFUTURO" = mp."FTN_ID_MOVIMIENTO_PROFUTURO"
             INNER JOIN "GESTOR"."TCGESPRO_MUESTRA" m ON m."FTN_ID_MUESTRA" = mr."FCN_ID_MUESTRA"
             -- INNER JOIN "GESTOR"."TCGESPRO_PERIODO_AREA" pa ON pa."FCN_ID_PERIODO" = m."FCN_ID_PERIODO"
+            LEFT OUTER JOIN "GESTOR"."TTGESPRO_MOV_PROFUTURO_CONSAR" mpc ON mr."FCN_ID_MOVIMIENTO_CONSAR" = mpc."FCN_ID_MOVIMIENTO_CONSAR"
+            LEFT OUTER JOIN "GESTOR"."TCGESPRO_MOVIMIENTO_PROFUTURO" mp ON mpc."FCN_ID_MOVIMIENTO_PROFUTURO" = mp."FTN_ID_MOVIMIENTO_PROFUTURO"
         WHERE mr."FTC_STATUS" = 'Aprobado'
           -- AND mp."FTB_SWITCH" = true
           -- AND pa."FTB_ESTATUS" = true
@@ -39,7 +39,7 @@ with define_extraction(phase, area, postgres_pool, integrity_pool) as (postgres,
         movements_integrity = list({record[2] for record in filter(lambda record: record[3] == "INTEGRITY", records)})
         print(movements_integrity, bool(movements_integrity))
         movements_mit = list({record[2] for record in filter(lambda record: record[3] == "MIT", records)})
-        print(movements_mit,bool(movements_integrity))
+        print(movements_mit, bool(movements_integrity))
 
         if movements_mit:
             extract_movements_mit(postgres, term_id, start_month, end_month, movements_mit)
@@ -50,7 +50,7 @@ with define_extraction(phase, area, postgres_pool, integrity_pool) as (postgres,
                 phase,
                 area,
                 term=term_id,
-                message=f"Se no se encontraron movimientos mit a reprocesar en los conceptos consar",
+                message="Se no se encontraron movimientos mit a reprocesar en los conceptos consar",
             )
 
         if movements_integrity:
@@ -62,7 +62,7 @@ with define_extraction(phase, area, postgres_pool, integrity_pool) as (postgres,
                 phase,
                 area,
                 term=term_id,
-                message=f"Se no se encontraron movimientos integrity a reprocesar en los conceptos consar",
+                message="Se no se encontraron movimientos integrity a reprocesar en los conceptos consar",
             )
 
         postgres.execute(text("""
@@ -71,11 +71,12 @@ with define_extraction(phase, area, postgres_pool, integrity_pool) as (postgres,
         WHERE "FTN_ID_SOLICITUD_REPROCESO" = ANY(:reprocess)
         """), {"reprocess": reprocess})
 
-        # postgres.execute(text("""
-        # DELETE FROM "GESTOR"."TCGESPRO_MUESTRA"
-        # WHERE "FTN_ID_MUESTRA" IN :samples
-        #   AND "FCN_ID_PERIODO" = :term
-        # """), {"samples": samples, "term": term_id})
+        postgres.execute(text("""
+        UPDATE "GESTOR"."TCGESPRO_MUESTRA"
+        SET "FTC_ESTATUS" = 'Reprocesado'
+        WHERE "FTN_ID_MUESTRA" = ANY(:samples)
+          AND "FCN_ID_PERIODO" = :term
+        """), {"samples": samples, "term": term_id})
 
         # Cifras de control
         report_mit_1 = html_reporter.generate(
@@ -88,10 +89,10 @@ with define_extraction(phase, area, postgres_pool, integrity_pool) as (postgres,
                    MC."FTC_DESCRIPCION" AS CONSAR,
                    COUNT(DISTINCT M."FCN_CUENTA") AS CLIENTES,
                    SUM(M."FTF_MONTO_PESOS") AS IMPORTE
-            FROM "TTHECHOS_MOVIMIENTO" M
-                INNER JOIN "TCHECHOS_CLIENTE" I ON M."FCN_CUENTA" = I."FCN_CUENTA"
-                INNER JOIN "TTGESPRO_MOV_PROFUTURO_CONSAR" PC ON M."FCN_ID_CONCEPTO_MOVIMIENTO" = PC."FCN_ID_MOVIMIENTO_PROFUTURO"
-                INNER JOIN "TCDATMAE_MOVIMIENTO_CONSAR" MC ON PC."FCN_ID_MOVIMIENTO_CONSAR" = MC."FTN_ID_MOVIMIENTO_CONSAR"
+            FROM "HECHOS"."TTHECHOS_MOVIMIENTO" M
+                INNER JOIN "HECHOS"."TCHECHOS_CLIENTE" I ON M."FCN_CUENTA" = I."FCN_CUENTA"
+                INNER JOIN "GESTOR"."TTGESPRO_MOV_PROFUTURO_CONSAR" PC ON M."FCN_ID_CONCEPTO_MOVIMIENTO" = PC."FCN_ID_MOVIMIENTO_PROFUTURO"
+                INNER JOIN "MAESTROS"."TCDATMAE_MOVIMIENTO_CONSAR" MC ON PC."FCN_ID_MOVIMIENTO_CONSAR" = MC."FTN_ID_MOVIMIENTO_CONSAR"
             WHERE M."FCN_ID_PERIODO" = :term
               AND M."FCN_ID_CONCEPTO_MOVIMIENTO" = ANY(:movements)
             GROUP BY I."FTC_GENERACION", I."FTC_VIGENCIA", I."FTC_TIPO_CLIENTE", I."FTC_ORIGEN", MC."FTC_DESCRIPCION"
