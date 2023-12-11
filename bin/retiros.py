@@ -145,7 +145,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
            coalesce(FTN_FEH_RES_PEN, '00010101') AS FTN_FEH_RES_PEN,
            CASE
                WHEN FTC_TMC_DESC_ITGY IN ('RJP', 'T73', 'TED', 'TGF', 'TJU', 'TPI', 'TPP', 'TPR', 'TRE', 'TRJ', 'TEX') THEN '73'
-               WHEN FTC_TMC_DESC_ITGY IN ('PPI', 'RCI', 'T97', 'TAI', 'TEI', 'TIV', 'TIX', 'TJI', 'TNI', 'TNP') THEN '97'
+               WHEN FTC_TMC_DESC_ITGY IN ('PPI', 'RCI', 'T97', 'TAI', 'TEI', 'TIV', 'TIX', 'TJI', 'TNI', 'TNP', 'TPG') THEN '97'
            END FTN_ARCHIVO,
            CASE
                WHEN FTC_TMC_DESC_ITGY IN ('T73', 'TNP', 'TPP', 'T97', 'TPR', 'TED', 'RJP', 'TRE', 'TJU', 'TEX', 'TGF', 'TPG', 'TRU', 'TIV') THEN 'IMSS'
