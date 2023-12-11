@@ -6,7 +6,7 @@ import sys
 import requests
 
 
-url = "https://procesos-api-service-dev-e46ynxyutq-uk.a.run.app/procesos/generarEstadosCuentaRetiros"
+url = "https://procesos-api-service-dev-e46ynxyutq-uk.a.run.app/procesos/generarEstadosCuentaRetiros/muestras"
 
 postgres_pool = get_postgres_pool()
 bigquery_pool = get_bigquery_pool()
