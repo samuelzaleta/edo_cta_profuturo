@@ -171,9 +171,9 @@ def _transform_mov(df: DataFrame, switches) -> DataFrame:
     # Si la SIEFORE es 99, toma el valor de 15
     df.withColumn("CVE_SIEFORE", when(col("CVE_SIEFORE") == 99, 15).otherwise("CVE_SIEFORE"))
 
-    df.withColumn("SUBCUENTA", lit(0))
-    df.withColumn("MONTO", lit(0))
     # Extrae los MONPES en base a los switches
+    expr_subaccount = lit(0)
+    expr_amount = lit(0)
     for switch in switches:
         codmov = switch[0]
         monpes = "CSIE1_MONPES_" + str(switch[1])
@@ -182,17 +182,11 @@ def _transform_mov(df: DataFrame, switches) -> DataFrame:
         if monpes not in df.columns:
             continue
 
-        """
-        df.withColumn(
-            "SUBCUENTA",
-            when((col("CSIE1_CODMOV") == codmov) & (col(monpes) > 0), subcuenta)
-            .otherwise(col("SUBCUENTA"))
-        )
-        df.withColumn(
-            "MONTO",
-            when((col("CSIE1_CODMOV") == codmov) & (col(monpes) > 0), col(monpes))
-            .otherwise(col("MONTO"))
-        )
-        """
+        expr_subaccount = when((col("CSIE1_CODMOV") == codmov) & (col(monpes) > 0), subcuenta) \
+            .otherwise(expr_subaccount)
+        expr_amount = when((col("CSIE1_CODMOV") == codmov) & (col(monpes) > 0), col(monpes)) \
+            .otherwise(expr_amount)
+    df.withColumn("SUBCUENTA", expr_subaccount)
+    df.withColumn("MONTO", expr_amount)
 
     return df
