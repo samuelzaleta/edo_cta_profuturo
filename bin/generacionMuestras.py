@@ -20,7 +20,7 @@ def find_samples(samples_cursor: CursorResult):
         for record in batch:
             account = record[0]
             consars = record[1]
-            i = i + 1
+            i += 1
 
             for consar in consars:
                 if consar not in configurations:
@@ -37,7 +37,19 @@ def find_samples(samples_cursor: CursorResult):
                     print("Cantidad de registros: " + str(i))
                     return samples
 
-    raise Exception('Insufficient samples')
+    notify(
+        postgres,
+        'No se encontraron suficientes registros para los movimientos CONSAR',
+        phase,
+        area,
+        term_id,
+        f"No se encontraron suficientes muestras para los movimientos CONSAR con los IDs {','.join(configurations.keys())}",
+        aprobar=False,
+        descarga=False,
+        reproceso=False,
+    )
+
+    return samples
 
 
 url = "https://procesos-api-service-dev-e46ynxyutq-uk.a.run.app/procesos/generarEstadosCuentaRecaudaciones/muestras"
@@ -76,11 +88,11 @@ with define_extraction(phase, area, postgres_pool, bigquery_pool) as (postgres, 
             SELECT "FCN_ID_MOVIMIENTO_CONSAR", "FTN_CANTIDAD"
             FROM "GESTOR"."TTGESPRO_CONFIGURACION_MUESTRA_AUTOMATICA"
             """))
-            configurations = {configuration[0]: configuration[1] for configuration in cursor.fetchall()}
+            configurations = {str(configuration[0]): configuration[1] for configuration in cursor.fetchall()}
             print("configuracion", configurations)
 
             cursor = postgres.execute(text("""
-            SELECT "FCN_CUENTA", array_agg(CC."FCN_ID_MOVIMIENTO_CONSAR")
+            SELECT "FCN_CUENTA", array_agg(CC."FCN_ID_MOVIMIENTO_CONSAR")::varchar[]
             FROM (
                 SELECT M."FCN_CUENTA", PC."FCN_ID_MOVIMIENTO_CONSAR"
                 FROM "HECHOS"."TTHECHOS_MOVIMIENTO" M
