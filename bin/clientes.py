@@ -251,7 +251,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
 
         query_pension = """
                 SELECT
-                PG.FTN_NUM_CTA_INVDUAL AS FCN_CUETA,
+                PG.FTN_NUM_CTA_INVDUAL AS FCN_CUENTA,
                 CASE
                 WHEN PG.FCN_ID_SUBPROCESO = 310 THEN 'PENSIÓN MÍNIMA GARANTIZADA ISSSTE'
                     ELSE 'PENSIÓN MÍNIMA GARANTIZADA IMSS'
