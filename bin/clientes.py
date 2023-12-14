@@ -270,6 +270,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                 PG.FTN_NUM_CTA_INVDUAL,PG.FCN_ID_SUBPROCESO
                 """
 
+        truncate_table(postgres, "TCDATMAE_PESION", term=term_id)
         extract_dataset_spark(
             configure_mit_spark,
             configure_postgres_spark,
