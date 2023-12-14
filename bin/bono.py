@@ -34,9 +34,6 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
 
     with register_time(postgres_pool, phase, term_id, user, area):
         truncate_table(postgres, 'TTCALCUL_BONO', term=term_id)
-        #truncate_table(postgres, 'TTHECHOS_RETIRO_LIQUIDACIONES', term=term_id)
-        #truncate_table(postgres, 'TTHECHOS_RETIRO_SALDOS_INICIALES', term=term_id)
-
 
         query_dias_rend_bono = """
         SELECT RB.FTN_NUM_CTA_INVDUAL, RB.FTD_FEH_VALOR AS FTD_FECHA_REDENCION_BONO,
