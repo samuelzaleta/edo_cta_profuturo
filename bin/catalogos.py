@@ -87,41 +87,6 @@ with define_extraction(phase, area, postgres_pool, mit_pool) as (postgres, mit):
         """, lambda i: [f":cod_mov_{i}", f":monpes_{i}", f":tipo_subcta_{i}", "'INTEGRITY'", f":description_{i}", "true"],
                        "TCGESPRO_MOVIMIENTO_PROFUTURO", upsert_id=lambda row: f"{str(row[0])}-{str(row[1])}")
 
-        """
-        tables = ["TCDATMAE_SIEFORE", "TCDATMAE_TIPO_SUBCUENTA", "TCGESPRO_MOVIMIENTO_PROFUTURO"]
-
-
-        def print_html_tables(tables):
-            for table in tables:
-                df = spark.sql(f"select * from {table}")
-
-                pandas_df = df.select(*[col(c).cast("string") for c in df.columns]).toPandas()
-
-                # Obtener el valor máximo de id
-                max_id = spark.sql(f"SELECT MAX(id) FROM {table}").collect()[0][0]
-
-                pandas_df['id'] = pandas_df['id'].astype(int)
-                # Dividir el resultado en tablas HTML de 50 en 50
-                batch_size = 100
-                for start in range(0, max_id, batch_size):
-                    end = start + batch_size
-                    batch_pandas_df = pandas_df[(pandas_df['id'] >= start) & (pandas_df['id'] < end)]
-                    batch_html_table = batch_pandas_df.to_html(index=False)
-
-                    # Enviar notificación con la tabla HTML de este lote
-                    notify(
-                        postgres,
-                        f"Cifras de control {table} generadas - Parte {start}-{end - 1}",
-                        phase,
-                        area,
-                        term=term_id,
-                        message=f"Se han generado las cifras de control para {table} exitosamente",
-                        details=batch_html_table,
-                    )
-
-
-        print_html_tables(tables)
-"""
         notify(
             postgres,
             f"Catálogos",

@@ -275,7 +275,6 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
             configure_postgres_spark,
             query_pension,
             '"MAESTROS"."TCDATMAE_PESION"',
-            term=term_id,
             params={"date": end_month, "type": "F"},
         )
 
