@@ -276,7 +276,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
             configure_postgres_spark,
             query_pension,
             '"MAESTROS"."TCDATMAE_PESION"',
-            params={"date": end_month, "type": "F"},
+            params={"end": end_month, "type": "F"},
         )
 
         # Cifras de control
