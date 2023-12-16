@@ -13,6 +13,7 @@ python-dotenv = "*"
 polars = {extras = ["connectorx", "pandas", "pyarrow"], version = "*"}
 cx-oracle = "*"
 sqlalchemy-bigquery = {extras = ["bqstorage"], version = "*"}
+google-cloud-secret-manager = "*"
 
 [dev-packages]
 pyspark = "*"
