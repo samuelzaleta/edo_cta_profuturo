@@ -47,12 +47,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
         SELECT 
                distinct
                SH.FTN_NUM_CTA_INVDUAL AS FCN_CUENTA,
-               --SH.FCN_ID_SIEFORE,
                SH.FCN_ID_TIPO_SUBCTA,
-               --SH.FTD_FEH_LIQUIDACION,
-               --:type AS FTC_TIPO_SALDO,
-               --MAX(VA.FCD_FEH_ACCION) AS FCD_FEH_ACCION,
-               --ROUND(SUM(SH.FTN_DIA_ACCIONES), 6) AS FTF_DIA_ACCIONES,
                ROUND(SUM(SH.FTN_DIA_ACCIONES * VA.FCN_VALOR_ACCION), 2) AS FTF_SALDO_INICIAL
         FROM cierren.thafogral_saldo_historico_v2 SH
         INNER JOIN cierren.TCCRXGRAL_TIPO_SUBCTA R ON R.FCN_ID_TIPO_SUBCTA = SH.FCN_ID_TIPO_SUBCTA
@@ -63,9 +58,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                    MAX(TRUNC(SHMAX.FTD_FEH_LIQUIDACION)) AS FTD_FEH_LIQUIDACION
             FROM cierren.thafogral_saldo_historico_v2 SHMAX
             WHERE SHMAX.FTD_FEH_LIQUIDACION <= :date
-              -- AND SHMAX.FTN_NUM_CTA_INVDUAL = 10044531
-              -- AND SHMAX.FCN_ID_TIPO_SUBCTA = 22
-              -- AND SHMAX.FCN_ID_SIEFORE = 83
+               --AND SHMAX.FTN_NUM_CTA_INVDUAL = 160014435
             GROUP BY SHMAX.FTN_NUM_CTA_INVDUAL, SHMAX.FCN_ID_SIEFORE, SHMAX.FCN_ID_TIPO_SUBCTA
         ) SHMAXIMO ON SH.FTN_NUM_CTA_INVDUAL = SHMAXIMO.FTN_NUM_CTA_INVDUAL
                   AND SH.FCN_ID_TIPO_SUBCTA = SHMAXIMO.FCN_ID_TIPO_SUBCTA AND SH.FCN_ID_SIEFORE = SHMAXIMO.FCN_ID_SIEFORE
@@ -93,8 +86,8 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
         WHERE
             1=1
             AND tsh."FTC_TIPO_SALDO" = 'F'
-            AND tsh."FTD_FEH_LIQUIDACION" BETWEEN :start_month AND :end_month
             AND tsh."FCN_ID_PERIODO" = :term_id
+            --AND tsh."FCN_CUENTA" = 160014435
         GROUP BY
             1=1
             , tsh."FCN_CUENTA"
@@ -110,6 +103,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
             WHERE "FTD_FEH_LIQUIDACION" BETWEEN :start_month AND :end_month
               AND "FCN_ID_TIPO_MOVIMIENTO" = '181'
               AND "FCN_ID_PERIODO" = :term_id
+              --AND "FCN_CUENTA" = 160014435
         
             UNION ALL
         
@@ -119,6 +113,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
             FROM "HECHOS"."TTHECHOS_MOVIMIENTOS_INTEGRITY"
             WHERE CAST("CSIE1_CODMOV" AS INT) <= 500
               AND "FCN_ID_PERIODO" = :term_id
+              --AND "CSIE1_NUMCUE" = 160014435
         ) AS mov
         GROUP BY "FCN_CUENTA", "FCN_ID_TIPO_SUBCTA"
         """
@@ -129,9 +124,9 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                    "FCN_ID_TIPO_SUBCTA",
                    "FTF_MONTO_PESOS"
             FROM "HECHOS"."TTHECHOS_MOVIMIENTO"
-            WHERE "FTD_FEH_LIQUIDACION" BETWEEN :start_month AND :end_month
-              AND "FCN_ID_TIPO_MOVIMIENTO" = '180'
+            WHERE "FCN_ID_TIPO_MOVIMIENTO" = '180'
               AND "FCN_ID_PERIODO" = :term_id
+              --AND "FCN_CUENTA" = 160014435
         
             UNION ALL
         
@@ -141,6 +136,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
             FROM "HECHOS"."TTHECHOS_MOVIMIENTOS_INTEGRITY"
             WHERE CAST("CSIE1_CODMOV" AS INT) > 500
               AND "FCN_ID_PERIODO" = :term_id
+              --AND "CSIE1_NUMCUE" = 160014435
         ) AS mov
         GROUP BY "FCN_CUENTA", "FCN_ID_TIPO_SUBCTA"
         """
@@ -150,7 +146,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
         C."FTN_TIPO_SUBCTA",
         SUM(C."FTF_MONTO_PESOS"::double precision) AS "FTF_COMISION"
         FROM "HECHOS"."TTHECHOS_COMISION" C
-        WHERE C."FTD_FEH_LIQUIDACION" BETWEEN :start_month AND :end_month
+        WHERE "FCN_ID_PERIODO" = :term_id --AND "FCN_CUENTA" = 160014435
         GROUP BY C."FCN_CUENTA", C."FTN_TIPO_SUBCTA"
         """
         truncate_table(postgres, "TTCALCUL_RENDIMIENTO", term=term_id)
@@ -165,7 +161,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
             configure_postgres_spark,
             saldo_final_query,
             "saldofinal",
-            params={"start_month ": start_month,
+            params={
                     "end_month": end_month,
                     "term_id": term_id}
         )
@@ -174,25 +170,26 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
             configure_postgres_spark,
             cargo_query,
             "cargo",
-            params={"start_month ": start_month,
-                    "end_month": end_month,
-                    "term_id": term_id}
+            params={"term_id": term_id}
         )
         read_table_insert_temp_view(
             configure_postgres_spark,
             abono_query,
             "abono",
-            params={"start_month ": start_month,
-                    "end_month": end_month,
-                    "term_id": term_id}
+            params={"term_id": term_id}
         )
         read_table_insert_temp_view(
             configure_postgres_spark,
             comision_query,
             "comision",
-            params={"start_month ": start_month,
-                    "end_month": end_month}
+            params={"term_id": term_id}
         )
+
+        spark.sql("SELECT * FROM saldofinal").show()
+        spark.sql("SELECT * FROM saldoinicial").show()
+        spark.sql("SELECT * FROM cargo").show()
+        spark.sql("SELECT * FROM abono").show()
+        spark.sql("SELECT * FROM comision").show()
 
         df = spark.sql(f"""
         WITH tablon as (
