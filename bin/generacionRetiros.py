@@ -14,7 +14,6 @@ postgres_pool = get_postgres_pool()
 phase = int(sys.argv[1])
 user = int(sys.argv[3])
 area = int(sys.argv[4])
-bucket_list = ["edo_cuenta_profuturo_dev_b", "edo_cuenta_profuturo_qa"]
 
 storage_client = storage.Client()
 bigquery_client = bigquery.Client()
@@ -25,7 +24,7 @@ def get_buckets():
     buckets = storage_client.list_buckets()
 
     for bucket in buckets:
-        if bucket.name in bucket_list:
+        if bucket.name.startswith("edo_cuenta_profuturo"):
             return bucket.name
 
 
