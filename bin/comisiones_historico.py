@@ -1,7 +1,7 @@
 from profuturo.extraction import  _get_spark_session, read_table_insert_temp_view, _write_spark_dataframe
 from profuturo.common import define_extraction
 from profuturo.database import get_postgres_pool,configure_postgres_spark
-from pyspark.sql.types import StringType,IntegerType, DateType, DecimalType, StructType, StructField,TimestampType, DoubleType
+from pyspark.sql.types import StringType,IntegerType, LongType, DateType, DecimalType, StructType, StructField,TimestampType, DoubleType
 from datetime import datetime as today
 from decimal import Decimal
 from pyspark.sql.functions import col, monotonically_increasing_id
@@ -217,7 +217,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
             "FTN_TIPO_SUBCTA"]
 
     schema = StructType([
-        StructField("FCN_CUENTA", IntegerType(), True),
+        StructField("FCN_CUENTA", LongType(), True),
         StructField("FCN_ID_PERIODO", IntegerType(), True),
         StructField("FCN_ID_CONCEPTO_MOVIMIENTO", IntegerType(), True),
         StructField("FCN_ID_MOVIMIENTO", IntegerType(), True),
@@ -238,7 +238,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
     df_insert = df_insert.withColumn("FTF_MONTO_ACCIONES", col("FTF_MONTO_ACCIONES").cast(DecimalType(12, 6)))
 
 
-    _write_spark_dataframe(df_insert, configure_postgres_spark_dev, '"HECHOS"."TTHECHOS_COMISION"')
+    _write_spark_dataframe(df_insert, configure_postgres_spark, '"HECHOS"."TTHECHOS_COMISION"')
 
     fin = time.time()
     print("Execution time")
