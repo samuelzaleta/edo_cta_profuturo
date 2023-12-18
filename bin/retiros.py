@@ -96,7 +96,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                 LEFT JOIN TTAFOGRAL_CTA_INVDUAL ctaind ON L.FTN_NUM_CTA_INVDUAL = ctaind.FTN_NUM_CTA_INVDUAL
                 LEFT JOIN RESOLUCIONES resol ON ctaind.FTN_NSS =  resol.FTC_NSS
                 AND T.FTC_CVE_TIPO_SEG = resol.FTC_CVE_TIPO_SEG
-                AND T.FTC_CVE_TIPO_PEN = resol.FTC_SEC_PENSION
+                --AND T.FTC_CVE_TIPO_PEN = resol.FTC_SEC_PENSION
                 AND T.FTC_CVE_REGIMEN = resol.FTC_CVE_REGIMEN
                 AND T.FTC_TIPO_PRESTACION = resol.FTC_TIPO_PRESTACION
             WHERE L.TMC_DESC_ITGY IN ('T73', 'TNP', 'TPP', 'T97', 'TPR', 'TED', 'RJP', 'TRE', 'TJU', 'TEX', 'TGF', 'TPG', 'TRU', 'TIV')
