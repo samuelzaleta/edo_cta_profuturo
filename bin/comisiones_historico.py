@@ -236,6 +236,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
     df_insert = df_insert.withColumn("row_id", monotonically_increasing_id())
     df_insert = df_insert.filter(df_insert.row_id != 0)
     df_insert = df_insert.withColumn("FTF_MONTO_ACCIONES", col("FTF_MONTO_ACCIONES").cast(DecimalType(12, 6)))
+    df_insert = df_insert.drop(col("row_id"))
 
 
     _write_spark_dataframe(df_insert, configure_postgres_spark, '"HECHOS"."TTHECHOS_COMISION"')
