@@ -429,7 +429,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
     print(df_insert.printSchema())
     df_insert.show(2)
 
-    _write_spark_dataframe(df_insert, configure_postgres_spark_dev, '"HECHOS"."THHECHOS_SALDO_HISTORICO"')
+    _write_spark_dataframe(df_insert, configure_postgres_spark, '"HECHOS"."THHECHOS_SALDO_HISTORICO"')
 
     #to postgres
     print('Rows inserted:')
