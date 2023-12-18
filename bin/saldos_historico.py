@@ -1,6 +1,6 @@
 from profuturo.extraction import  _get_spark_session, read_table_insert_temp_view, _write_spark_dataframe
 from profuturo.common import define_extraction
-from profuturo.database import get_postgres_pool,configure_postgres_spark_dev
+from profuturo.database import get_postgres_pool,configure_postgres_spark
 from datetime import datetime as today
 from pyspark.sql.types import StringType,IntegerType, DateType, DecimalType, StructType, StructField,TimestampType, DoubleType, LongType
 from pyspark.sql.functions import col, monotonically_increasing_id, regexp_replace
