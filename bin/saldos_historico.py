@@ -32,13 +32,13 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
     query_tipo_sbcta =  "SELECT * FROM \"MAESTROS\".\"TCDATMAE_TIPO_SUBCUENTA_INTEGRITY_VAR\" "
 
     read_table_insert_temp_view(
-        configure_postgres_spark_dev,
+        configure_postgres_spark,
         query_tipo_siefore,
         "TIPOSIEROFE",
     )
 
     read_table_insert_temp_view(
-        configure_postgres_spark_dev,
+        configure_postgres_spark,
         query_tipo_sbcta,
         "TIPOSBCTA",
     )
