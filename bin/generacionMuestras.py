@@ -132,7 +132,6 @@ with define_extraction(phase, area, postgres_pool, bigquery_pool) as (postgres, 
         random = char1 + char2
         print(random)
         general_df = _create_spark_dataframe(spark, configure_postgres_spark, f"""
-        
         SELECT DISTINCT F."FCN_ID_GENERACION" AS "FTN_ID_GRUPO_SEGMENTACION",
                -- F."FCN_ID_GENERACION",
                'CANDADO' AS "FTC_CANDADO_APERTURA",
@@ -162,6 +161,7 @@ with define_extraction(phase, area, postgres_pool, bigquery_pool) as (postgres, 
                TP."FTN_MONTO_PEN" AS "FTN_PENSION_MENSUAL",
                --DT."MONTO_PESOS" AS "FTN_SALDO_TOTAL",
                FE."FTC_DESCRIPCION" AS "FTC_FORMATO",
+               IEC."FTC_DESCRIPCION" AS "FTC_TIPO_TRABAJADOR",
                :user AS "FTC_USUARIO_ALTA"
         FROM "GESTOR"."TTGESPRO_CONFIGURACION_FORMATO_ESTADO_CUENTA" F
             INNER JOIN "GESTOR"."TCGESPRO_FORMATO_ESTADO_CUENTA" FE ON F."FCN_ID_FORMATO_ESTADO_CUENTA" = FE."FTN_ID_FORMATO_ESTADO_CUENTA"
@@ -238,7 +238,7 @@ with define_extraction(phase, area, postgres_pool, bigquery_pool) as (postgres, 
                 INNER JOIN "GESTOR"."TCGESPRO_PERIODICIDAD" PR ON F."FCN_ID_PERIODICIDAD_REVERSO" = PR."FTN_ID_PERIODICIDAD"
                 INNER JOIN "GESTOR"."TCGESPRO_PERIODO" P ON P."FTN_ID_PERIODO" = :term
                 INNER JOIN "GESTOR"."TCGESPRO_MUESTRA" M ON P."FTN_ID_PERIODO" = M."FCN_ID_PERIODO"
-                {filter_reprocessed_samples}
+                --{filter_reprocessed_samples}
                 INNER JOIN "HECHOS"."TCHECHOS_CLIENTE" I
                     ON M."FCN_ID_PERIODO" = I."FCN_ID_PERIODO"
                    AND M."FCN_CUENTA" = I."FCN_CUENTA"
@@ -277,10 +277,17 @@ with define_extraction(phase, area, postgres_pool, bigquery_pool) as (postgres, 
                R."FTD_FEH_LIQUIDACION" AS "FTD_FECHA_MOVIMIENTO",
                MC."FTN_ID_MOVIMIENTO_CONSAR" AS "FTN_ID_CONCEPTO",
                MC."FTC_DESCRIPCION" AS "FTC_DESC_CONCEPTO",
-               NULL AS "FTC_PERIODO_REFERENCIA",
+               CASE
+               WHEN TRMC."FTB_FIJA" = true THEN TRMC."FTC_REFERENCIA_VARIABLE"
+               ELSE ''
+               END "FTC_PERIODO_REFERENCIA",
                sum(R."FTF_MONTO_PESOS") AS "FTN_MONTO",
-               0 AS "FTN_DIA_COTIZADO",
-               cast(0.0 as numeric) as "FTN_SALARIO_BASE",
+               CASE
+               WHEN MC."FTB_INTEGRACION_DIAS_COTIZADOS_SALARIO_BASE" THEN R."FTN_SUA_DIAS_COTZDOS_BIMESTRE"
+               END "FTN_DIA_COTIZADO",
+               CASE
+               WHEN MC."FTB_INTEGRACION_DIAS_COTIZADOS_SALARIO_BASE" THEN R."FTN_SUA_ULTIMO_SALARIO_INT_PER"
+               END "FTN_SALARIO_BASE",
                -- now() AS "FTD_FECHAHORA_ALTA",
                :user AS FTC_USUARIO_ALTA
         FROM "GESTOR"."TTGESPRO_CONFIGURACION_FORMATO_ESTADO_CUENTA" F
@@ -290,6 +297,7 @@ with define_extraction(phase, area, postgres_pool, bigquery_pool) as (postgres, 
             INNER JOIN "GESTOR"."TCGESPRO_PERIODO" T ON R."FCN_ID_PERIODO" = T."FTN_ID_PERIODO"
             INNER JOIN "GESTOR"."TTGESPRO_MOV_PROFUTURO_CONSAR" PC ON R."FCN_ID_CONCEPTO_MOVIMIENTO" = PC."FCN_ID_MOVIMIENTO_PROFUTURO"
             INNER JOIN "MAESTROS"."TCDATMAE_MOVIMIENTO_CONSAR" MC ON PC."FCN_ID_MOVIMIENTO_CONSAR" = MC."FTN_ID_MOVIMIENTO_CONSAR"
+            LEFT JOIN "GESTOR"."TCGESPRO_REFER_MOV_CONSAR"  TRMC ON MC."FCN_ID_REFERENCIA" = TRMC."FTN_ID_REFERENCIA"
             INNER JOIN "GESTOR"."TCGESPRO_PERIODO" PRD ON PRD."FTN_ID_PERIODO" = :term
         WHERE mod(extract(MONTH FROM to_date(T."FTC_PERIODO", 'MM/YYYY')), PG."FTN_MESES") = 0
           AND to_date(T."FTC_PERIODO", 'MM/YYYY') BETWEEN :start - INTERVAL '1 month' * (PG."FTN_MESES" - 1) AND :end
@@ -298,7 +306,12 @@ with define_extraction(phase, area, postgres_pool, bigquery_pool) as (postgres, 
                  F."FCN_ID_FORMATO_ESTADO_CUENTA",
                  R."FCN_CUENTA",
                  MC."FTN_ID_MOVIMIENTO_CONSAR",
-                 R."FTD_FEH_LIQUIDACION"
+                 MC."FTB_INTEGRACION_DIAS_COTIZADOS_SALARIO_BASE",
+                 R."FTN_SUA_DIAS_COTZDOS_BIMESTRE",
+                 R."FTN_SUA_ULTIMO_SALARIO_INT_PER",
+                 R."FTD_FEH_LIQUIDACION",
+                 TRMC."FTC_REFERENCIA_VARIABLE",
+                 TRMC."FTB_FIJA"
         """, {"term": term_id, "start": start_month, "end": end_month, "user": str(user)})
 
         # reverso_df = reverso_df.drop(col("PERIODO"))
