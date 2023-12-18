@@ -69,12 +69,12 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
         ) PT ON PT.FCN_ID_SUBPROCESO = X.FCN_ID_SUBPROCESO
         ), RESOLUCIONES AS (
         SELECT
-        resol.FTD_FEH_CRE,resol.FTN_NUM_CTA_INVDUAL, resol.FTD_FEH_INI_PEN,
+        resol.FTD_FEH_CRE,resol, resol.FTD_FEH_INI_PEN,
         resol.FTD_FEH_EMI_RES,resol.FTC_CVE_TIPO_SEG,resol.FTC_SEC_PENSION,
         resol.FTC_CVE_REGIMEN,resol.FTC_TIPO_PRESTACION, resol.FTC_NSS, resol.FTC_CURP
         FROM TTAFORETI_RESOLUCIONES resol
         WHERE resol.FTD_FEH_INI_PEN IS NOT NULL
-        AND (resol.FTD_FEH_CRE,resol.FTN_NUM_CTA_INVDUAL) IN (SELECT MAX( resol.FTD_FEH_CRE),resol.FTN_NUM_CTA_INVDUAL FROM TTAFORETI_RESOLUCIONES resol GROUP BY resol.FTN_NUM_CTA_INVDUAL)
+        AND (resol.FTD_FEH_CRE,resol.FTC_NSS) IN (SELECT MAX( resol.FTD_FEH_CRE),resol.FTC_NSS FROM TTAFORETI_RESOLUCIONES resol GROUP BY resol.FTC_NSS)
         )
         , DIS_TRANS AS (
         SELECT ROW_NUMBER() OVER (PARTITION BY FCN_CUENTA,FTC_FOLIO ORDER BY FTD_FEH_CRE DESC) rown,
@@ -96,7 +96,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                 LEFT JOIN TTAFOGRAL_CTA_INVDUAL ctaind ON L.FTN_NUM_CTA_INVDUAL = ctaind.FTN_NUM_CTA_INVDUAL
                 LEFT JOIN RESOLUCIONES resol ON ctaind.FTN_NSS =  resol.FTC_NSS
                 AND T.FTC_CVE_TIPO_SEG = resol.FTC_CVE_TIPO_SEG
-                --AND T.FTC_CVE_TIPO_PEN = resol.FTC_SEC_PENSION
+                AND T.FTC_CVE_TIPO_PEN = resol.FTC_SEC_PENSION
                 AND T.FTC_CVE_REGIMEN = resol.FTC_CVE_REGIMEN
                 AND T.FTC_TIPO_PRESTACION = resol.FTC_TIPO_PRESTACION
             WHERE L.TMC_DESC_ITGY IN ('T73', 'TNP', 'TPP', 'T97', 'TPR', 'TED', 'RJP', 'TRE', 'TJU', 'TEX', 'TGF', 'TPG', 'TRU', 'TIV')
