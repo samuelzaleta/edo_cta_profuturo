@@ -298,11 +298,9 @@ with define_extraction(phase, area, postgres_pool, bigquery_pool) as (postgres, 
             INNER JOIN "GESTOR"."TTGESPRO_MOV_PROFUTURO_CONSAR" PC ON R."FCN_ID_CONCEPTO_MOVIMIENTO" = PC."FCN_ID_MOVIMIENTO_PROFUTURO"
             INNER JOIN "MAESTROS"."TCDATMAE_MOVIMIENTO_CONSAR" MC ON PC."FCN_ID_MOVIMIENTO_CONSAR" = MC."FTN_ID_MOVIMIENTO_CONSAR"
             LEFT JOIN "GESTOR"."TCGESPRO_REFER_MOV_CONSAR"  TRMC ON MC."FCN_ID_REFERENCIA" = TRMC."FTN_ID_REFERENCIA"
-            INNER JOIN "GESTOR"."TCGESPRO_PERIODO" PRD ON PRD."FTN_ID_PERIODO" = :term
-        WHERE mod(extract(MONTH FROM to_date(T."FTC_PERIODO", 'MM/YYYY')), PG."FTN_MESES") = 0
-          AND to_date(T."FTC_PERIODO", 'MM/YYYY') BETWEEN :start - INTERVAL '1 month' * (PG."FTN_MESES" - 1) AND :end
+        WHERE --mod(extract(MONTH FROM to_date(T."FTC_PERIODO", 'MM/YYYY')), PG."FTN_MESES") = 0 AND
+            to_date(T."FTC_PERIODO", 'MM/YYYY') BETWEEN :start - INTERVAL '4 month' * (PG."FTN_MESES" - 1) AND :end
         GROUP BY F."FCN_ID_FORMATO_ESTADO_CUENTA",
-                 PRD."FTC_PERIODO",
                  F."FCN_ID_FORMATO_ESTADO_CUENTA",
                  R."FCN_CUENTA",
                  MC."FTN_ID_MOVIMIENTO_CONSAR",
