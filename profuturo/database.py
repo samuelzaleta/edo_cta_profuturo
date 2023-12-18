@@ -217,6 +217,18 @@ def configure_jdbc_spark(connection: SparkConnection, table: str, reading: bool)
     return connection .format("jdbc")
 
 
+def configure_parquet_spark(connection: SparkConnection, filename: str, _: bool) -> SparkConnection:
+    return connection \
+        .format("parquet") \
+        .option("path", filename)
+
+
+def configure_avro_spark(connection: SparkConnection, filename: str, _: bool) -> SparkConnection:
+    return connection \
+        .format("avro") \
+        .option("path", filename)
+
+
 def get_mit_url():
     host = os.getenv("MIT_HOST")
     port = int(os.getenv("MIT_PORT"))
