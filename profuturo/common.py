@@ -3,9 +3,9 @@ from sqlalchemy.engine import Engine, Connection
 from sqlalchemy import text, delete, column, table, literal
 from datetime import time, timedelta
 from contextlib import contextmanager
-from dotenv import load_dotenv
 from typing import Union
 from .database import use_pools
+from .env import load_env
 from .exceptions import ProfuturoException
 from .extraction import _get_spark_session
 
@@ -15,7 +15,7 @@ def define_extraction(phase: int, area: int, main_pool: Engine, *pools: Engine):
     spark = _get_spark_session()
     gw = spark.sparkContext._gateway
 
-    load_dotenv()
+    load_env()
     java_import(gw.jvm, "org.profuturo.rdb.RdbDialect")
     gw.jvm.org.apache.spark.sql.jdbc.JdbcDialects.registerDialect(gw.jvm.org.profuturo.rdb.RdbDialect())
 

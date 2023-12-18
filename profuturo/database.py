@@ -164,7 +164,7 @@ def configure_integrity_spark(database: str) -> SparkConnectionConfigurator:
         password = os.getenv("INTEGRITY_PASSWORD")
 
         return configure_jdbc_spark(connection, table, reading) \
-            .option("url", f"jdbc:rdbThin://130.40.30.144:1730/MEXICO$BASE:CIERREN@transaction=readonly") \
+            .option("url", f"jdbc:rdbThin://{host}:{port}/mexico$base:{database}@transaction=readonly") \
             .option("driver", "oracle.rdb.jdbc.rdbThin.Driver") \
             .option("oracle.jdbc.timezoneAsRegion", False) \
             .option("user", user) \
@@ -172,7 +172,7 @@ def configure_integrity_spark(database: str) -> SparkConnectionConfigurator:
 
     return creator
 
-#.option("url", f"jdbc:rdbThin://{host}:{port}/mexico$base:{database}@transaction=readonly") \
+
 def configure_postgres_spark(connection: SparkConnection, table: str, reading: bool) -> SparkConnection:
     host = os.getenv("POSTGRES_HOST")
     port = int(os.getenv("POSTGRES_PORT"))
@@ -215,6 +215,18 @@ def configure_jdbc_spark(connection: SparkConnection, table: str, reading: bool)
             .option("dbtable", table)
 
     return connection .format("jdbc")
+
+
+def configure_parquet_spark(connection: SparkConnection, filename: str, _: bool) -> SparkConnection:
+    return connection \
+        .format("parquet") \
+        .option("path", filename)
+
+
+def configure_avro_spark(connection: SparkConnection, filename: str, _: bool) -> SparkConnection:
+    return connection \
+        .format("avro") \
+        .option("path", filename)
 
 
 def get_mit_url():

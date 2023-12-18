@@ -388,20 +388,24 @@ def _get_spark_session() -> SparkSession:
         .getOrCreate()
 
 
-def _create_spark_dataframe(spark: SparkSession, connection_configurator, query: str, params: Dict[str, Any]) -> SparkDataFrame:
+def _create_spark_dataframe(
+    spark: SparkSession,
+    connection_configurator: SparkConnectionConfigurator,
+    query: str,
+    params: Dict[str, Any],
+) -> SparkDataFrame:
     return connection_configurator(spark.read, _replace_query_params(query, params), True) \
         .load()
 
 
-def _write_spark_dataframe(df: SparkDataFrame, connection_configurator, table: str) -> None:
+def _write_spark_dataframe(
+    df: SparkDataFrame,
+    connection_configurator: SparkConnectionConfigurator,
+    table: str,
+    mode="append",
+) -> None:
     connection_configurator(df.write, table, False) \
-        .mode("append") \
-        .save()
-
-
-def _write_spark_dataframe_overwrite(df: SparkDataFrame, connection_configurator, table: str) -> None:
-    connection_configurator(df.write, table, False) \
-        .mode("overwrite") \
+        .mode(mode) \
         .save()
 
 

@@ -1,7 +1,8 @@
 from profuturo.common import truncate_table, notify, register_time, define_extraction
 from profuturo.database import get_postgres_pool, configure_mit_spark, configure_postgres_spark
-from profuturo.extraction import extract_terms, extract_dataset_spark
+from profuturo.extraction import extract_terms, _get_spark_session, read_table_insert_temp_view, _write_spark_dataframe, extract_dataset_spark
 from profuturo.reporters import HtmlReporter
+from pyspark.sql.functions import col, lit
 import sys
 from datetime import datetime
 
@@ -18,6 +19,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
     time_period = term["time_period"]
     print(term_id)
     end_month = term["end_month"]
+    spark = _get_spark_session()
 
     with register_time(postgres_pool, phase, term_id, user, area):
         # Extracción
@@ -71,6 +73,77 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
             params={"date": end_month, "type": "F"},
         )
 
+        truncate_table(postgres, 'TTCALCUL_BONO', term=term_id)
+
+        query_dias_rend_bono = """
+                SELECT RB.FTN_NUM_CTA_INVDUAL, RB.FTD_FEH_VALOR AS FTD_FECHA_REDENCION_BONO,
+                CAST(EXTRACT(DAY FROM RB.FTD_FEH_VALOR - TRUNC(:end)) AS INTEGER) AS DIAS_PLAZO_NATURALES
+                FROM TTAFOGRAL_OP_INVDUAL RB
+                WHERE (RB.FTN_NUM_CTA_INVDUAL, RB.FTD_FEH_VALOR) IN (
+                                        SELECT FTN_NUM_CTA_INVDUAL,
+                                               MAX(FTD_FEH_VALOR)
+                                        FROM TTAFOGRAL_OP_INVDUAL
+                                        GROUP BY FTN_NUM_CTA_INVDUAL)
+                """
+
+        query_vector = """
+                SELECT FTN_PLAZO, FTN_FACTOR FROM TTAFOGRAL_VECTOR
+                """
+
+        query_saldos = """
+                SELECT "FCN_CUENTA", "FTF_DIA_ACCIONES", "FTF_SALDO_DIA"
+                FROM "HECHOS"."THHECHOS_SALDO_HISTORICO"
+                WHERE "FCN_ID_PERIODO" = :term
+                and "FCN_ID_TIPO_SUBCTA"  = 14
+                """
+
+        read_table_insert_temp_view(
+            configure_mit_spark,
+            query_dias_rend_bono,
+            "DIAS_REDENCION",
+            params={"end": end_month}
+        )
+
+        read_table_insert_temp_view(
+            configure_mit_spark,
+            query_vector,
+            "VECTOR",
+            params={"end": end_month}
+        )
+
+        read_table_insert_temp_view(
+            configure_postgres_spark,
+            query_saldos,
+            "SALDOS",
+            params={"term": term_id}
+        )
+
+        df = spark.sql("""
+                    SELECT 
+                    S.FCN_CUENTA,
+                    ROUND(S.FTF_DIA_ACCIONES,6) AS FTF_BON_NOM_ACC, 
+                    ROUND(S.FTF_SALDO_DIA,2) AS FTF_BON_NOM_PES,
+                    COALESCE(CASE 
+                    WHEN S.FTF_DIA_ACCIONES > 0 THEN ROUND(S.FTF_DIA_ACCIONES * X.FTN_FACTOR,6) END, 0) FTF_BON_ACT_ACC,
+                    COALESCE(CASE 
+                    WHEN S.FTF_SALDO_DIA > 0 THEN ROUND(S.FTF_SALDO_DIA * X.FTN_FACTOR,2) END, 0) FTF_BON_ACT_PES,
+                    FTD_FECHA_REDENCION_BONO AS FTD_FEC_RED_BONO,
+                    FTN_FACTOR
+                    FROM (SELECT 
+                            DR.FTN_NUM_CTA_INVDUAL,DR.FTD_FECHA_REDENCION_BONO,
+                            DR.DIAS_PLAZO_NATURALES, VT.FTN_FACTOR
+                            FROM DIAS_REDENCION DR
+                                INNER JOIN VECTOR VT
+                                ON VT.FTN_PLAZO = DR.DIAS_PLAZO_NATURALES
+                        ) X
+                            INNER JOIN SALDOS S 
+                            ON X.FTN_NUM_CTA_INVDUAL = S.FCN_CUENTA
+                """)
+
+        df = df.withColumn("FCN_ID_PERIODO", lit(term_id))
+
+        _write_spark_dataframe(df, configure_postgres_spark, '"HECHOS"."TTCALCUL_BONO"')
+
         # Cifras de control
         report1 = html_reporter.generate(
             postgres,
@@ -97,6 +170,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
             ["Saldo final en pesos", "Saldo final en acciones"],
             params={"term": term_id},
         )
+
         report2 = html_reporter.generate(
             postgres,
             """

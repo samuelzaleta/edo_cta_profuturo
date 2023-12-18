@@ -1,6 +1,6 @@
 from profuturo.common import register_time, define_extraction, notify, truncate_table
 from profuturo.database import get_postgres_pool, configure_buc_spark, configure_mit_spark, configure_postgres_spark
-from profuturo.extraction import _get_spark_session, _write_spark_dataframe, read_table_insert_temp_view
+from profuturo.extraction import _get_spark_session, _write_spark_dataframe, read_table_insert_temp_view, extract_dataset_spark
 from profuturo.reporters import HtmlReporter
 from profuturo.extraction import extract_terms
 from datetime import datetime
@@ -248,6 +248,36 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
         df.show(2)
         df = df.dropDuplicates(["FCN_CUENTA"])
         _write_spark_dataframe(df, configure_postgres_spark, '"HECHOS"."TCHECHOS_CLIENTE"')
+
+        query_pension = """
+                SELECT
+                PG.FTN_NUM_CTA_INVDUAL AS FCN_CUENTA,
+                CASE
+                WHEN PG.FCN_ID_SUBPROCESO = 310 THEN 'PENSIÓN MÍNIMA GARANTIZADA ISSSTE'
+                    ELSE 'PENSIÓN MÍNIMA GARANTIZADA IMSS'
+                    END FTC_TIPO_PENSION,
+                SUM(PGS.FTN_MONTO_PESOS) AS FTN_MONTO_PEN
+                FROM BENEFICIOS.TTCRXGRAL_PAGO PG
+                    INNER JOIN BENEFICIOS.TTCRXGRAL_PAGO_SUBCTA PGS
+                    ON PGS.FTC_FOLIO = PG.FTC_FOLIO AND PGS.FTC_FOLIO_LIQUIDACION = PG.FTC_FOLIO_LIQUIDACION
+                    INNER JOIN BENEFICIOS.TTAFORETI_TRAMITE TR
+                    ON TR.FTN_FOLIO_TRAMITE = PG.FTN_FOLIO_TRAMITE
+                WHERE PG.FCN_ID_PROCESO IN (4050,4051)
+                        AND PG.FCN_ID_SUBPROCESO IN (309, 310)
+                        AND PGS.FCN_ID_TIPO_SUBCTA NOT IN (15,16,17,18)
+                        AND TRUNC(PG.FTD_FEH_LIQUIDACION) <= :end
+                GROUP BY
+                PG.FTN_NUM_CTA_INVDUAL,PG.FCN_ID_SUBPROCESO
+                """
+
+        truncate_table(postgres, "TCDATMAE_PENSION", term=term_id)
+        extract_dataset_spark(
+            configure_mit_spark,
+            configure_postgres_spark,
+            query_pension,
+            '"MAESTROS"."TCDATMAE_PENSION"',
+            params={"end": end_month, "type": "F"},
+        )
 
         # Cifras de control
         report = html_reporter.generate(
