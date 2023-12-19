@@ -67,7 +67,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
     hoy = today.today()
     print(inicio, hoy)
 
-    saldosDFfile = spark.read.text("gs://dataproc-spark-dev/SALDOSTDF_PESOS_202203.TXT")
+    saldosDFfile = spark.read.text("gs://dataproc-spark-dev/SALDOSTDF_PESOS_202203_muestra.TXT")
 
     saldosDFfile.show(2)
 
@@ -77,44 +77,44 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                 .withColumn("cuenta", saldosDFfile["value"][7:10]) \
                 .withColumn("service", saldosDFfile["value"][17:1]) \
                 .withColumn("SAL_SALD_SIEFORE", saldosDFfile["value"][18:2]) \
-                .withColumn("SAL_SALD_RETS", saldosDFfile["value"][20:19]) \
-                .withColumn("SAL_SALD_RET8S", saldosDFfile["value"][40:19]) \
-                .withColumn("SAL-SALD-CYVS", saldosDFfile["value"][60:19]) \
-                .withColumn("SAL-SALD-CYVTS", saldosDFfile["value"][80:19]) \
-                .withColumn("SAL-SALD-CSOS", saldosDFfile["value"][100:19]) \
-                .withColumn("SAL-SALD-ESTS", saldosDFfile["value"][120:19]) \
-                .withColumn("SAL-SALD-ESPS", saldosDFfile["value"][140:19]) \
-                .withColumn("SAL-SALD-CRES", saldosDFfile["value"][160:19]) \
-                .withColumn("SAL-SALD-CREDS", saldosDFfile["value"][180:19]) \
-                .withColumn("SAL-SALD-SARS", saldosDFfile["value"][200:19]) \
-                .withColumn("SAL-SALD-AVDS", saldosDFfile["value"][220:19]) \
-                .withColumn("SAL-SALD-AVPS", saldosDFfile["value"][240:19]) \
-                .withColumn("SAL-SALD-AVES", saldosDFfile["value"][260:19]) \
-                .withColumn("SAL-SALD-ALPS", saldosDFfile["value"][280:19]) \
-                .withColumn("SAL-SALD-ALPDS", saldosDFfile["value"][300:19]) \
-                .withColumn("SAL-SALD-ALPES", saldosDFfile["value"][320:19]) \
-                .withColumn("SAL-SALD-SDOV92", saldosDFfile["value"][340:19]) \
-                .withColumn("SAL-SALD-SDOV97", saldosDFfile["value"][360:19]) \
-                .withColumn("SAL-SALD-SDOBUD", saldosDFfile["value"][380:19]) \
-                .withColumn("SAL_SALD_RETS_PESOS", saldosDFfile["value"][400:19]) \
-                .withColumn("SAL_SALD_RET8S_PESOS", saldosDFfile["value"][420:19]) \
-                .withColumn("SAL-SALD-CYVS_PESOS", saldosDFfile["value"][440:19]) \
-                .withColumn("SAL-SALD-CYVTS_PESOS", saldosDFfile["value"][460:19]) \
-                .withColumn("SAL-SALD-CSOS_PESOS", saldosDFfile["value"][480:19]) \
-                .withColumn("SAL-SALD-ESTS_PESOS", saldosDFfile["value"][500:19]) \
-                .withColumn("SAL-SALD-ESPS_PESOS", saldosDFfile["value"][520:19]) \
-                .withColumn("SAL-SALD-CRES_PESOS", saldosDFfile["value"][540:19]) \
-                .withColumn("SAL-SALD-CREDS_PESOS", saldosDFfile["value"][560:19]) \
-                .withColumn("SAL-SALD-SARS_PESOS", saldosDFfile["value"][580:19]) \
-                .withColumn("SAL-SALD-AVDS_PESOS", saldosDFfile["value"][600:19]) \
-                .withColumn("SAL-SALD-AVPS_PESOS", saldosDFfile["value"][620:19]) \
-                .withColumn("SAL-SALD-AVES_PESOS", saldosDFfile["value"][640:19]) \
-                .withColumn("SAL-SALD-ALPS_PESOS", saldosDFfile["value"][660:19]) \
-                .withColumn("SAL-SALD-ALPDS_PESOS", saldosDFfile["value"][680:19]) \
-                .withColumn("SAL-SALD-ALPES_PESOS", saldosDFfile["value"][700:19]) \
-                .withColumn("SAL-SALD-SDOV92_PESOS", saldosDFfile["value"][720:19]) \
-                .withColumn("SAL-SALD-SDOV97_PESOS", saldosDFfile["value"][740:19]) \
-                .withColumn("SAL-SALD-SDOBUD_PESOS", saldosDFfile["value"][760:19]) \
+                .withColumn("SAL_SALD_RETS", saldosDFfile["value"][20:20]) \
+                .withColumn("SAL_SALD_RET8S", saldosDFfile["value"][40:20]) \
+                .withColumn("SAL-SALD-CYVS", saldosDFfile["value"][60:20]) \
+                .withColumn("SAL-SALD-CYVTS", saldosDFfile["value"][80:20]) \
+                .withColumn("SAL-SALD-CSOS", saldosDFfile["value"][100:20]) \
+                .withColumn("SAL-SALD-ESTS", saldosDFfile["value"][120:20]) \
+                .withColumn("SAL-SALD-ESPS", saldosDFfile["value"][140:20]) \
+                .withColumn("SAL-SALD-CRES", saldosDFfile["value"][160:20]) \
+                .withColumn("SAL-SALD-CREDS", saldosDFfile["value"][180:20]) \
+                .withColumn("SAL-SALD-SARS", saldosDFfile["value"][200:20]) \
+                .withColumn("SAL-SALD-AVDS", saldosDFfile["value"][220:20]) \
+                .withColumn("SAL-SALD-AVPS", saldosDFfile["value"][240:20]) \
+                .withColumn("SAL-SALD-AVES", saldosDFfile["value"][260:20]) \
+                .withColumn("SAL-SALD-ALPS", saldosDFfile["value"][280:20]) \
+                .withColumn("SAL-SALD-ALPDS", saldosDFfile["value"][300:20]) \
+                .withColumn("SAL-SALD-ALPES", saldosDFfile["value"][320:20]) \
+                .withColumn("SAL-SALD-SDOV92", saldosDFfile["value"][340:20]) \
+                .withColumn("SAL-SALD-SDOV97", saldosDFfile["value"][360:20]) \
+                .withColumn("SAL-SALD-SDOBUD", saldosDFfile["value"][380:20]) \
+                .withColumn("SAL_SALD_RETS_PESOS", saldosDFfile["value"][400:20]) \
+                .withColumn("SAL_SALD_RET8S_PESOS", saldosDFfile["value"][420:20]) \
+                .withColumn("SAL-SALD-CYVS_PESOS", saldosDFfile["value"][440:20]) \
+                .withColumn("SAL-SALD-CYVTS_PESOS", saldosDFfile["value"][460:20]) \
+                .withColumn("SAL-SALD-CSOS_PESOS", saldosDFfile["value"][480:20]) \
+                .withColumn("SAL-SALD-ESTS_PESOS", saldosDFfile["value"][500:20]) \
+                .withColumn("SAL-SALD-ESPS_PESOS", saldosDFfile["value"][520:20]) \
+                .withColumn("SAL-SALD-CRES_PESOS", saldosDFfile["value"][540:20]) \
+                .withColumn("SAL-SALD-CREDS_PESOS", saldosDFfile["value"][560:20]) \
+                .withColumn("SAL-SALD-SARS_PESOS", saldosDFfile["value"][580:20]) \
+                .withColumn("SAL-SALD-AVDS_PESOS", saldosDFfile["value"][600:20]) \
+                .withColumn("SAL-SALD-AVPS_PESOS", saldosDFfile["value"][620:20]) \
+                .withColumn("SAL-SALD-AVES_PESOS", saldosDFfile["value"][640:20]) \
+                .withColumn("SAL-SALD-ALPS_PESOS", saldosDFfile["value"][660:20]) \
+                .withColumn("SAL-SALD-ALPDS_PESOS", saldosDFfile["value"][680:20]) \
+                .withColumn("SAL-SALD-ALPES_PESOS", saldosDFfile["value"][700:20]) \
+                .withColumn("SAL-SALD-SDOV92_PESOS", saldosDFfile["value"][720:20]) \
+                .withColumn("SAL-SALD-SDOV97_PESOS", saldosDFfile["value"][740:20]) \
+                .withColumn("SAL-SALD-SDOBUD_PESOS", saldosDFfile["value"][760:20]) \
                 .withColumn("TIPO_CAMBIO", saldosDFfile["value"][780:4])
 
     saldosDFfile2 = saldosDFfile2.withColumn("SAL_SALD_RETS", regexp_replace("SAL_SALD_RETS", ' ', ''))\
@@ -186,6 +186,9 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
             resuSiefore = listaSieforeDF[listaSieforeDF['fcn_code_integrity'].astype(int) == int(df['SAL_SALD_SIEFORE'])]
             id_resuSiefore = resuSiefore['fcn_id_siefore'].values
 
+            if c==0:
+                data.append((1,1,float(0.0),1,1,fecha_liquida, feh_accion, 'F',float(0.0),hoy,v_historico))
+
             # Busqueda de subcuenta
             if float(df['SAL_SALD_RETS']) > 0 or float(df['SAL_SALD_RETS']) < 0:
                 var = 'SAL-SALD-RETS'
@@ -193,8 +196,8 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                             listaSubctaDF['fcc_registro'].astype(int) == int(df['service']))]
                 id_postgres = resuSbcta['id_tipo_sbcta'].values
 
-                data.append((int(df['cuenta']), int(df['periodo']), Decimal(df['SAL_SALD_RETS']), int(id_resuSiefore[0]),
-                             int(id_postgres[0]), fecha_liquida, feh_accion, 'F', Decimal(df['SAL_SALD_RETS_PESOS']), hoy,
+                data.append((int(df['cuenta']), int(df['periodo']), float(df['SAL_SALD_RETS']), int(id_resuSiefore[0]),
+                             int(id_postgres[0]), fecha_liquida, feh_accion, 'F', float(df['SAL_SALD_RETS_PESOS']), hoy,
                              v_historico))
                 c += 1
 
@@ -204,9 +207,9 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                 resuSbcta = listaSubctaDF[(listaSubctaDF['fcc_var_integrity'] == var) & (
                             listaSubctaDF['fcc_registro'].astype(int) == int(df['service']))]
                 id_postgres = resuSbcta['id_tipo_sbcta'].values
-                data.append((int(df['cuenta']), int(df['periodo']), Decimal(str(df['SAL_SALD_RET8S']).replace(' ', '')),
+                data.append((int(df['cuenta']), int(df['periodo']), float(str(df['SAL_SALD_RET8S']).replace(' ', '')),
                              int(id_resuSiefore[0]), int(id_postgres[0]), fecha_liquida, feh_accion, 'F',
-                             Decimal(str(df['SAL_SALD_RET8S_PESOS']).replace(' ', '')), hoy, v_historico))
+                             float(str(df['SAL_SALD_RET8S_PESOS']).replace(' ', '')), hoy, v_historico))
                 c += 1
 
             if float(df['SAL-SALD-CYVS']) > 0 or float(df['SAL-SALD-CYVS']) < 0:
@@ -214,8 +217,8 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                 resuSbcta = listaSubctaDF[(listaSubctaDF['fcc_var_integrity'] == var) & (
                             listaSubctaDF['fcc_registro'].astype(int) == int(df['service']))]
                 id_postgres = resuSbcta['id_tipo_sbcta'].values
-                data.append((int(df['cuenta']), int(df['periodo']), Decimal(df['SAL-SALD-CYVS']), int(id_resuSiefore[0]),
-                             int(id_postgres[0]), fecha_liquida, feh_accion, 'F', Decimal(df['SAL-SALD-CYVS_PESOS']), hoy,
+                data.append((int(df['cuenta']), int(df['periodo']), float(df['SAL-SALD-CYVS']), int(id_resuSiefore[0]),
+                             int(id_postgres[0]), fecha_liquida, feh_accion, 'F', float(df['SAL-SALD-CYVS_PESOS']), hoy,
                              v_historico))
                 c += 1
 
@@ -228,8 +231,8 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                 resuSbcta = listaSubctaDF[(listaSubctaDF['fcc_var_integrity'] == var) & (
                             listaSubctaDF['fcc_registro'].astype(int) == int(df['service']))]
                 id_postgres = resuSbcta['id_tipo_sbcta'].values
-                data.append((int(df['cuenta']), int(df['periodo']), Decimal(df['SAL-SALD-CYVTS']), int(id_resuSiefore[0]),
-                             int(id_postgres[0]), fecha_liquida, feh_accion, 'F', Decimal(df['SAL-SALD-CYVTS_PESOS']),
+                data.append((int(df['cuenta']), int(df['periodo']), float(df['SAL-SALD-CYVTS']), int(id_resuSiefore[0]),
+                             int(id_postgres[0]), fecha_liquida, feh_accion, 'F', float(df['SAL-SALD-CYVTS_PESOS']),
                              hoy, v_historico))
                 c += 1
 
@@ -238,8 +241,8 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                 resuSbcta = listaSubctaDF[(listaSubctaDF['fcc_var_integrity'] == var) & (
                             listaSubctaDF['fcc_registro'].astype(int) == int(df['service']))]
                 id_postgres = resuSbcta['id_tipo_sbcta'].values
-                data.append((int(df['cuenta']), int(df['periodo']), Decimal(df['SAL-SALD-CSOS']), int(id_resuSiefore[0]),
-                             int(id_postgres[0]), fecha_liquida, feh_accion, 'F', Decimal(df['SAL-SALD-CSOS_PESOS']), hoy,
+                data.append((int(df['cuenta']), int(df['periodo']), float(df['SAL-SALD-CSOS']), int(id_resuSiefore[0]),
+                             int(id_postgres[0]), fecha_liquida, feh_accion, 'F', float(df['SAL-SALD-CSOS_PESOS']), hoy,
                              v_historico))
                 c += 1
 
@@ -248,8 +251,8 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                 resuSbcta = listaSubctaDF[(listaSubctaDF['fcc_var_integrity'] == var) & (
                             listaSubctaDF['fcc_registro'].astype(int) == int(df['service']))]
                 id_postgres = resuSbcta['id_tipo_sbcta'].values
-                data.append((int(df['cuenta']), int(df['periodo']), Decimal(df['SAL-SALD-ESTS']), int(id_resuSiefore[0]),
-                             int(id_postgres[0]), fecha_liquida, feh_accion, 'F', Decimal(df['SAL-SALD-ESTS_PESOS']), hoy,
+                data.append((int(df['cuenta']), int(df['periodo']), float(df['SAL-SALD-ESTS']), int(id_resuSiefore[0]),
+                             int(id_postgres[0]), fecha_liquida, feh_accion, 'F', float(df['SAL-SALD-ESTS_PESOS']), hoy,
                              v_historico))
                 c += 1
 
@@ -258,8 +261,8 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                 resuSbcta = listaSubctaDF[(listaSubctaDF['fcc_var_integrity'] == var) & (
                             listaSubctaDF['fcc_registro'].astype(int) == int(df['service']))]
                 id_postgres = resuSbcta['id_tipo_sbcta'].values
-                data.append((int(df['cuenta']), int(df['periodo']), Decimal(df['SAL-SALD-ESPS']), int(id_resuSiefore[0]),
-                             int(id_postgres[0]), fecha_liquida, feh_accion, 'F', Decimal(df['SAL-SALD-ESPS_PESOS']), hoy,
+                data.append((int(df['cuenta']), int(df['periodo']), float(df['SAL-SALD-ESPS']), int(id_resuSiefore[0]),
+                             int(id_postgres[0]), fecha_liquida, feh_accion, 'F', float(df['SAL-SALD-ESPS_PESOS']), hoy,
                              v_historico))
                 c += 1
 
@@ -268,8 +271,8 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                 resuSbcta = listaSubctaDF[(listaSubctaDF['fcc_var_integrity'] == var) & (
                             listaSubctaDF['fcc_registro'].astype(int) == int(df['service']))]
                 id_postgres = resuSbcta['id_tipo_sbcta'].values
-                data.append((int(df['cuenta']), int(df['periodo']), Decimal(df['SAL-SALD-CRES']), int(id_resuSiefore[0]),
-                             int(id_postgres[0]), fecha_liquida, feh_accion, 'F', Decimal(df['SAL-SALD-CRES_PESOS']), hoy,
+                data.append((int(df['cuenta']), int(df['periodo']), float(df['SAL-SALD-CRES']), int(id_resuSiefore[0]),
+                             int(id_postgres[0]), fecha_liquida, feh_accion, 'F', float(df['SAL-SALD-CRES_PESOS']), hoy,
                              v_historico))
                 c += 1
 
@@ -279,9 +282,9 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                             listaSubctaDF['fcc_registro'].astype(int) == int(df['service']))]
                 id_postgres = resuSbcta['id_tipo_sbcta'].values
                 if id_resuSiefore:
-                    data.append((int(df['cuenta']), int(df['periodo']), Decimal(df['SAL-SALD-CREDS']),
+                    data.append((int(df['cuenta']), int(df['periodo']), float(df['SAL-SALD-CREDS']),
                                  int(id_resuSiefore[0]), int(id_postgres[0]), fecha_liquida, feh_accion, 'F',
-                                 Decimal(df['SAL-SALD-CREDS_PESOS']), hoy, v_historico))
+                                 float(df['SAL-SALD-CREDS_PESOS']), hoy, v_historico))
                     c += 1
                 else:
                     print('no subcta' + cuenta + ' - serv' + str(df['service']))
@@ -291,8 +294,8 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                 resuSbcta = listaSubctaDF[(listaSubctaDF['fcc_var_integrity'] == var) & (
                             listaSubctaDF['fcc_registro'].astype(int) == int(df['service']))]
                 id_postgres = resuSbcta['id_tipo_sbcta'].values
-                data.append((int(df['cuenta']), int(df['periodo']), Decimal(df['SAL-SALD-SARS']), int(id_resuSiefore[0]),
-                             int(id_postgres[0]), fecha_liquida, feh_accion, 'F', Decimal(df['SAL-SALD-SARS_PESOS']), hoy,
+                data.append((int(df['cuenta']), int(df['periodo']), float(df['SAL-SALD-SARS']), int(id_resuSiefore[0]),
+                             int(id_postgres[0]), fecha_liquida, feh_accion, 'F', float(df['SAL-SALD-SARS_PESOS']), hoy,
                              v_historico))
                 c += 1
 
@@ -301,8 +304,8 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                 resuSbcta = listaSubctaDF[(listaSubctaDF['fcc_var_integrity'] == var) & (
                             listaSubctaDF['fcc_registro'].astype(int) == int(df['service']))]
                 id_postgres = resuSbcta['id_tipo_sbcta'].values
-                data.append((int(df['cuenta']), int(df['periodo']), Decimal(df['SAL-SALD-AVDS']), int(id_resuSiefore[0]),
-                             int(id_postgres[0]), fecha_liquida, feh_accion, 'F', Decimal(df['SAL-SALD-AVDS_PESOS']), hoy,
+                data.append((int(df['cuenta']), int(df['periodo']), float(df['SAL-SALD-AVDS']), int(id_resuSiefore[0]),
+                             int(id_postgres[0]), fecha_liquida, feh_accion, 'F', float(df['SAL-SALD-AVDS_PESOS']), hoy,
                              v_historico))
                 c += 1
 
@@ -311,8 +314,8 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                 resuSbcta = listaSubctaDF[(listaSubctaDF['fcc_var_integrity'] == var) & (
                             listaSubctaDF['fcc_registro'].astype(int) == int(df['service']))]
                 id_postgres = resuSbcta['id_tipo_sbcta'].values
-                data.append((int(df['cuenta']), int(df['periodo']), Decimal(df['SAL-SALD-AVPS']), int(id_resuSiefore[0]),
-                             int(id_postgres[0]), fecha_liquida, feh_accion, 'F', Decimal(df['SAL-SALD-AVPS_PESOS']), hoy,
+                data.append((int(df['cuenta']), int(df['periodo']), float(df['SAL-SALD-AVPS']), int(id_resuSiefore[0]),
+                             int(id_postgres[0]), fecha_liquida, feh_accion, 'F', float(df['SAL-SALD-AVPS_PESOS']), hoy,
                              v_historico))
                 c += 1
 
@@ -321,7 +324,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                 resuSbcta = listaSubctaDF[(listaSubctaDF['fcc_var_integrity'] == var) & (
                             listaSubctaDF['fcc_registro'].astype(int) == int(df['service']))]
                 id_postgres = resuSbcta['id_tipo_sbcta'].values
-                # data.append((int(df['cuenta']),int(df['periodo']),Decimal(df['SAL-SALD-AVES']),int(id_resuSiefore[0]),int(id_postgres[0]),fecha_liquida,feh_accion,'F',float(df['SAL-SALD-AVES']),hoy,None))
+                # data.append((int(df['cuenta']),int(df['periodo']),float(df['SAL-SALD-AVES']),int(id_resuSiefore[0]),int(id_postgres[0]),fecha_liquida,feh_accion,'F',float(df['SAL-SALD-AVES']),hoy,None))
                 c += 1
 
             if float(df['SAL-SALD-ALPS']) > 0 or float(df['SAL-SALD-ALPS']) < 0:
@@ -329,8 +332,8 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                 resuSbcta = listaSubctaDF[(listaSubctaDF['fcc_var_integrity'] == var) & (
                             listaSubctaDF['fcc_registro'].astype(int) == int(df['service']))]
                 id_postgres = resuSbcta['id_tipo_sbcta'].values
-                data.append((int(df['cuenta']), int(df['periodo']), Decimal(df['SAL-SALD-ALPS']), int(id_resuSiefore[0]),
-                             int(id_postgres[0]), fecha_liquida, feh_accion, 'F', Decimal(df['SAL-SALD-ALPS_PESOS']), hoy,
+                data.append((int(df['cuenta']), int(df['periodo']), float(df['SAL-SALD-ALPS']), int(id_resuSiefore[0]),
+                             int(id_postgres[0]), fecha_liquida, feh_accion, 'F', float(df['SAL-SALD-ALPS_PESOS']), hoy,
                              v_historico))
                 c += 1
 
@@ -339,8 +342,8 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                 resuSbcta = listaSubctaDF[(listaSubctaDF['fcc_var_integrity'] == var) & (
                             listaSubctaDF['fcc_registro'].astype(int) == int(df['service']))]
                 id_postgres = resuSbcta['id_tipo_sbcta'].values
-                data.append((int(df['cuenta']), int(df['periodo']), Decimal(df['SAL-SALD-ALPDS']), int(id_resuSiefore[0]),
-                             int(id_postgres[0]), fecha_liquida, feh_accion, 'F', Decimal(df['SAL-SALD-ALPDS_PESOS']),
+                data.append((int(df['cuenta']), int(df['periodo']), float(df['SAL-SALD-ALPDS']), int(id_resuSiefore[0]),
+                             int(id_postgres[0]), fecha_liquida, feh_accion, 'F', float(df['SAL-SALD-ALPDS_PESOS']),
                              hoy, v_historico))
                 c += 1
 
@@ -349,8 +352,8 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                 resuSbcta = listaSubctaDF[(listaSubctaDF['fcc_var_integrity'] == var) & (
                             listaSubctaDF['fcc_registro'].astype(int) == int(df['service']))]
                 id_postgres = resuSbcta['id_tipo_sbcta'].values
-                data.append((int(df['cuenta']), int(df['periodo']), Decimal(df['SAL-SALD-ALPES']), int(id_resuSiefore[0]),
-                             int(id_postgres[0]), fecha_liquida, feh_accion, 'F', Decimal(df['SAL-SALD-ALPES_PESOS']),
+                data.append((int(df['cuenta']), int(df['periodo']), float(df['SAL-SALD-ALPES']), int(id_resuSiefore[0]),
+                             int(id_postgres[0]), fecha_liquida, feh_accion, 'F', float(df['SAL-SALD-ALPES_PESOS']),
                              hoy, v_historico))
                 c += 1
 
@@ -360,8 +363,8 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                             listaSubctaDF['fcc_registro'].astype(int) == int(df['service']))]
                 id_postgres = resuSbcta['id_tipo_sbcta'].values
                 data.append((
-                            int(df['cuenta']), int(df['periodo']), Decimal(df['SAL-SALD-SDOV92']), int(id_resuSiefore[0]),
-                            int(id_postgres[0]), fecha_liquida, feh_accion, 'F', Decimal(df['SAL-SALD-SDOV92_PESOS']),
+                            int(df['cuenta']), int(df['periodo']), float(df['SAL-SALD-SDOV92']), int(id_resuSiefore[0]),
+                            int(id_postgres[0]), fecha_liquida, feh_accion, 'F', float(df['SAL-SALD-SDOV92_PESOS']),
                             hoy, v_historico))
                 c += 1
 
@@ -371,8 +374,8 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                             listaSubctaDF['fcc_registro'].astype(int) == int(df['service']))]
                 id_postgres = resuSbcta['id_tipo_sbcta'].values
                 data.append((
-                            int(df['cuenta']), int(df['periodo']), Decimal(df['SAL-SALD-SDOV97']), int(id_resuSiefore[0]),
-                            int(id_postgres[0]), fecha_liquida, feh_accion, 'F', Decimal(df['SAL-SALD-SDOV97_PESOS']),
+                            int(df['cuenta']), int(df['periodo']), float(df['SAL-SALD-SDOV97']), int(id_resuSiefore[0]),
+                            int(id_postgres[0]), fecha_liquida, feh_accion, 'F', float(df['SAL-SALD-SDOV97_PESOS']),
                             hoy, v_historico))
                 c += 1
 
@@ -382,8 +385,8 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                             listaSubctaDF['fcc_registro'].astype(int) == int(df['service']))]
                 id_postgres = resuSbcta['id_tipo_sbcta'].values
                 data.append((
-                            int(df['cuenta']), int(df['periodo']), Decimal(df['SAL-SALD-SDOBUD']), int(id_resuSiefore[0]),
-                            int(id_postgres[0]), fecha_liquida, feh_accion, 'F', Decimal(df['SAL-SALD-SDOBUD_PESOS']),
+                            int(df['cuenta']), int(df['periodo']), float(df['SAL-SALD-SDOBUD']), int(id_resuSiefore[0]),
+                            int(id_postgres[0]), fecha_liquida, feh_accion, 'F', float(df['SAL-SALD-SDOBUD_PESOS']),
                             hoy, v_historico))
                 c += 1
 
@@ -410,13 +413,13 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
     schema = StructType([
         StructField("FCN_CUENTA", LongType(), True),
         StructField("FCN_ID_PERIODO", IntegerType(), True),
-        StructField("FTF_DIA_ACCIONES", DecimalType(), True),
+        StructField("FTF_DIA_ACCIONES", DoubleType(), True),
         StructField("FCN_ID_SIEFORE", IntegerType(), True),
         StructField("FCN_ID_TIPO_SUBCTA", IntegerType(), True),
         StructField("FTD_FEH_LIQUIDACION", DateType(), True),
         StructField("FCD_FEH_ACCION", StringType(), True),
         StructField("FTC_TIPO_SALDO", StringType(), True),
-        StructField("FTF_SALDO_DIA", DecimalType(), True),
+        StructField("FTF_SALDO_DIA", DoubleType(), True),
         StructField("FTD_FECHA_INGESTA", TimestampType(), True),
         StructField("FTC_EXTRACTOR_INGESTA", StringType(), True)
     ])
