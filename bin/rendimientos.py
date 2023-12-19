@@ -58,7 +58,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                    MAX(TRUNC(SHMAX.FTD_FEH_LIQUIDACION)) AS FTD_FEH_LIQUIDACION
             FROM cierren.thafogral_saldo_historico_v2 SHMAX
             WHERE SHMAX.FTD_FEH_LIQUIDACION <= :date
-               --AND SHMAX.FTN_NUM_CTA_INVDUAL = 160014435
+
             GROUP BY SHMAX.FTN_NUM_CTA_INVDUAL, SHMAX.FCN_ID_SIEFORE, SHMAX.FCN_ID_TIPO_SUBCTA
         ) SHMAXIMO ON SH.FTN_NUM_CTA_INVDUAL = SHMAXIMO.FTN_NUM_CTA_INVDUAL
                   AND SH.FCN_ID_TIPO_SUBCTA = SHMAXIMO.FCN_ID_TIPO_SUBCTA AND SH.FCN_ID_SIEFORE = SHMAXIMO.FCN_ID_SIEFORE
@@ -87,7 +87,6 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
             1=1
             AND tsh."FTC_TIPO_SALDO" = 'F'
             AND tsh."FCN_ID_PERIODO" = :term_id
-            --AND tsh."FCN_CUENTA" = 160014435
         GROUP BY
             1=1
             , tsh."FCN_CUENTA"
@@ -100,20 +99,16 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                    "FCN_ID_TIPO_SUBCTA",
                    "FTF_MONTO_PESOS"
             FROM "HECHOS"."TTHECHOS_MOVIMIENTO"
-            WHERE "FTD_FEH_LIQUIDACION" BETWEEN :start_month AND :end_month
-              AND "FCN_ID_TIPO_MOVIMIENTO" = '181'
+            WHERE "FCN_ID_TIPO_MOVIMIENTO" = '181'
               AND "FCN_ID_PERIODO" = :term_id
-              --AND "FCN_CUENTA" = 160014435
-        
             UNION ALL
-        
             SELECT DISTINCT "CSIE1_NUMCUE",
                    "SUBCUENTA",
                    "MONTO"
             FROM "HECHOS"."TTHECHOS_MOVIMIENTOS_INTEGRITY"
             WHERE CAST("CSIE1_CODMOV" AS INT) <= 500
               AND "FCN_ID_PERIODO" = :term_id
-              --AND "CSIE1_NUMCUE" = 160014435
+
         ) AS mov
         GROUP BY "FCN_CUENTA", "FCN_ID_TIPO_SUBCTA"
         """
@@ -126,8 +121,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
             FROM "HECHOS"."TTHECHOS_MOVIMIENTO"
             WHERE "FCN_ID_TIPO_MOVIMIENTO" = '180'
               AND "FCN_ID_PERIODO" = :term_id
-              --AND "FCN_CUENTA" = 160014435
-        
+
             UNION ALL
         
             SELECT DISTINCT "CSIE1_NUMCUE",
@@ -136,7 +130,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
             FROM "HECHOS"."TTHECHOS_MOVIMIENTOS_INTEGRITY"
             WHERE CAST("CSIE1_CODMOV" AS INT) > 500
               AND "FCN_ID_PERIODO" = :term_id
-              --AND "CSIE1_NUMCUE" = 160014435
+
         ) AS mov
         GROUP BY "FCN_CUENTA", "FCN_ID_TIPO_SUBCTA"
         """
@@ -146,7 +140,8 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
         C."FTN_TIPO_SUBCTA",
         SUM(C."FTF_MONTO_PESOS"::double precision) AS "FTF_COMISION"
         FROM "HECHOS"."TTHECHOS_COMISION" C
-        WHERE "FCN_ID_PERIODO" = :term_id --AND "FCN_CUENTA" = 160014435
+        WHERE "FCN_ID_PERIODO" = :term_id 
+
         GROUP BY C."FCN_CUENTA", C."FTN_TIPO_SUBCTA"
         """
         truncate_table(postgres, "TTCALCUL_RENDIMIENTO", term=term_id)

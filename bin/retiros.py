@@ -69,7 +69,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
         ) PT ON PT.FCN_ID_SUBPROCESO = X.FCN_ID_SUBPROCESO
         ), RESOLUCIONES AS (
         SELECT
-        resol.FTD_FEH_CRE,resol, resol.FTD_FEH_INI_PEN,
+        resol.FTD_FEH_CRE, resol.FTD_FEH_INI_PEN,
         resol.FTD_FEH_EMI_RES,resol.FTC_CVE_TIPO_SEG,resol.FTC_SEC_PENSION,
         resol.FTC_CVE_REGIMEN,resol.FTC_TIPO_PRESTACION, resol.FTC_NSS, resol.FTC_CURP
         FROM TTAFORETI_RESOLUCIONES resol
