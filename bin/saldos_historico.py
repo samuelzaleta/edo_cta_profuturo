@@ -60,8 +60,6 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
     #print(listaSieforeDF.values)
 
 
-
-
     #medir tiempo ejecucion
     inicio = time.time()
     hoy = today.today()
@@ -325,7 +323,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                             listaSubctaDF['fcc_registro'].astype(int) == int(df['service']))]
                 id_postgres = resuSbcta['id_tipo_sbcta'].values
                 # data.append((int(df['cuenta']),int(df['periodo']),float(df['SAL-SALD-AVES']),int(id_resuSiefore[0]),int(id_postgres[0]),fecha_liquida,feh_accion,'F',float(df['SAL-SALD-AVES']),hoy,None))
-                c += 1
+                #c += 1
 
             if float(df['SAL-SALD-ALPS']) > 0 or float(df['SAL-SALD-ALPS']) < 0:
                 var = 'SAL-SALD-ALPS'
@@ -441,6 +439,5 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
     fin = time.time()
     print("execution time")
     print(fin - inicio)
-
 
     ##Reporte
