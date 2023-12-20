@@ -521,7 +521,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
             configure_mit_spark,
             query_saldos,
             "SALDOS_INICIALES",
-            params={"end": end_month}
+            params={"end": end_month,'start': start_month, 'term': term_id}
         )
 
         df = spark.sql("""
