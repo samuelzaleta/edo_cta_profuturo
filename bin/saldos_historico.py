@@ -55,8 +55,8 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                                     FCN_CODE_SIEFORE_INTEGRITY as fcn_code_integrity
                                  FROM TIPOSIEROFE""").toPandas()
 
-    print(listaSieforeDF)
-    print(listaSubctaDF)
+    #print(listaSieforeDF)
+    #print(listaSubctaDF)
     #print(listaSieforeDF.values)
 
 
@@ -65,9 +65,9 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
     hoy = today.today()
     print(inicio, hoy)
 
-    saldosDFfile = spark.read.text("gs://dataproc-spark-dev/SALDOSTDF_PESOS_202203_muestra.TXT")
+    saldosDFfile = spark.read.text("gs://dataproc-spark-dev/SALDOSTDF_PESOS_202203_muestra2.TXT")
 
-    saldosDFfile.show(2)
+    #saldosDFfile.show(2)
 
     print(type(saldosDFfile))
     data = []
@@ -157,9 +157,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
     #.withColumn("cuenta", saldosDFfile["value"].cast(IntegerType()))
 
     #print(saldosDFfile2.printSchema())
-    saldosDFfile2.show(2)
-
-
+    #saldosDFfile2.show(2)
 
     saldosDFfile2.printSchema()
 
@@ -428,7 +426,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
     df_insert = df_insert.withColumn("FCD_FEH_ACCION", col("FCD_FEH_ACCION").cast(DateType()))
     df_insert = df_insert.drop(col("row_id"))
     print(df_insert.printSchema())
-    df_insert.show(2)
+    #df_insert.show(2)
 
     _write_spark_dataframe(df_insert, configure_postgres_spark, '"HECHOS"."THHECHOS_SALDO_HISTORICO"')
 
