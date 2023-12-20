@@ -337,7 +337,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
             FROM TMSISGRAL_MAP_NCI_ITGY tms
                 INNER JOIN TTCRXGRAL_PAGO ttc ON tms.TMN_CVE_NCI = ttc.FCN_ID_SUBPROCESO
             WHERE tms.TMC_DESC_ITGY IN (
-                'TGF','TPG','TRJ','TRU','TIV'
+                'TGF','TPG','TRJ','TRU','TIV','TNP'
             )
         ) PT ON PT.FCN_ID_SUBPROCESO = X.FCN_ID_SUBPROCESO
         )
@@ -347,9 +347,9 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                FROM BENEFICIOS.TTCRXGRAL_PAGO_SUBCTA PS
                  INNER JOIN LIQ_SOLICITUDES RET
                  ON PS.FTC_FOLIO = RET.FTC_FOLIO
-        WHERE (PS.FTC_FOLIO, PS.FTN_NUM_REEXP) IN (
+        WHERE (PS.FTC_FOLIO, PS.FCN_ID_TIPO_SUBCTA, PS.FTN_NUM_REEXP) IN (
                             SELECT PSMAX.FTC_FOLIO,MAX(PSMAX.FTN_NUM_REEXP)FROM BENEFICIOS.TTCRXGRAL_PAGO_SUBCTA PSMAX
-                            GROUP BY PSMAX.FTC_FOLIO)
+                            GROUP BY PSMAX.FTC_FOLIO, PSMAX.FCN_ID_TIPO_SUBCTA)
         --AND RET.FTN_NUM_CTA_INVDUAL = 3200559346
         GROUP BY PS.FTC_FOLIO, RET.FTN_NUM_CTA_INVDUAL,RET.FTC_FOLIO_REL """
 
@@ -536,8 +536,8 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
         FROM RETIROS RET
             INNER JOIN SALDOS_LIQUIDACIONES SL ON RET.FTC_FOLIO = SL.FTC_FOLIO AND RET.FTC_FOLIO_REL = SL.FTC_FOLIO_REL
         WHERE RET.FTC_TMC_DESC_ITGY IN (
-            'T73', 'TNP' ,'TPP', 'T97', 'TPR', 'TED', 'RJP', 'TRE', 'TEX',
-            'TIX', 'TEI', 'TPI', 'TNI', 'TJI', 'PPI', 'RCI', 'TAI','TIV'
+            'T73' ,'TPP', 'T97', 'TPR', 'TED', 'RJP', 'TRE', 'TEX',
+            'TIX', 'TEI', 'TPI', 'TNI', 'TJI', 'PPI', 'RCI', 'TAI'
         )
 
         UNION ALL
@@ -552,7 +552,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                RET.FTN_ARCHIVO, RET.FTC_LEY_PENSION, RET.FTC_FON_ENTIDAD, RET.FTD_FEH_CRE
         FROM RETIROS RET
             INNER JOIN SALDOS_LIQUIDACIONES_TRANSFERENCIAS SL ON RET.FCN_CUENTA = SL.FTN_NUM_CTA_INVDUAL
-        WHERE RET.FTC_TMC_DESC_ITGY IN ('TJU', 'TGF', 'TPG', 'TRJ', 'TRU')
+        WHERE RET.FTC_TMC_DESC_ITGY IN ('TJU', 'TGF', 'TPG', 'TRJ', 'TRU','TIV','TNP')
         """)
 
         df.show()
