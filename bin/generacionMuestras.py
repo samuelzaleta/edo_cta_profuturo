@@ -53,7 +53,7 @@ def find_samples(samples_cursor: CursorResult):
 
 
 #url = "https://procesos-api-service-dev-e46ynxyutq-uk.a.run.app/procesos/generarEstadosCuentaRecaudaciones/muestras"
-url = "https://google.com"
+url = "https://procesos-api-service-dev-e46ynxyutq-uk.a.run.app/procesos/generarEstadosCuentaRecaudaciones/muestras"
 
 postgres_pool = get_postgres_pool()
 bigquery_pool = get_bigquery_pool()
@@ -239,7 +239,7 @@ with define_extraction(phase, area, postgres_pool, bigquery_pool) as (postgres, 
                 INNER JOIN "GESTOR"."TCGESPRO_PERIODICIDAD" PR ON F."FCN_ID_PERIODICIDAD_REVERSO" = PR."FTN_ID_PERIODICIDAD"
                 INNER JOIN "GESTOR"."TCGESPRO_PERIODO" P ON P."FTN_ID_PERIODO" = :term
                 INNER JOIN "GESTOR"."TCGESPRO_MUESTRA" M ON P."FTN_ID_PERIODO" = M."FCN_ID_PERIODO"
-                --{filter_reprocessed_samples}
+                {filter_reprocessed_samples}
                 INNER JOIN "HECHOS"."TCHECHOS_CLIENTE" I
                     ON M."FCN_ID_PERIODO" = I."FCN_ID_PERIODO"
                    AND M."FCN_CUENTA" = I."FCN_CUENTA"
