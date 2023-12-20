@@ -69,7 +69,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
     hoy = today.today()
     print(inicio, hoy)
 
-    saldosDFfile = spark.read.text("gs://dataproc-spark-dev/COMISXSALDO_202203_CORTO.TXT")
+    saldosDFfile = spark.read.text("gs://dataproc-spark-dev/COMISXSALDO_202301_CORTO_muestra.TXT")
 
     saldosDFfile2 = saldosDFfile.withColumn("cuenta", saldosDFfile["value"][0:10])\
                             .withColumn("periodo", saldosDFfile["value"][11:6])\
@@ -111,7 +111,8 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
 
             if c == 0:
                 #Fix para Dataframe que inserta en postgres - Se elimina al final
-                data.append((1,1,1,1,1,1,1,Decimal(0.0),Decimal(0.0),fecha_liquida, hoy, v_historico, 1))
+                data.append((1,1,1,1,1,1,1,float(0.0),float(0.0),fecha_liquida, hoy, v_historico, 1))
+                c+=1
                       
             #Busqueda de subcuenta
             if float(df['COM_RETIRO']) > 0:
@@ -139,7 +140,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                 idSubCta = resuSbcta['id_tipo_sbcta'].values
                 resMov = listaMovimientosDF[(listaMovimientosDF['FTN_ID_TIPO_SUBCTA'] == int(idSubCta[0]))]
                 idmov = resMov['FTN_ID_MOVIMIENTO_PROFUTURO'].values
-                data.append((int(df['cuenta']), int(df['periodo']), int(idmov[0]), None, 9486, None, None, Decimal(0.0), Decimal(df[var]), fecha_liquida, hoy, v_historico, int(idSubCta[0])))
+                data.append((int(df['cuenta']), int(df['periodo']), int(idmov[0]), None, 9486, None, None, float(0.0), Decimal(df[var]), fecha_liquida, hoy, v_historico, int(idSubCta[0])))
                 c+=1
 
             #COM_SAR_IS
@@ -158,7 +159,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                 idSubCta = resuSbcta['id_tipo_sbcta'].values
                 resMov = listaMovimientosDF[(listaMovimientosDF['FTN_ID_TIPO_SUBCTA'] == int(idSubCta[0]))]
                 idmov = resMov['FTN_ID_MOVIMIENTO_PROFUTURO'].values
-                data.append((int(df['cuenta']), int(df['periodo']), int(idmov[0]), None, 9486, None, None, Decimal(0.0), Decimal(df[var]), fecha_liquida, hoy, v_historico, int(idSubCta[0])))
+                data.append((int(df['cuenta']), int(df['periodo']), int(idmov[0]), None, 9486, None, None, float(0.0), Decimal(df[var]), fecha_liquida, hoy, v_historico, int(idSubCta[0])))
                 c+=1
             
             if float(df['COM_ACR']) > 0:
@@ -167,7 +168,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                 idSubCta = resuSbcta['id_tipo_sbcta'].values
                 resMov = listaMovimientosDF[(listaMovimientosDF['FTN_ID_TIPO_SUBCTA'] == int(idSubCta[0]))]
                 idmov = resMov['FTN_ID_MOVIMIENTO_PROFUTURO'].values
-                data.append((int(df['cuenta']), int(df['periodo']), int(idmov[0]), None, 9486, None, None, Decimal(0.0), Decimal(df[var]), fecha_liquida, hoy, v_historico, int(idSubCta[0])))
+                data.append((int(df['cuenta']), int(df['periodo']), int(idmov[0]), None, 9486, None, None, float(0.0), Decimal(df[var]), fecha_liquida, hoy, v_historico, int(idSubCta[0])))
                 c+=1
 
             #COM_ALP
@@ -186,7 +187,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                 idSubCta = resuSbcta['id_tipo_sbcta'].values
                 resMov = listaMovimientosDF[(listaMovimientosDF['FTN_ID_TIPO_SUBCTA'] == int(idSubCta[0]))]
                 idmov = resMov['FTN_ID_MOVIMIENTO_PROFUTURO'].values
-                data.append((int(df['cuenta']), int(df['periodo']), int(idmov[0]), None, 9486, None, None, Decimal(0.0), Decimal(df[var]), fecha_liquida, hoy, v_historico, int(idSubCta[0])))
+                data.append((int(df['cuenta']), int(df['periodo']), int(idmov[0]), None, 9486, None, None, float(0.0), Decimal(df[var]), fecha_liquida, hoy, v_historico, int(idSubCta[0])))
                 c+=1
             
             if float(df['COM_AHO_SOL']) > 0:
@@ -204,9 +205,6 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
         print(var)
         print('registro ' +str(c))
         print(cuenta)
-
-    print('Rows to insert:')
-    print(c)
 
     #df to insert into "comisiones"
     # Define the column names
@@ -242,6 +240,9 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
 
 
     _write_spark_dataframe(df_insert, configure_postgres_spark, '"HECHOS"."TTHECHOS_COMISION"')
+
+    print('Rows to insert:')
+    print(c)
 
     fin = time.time()
     print("Execution time")
