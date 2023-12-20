@@ -46,16 +46,16 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
             WHERE FTB_IND_FOLIO_AGRUP = '1'
               AND FCN_ID_ESTATUS = 6649
               -- AND tthls.FCN_ID_PROCESO IN (4045, 4046, 4047, 4048, 4049, 4050, 4051)
-              AND FTD_FEH_CRE BETWEEN DATE :start AND :end
+              AND FTD_FEH_CRE BETWEEN :start AND :end
               --AND  FTN_NUM_CTA_INVDUAL = 3200559346
             UNION ALL
-        
+
             SELECT FTC_FOLIO, FTC_FOLIO_REL, FTN_NUM_CTA_INVDUAL,
                    FCN_ID_PROCESO, FCN_ID_SUBPROCESO, FTD_FEH_CRE
             FROM BENEFICIOS.TTAFORETI_LIQ_SOLICITUDES ttls
             WHERE FTB_IND_FOLIO_AGRUP = '1'
               AND FCN_ID_ESTATUS = 6649
-              AND FTD_FEH_CRE BETWEEN DATE :start AND :end
+              AND FTD_FEH_CRE BETWEEN :start AND :end
               --AND FTN_NUM_CTA_INVDUAL = 3200559346
         ) X
         INNER JOIN (
@@ -82,7 +82,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                FTC_TPSEGURO, FTC_REGIMEN, FTC_TPPENSION, FTC_TMC_DESC_ITGY, FTC_TMC_DESC_NCI,
                FTN_TMN_CVE_NCI, FTN_FEH_INI_PEN, FTN_FEH_RES_PEN, FTD_FEH_CRE
         FROM (
-                        SELECT L.FTN_NUM_CTA_INVDUAL AS FCN_CUENTA, L.FTC_FOLIO AS FTC_FOLIO,
+                   SELECT L.FTN_NUM_CTA_INVDUAL AS FCN_CUENTA, L.FTC_FOLIO AS FTC_FOLIO,
                    L.FTC_FOLIO_REL AS FTC_FOLIO_REL, L.FCN_ID_PROCESO AS FCN_ID_PROCESO,
                    L.FCN_ID_SUBPROCESO AS FCN_ID_SUBPROCESO, T.FTC_TIPO_TRAMITE,
                    T.FTC_CVE_TIPO_SEG FTC_TPSEGURO, T.FTC_CVE_REGIMEN FTC_REGIMEN,
@@ -223,7 +223,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
             FROM BENEFICIOS.TTCRXGRAL_PAGO ttcp
                 INNER JOIN CIERREN.TCCRXGRAL_CAT_CATALOGO thccc ON ttcp.FCC_CVE_BANCO = thccc.FCN_ID_CAT_CATALOGO
                 INNER JOIN CIERREN.TCCRXGRAL_CAT_CATALOGO thcccc ON ttcp.FCN_TIPO_PAGO = thcccc.FCN_ID_CAT_CATALOGO
-            WHERE ttcp.FTD_FEH_CRE BETWEEN DATE :start AND :end
+            WHERE ttcp.FTD_FEH_CRE BETWEEN :start AND :end
               AND (FTC_FOLIO, FTN_ID_ASOCIADO, FTN_NUM_REEXP) IN (
                   SELECT FTC_FOLIO,FTN_ID_ASOCIADO, MAX(FTN_NUM_REEXP)
                   FROM BENEFICIOS.TTCRXGRAL_PAGO ttcp
@@ -267,19 +267,19 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
         FROM (
             SELECT FTC_FOLIO, FTC_FOLIO_REL, FTN_NUM_CTA_INVDUAL, FCN_ID_TIPO_SUBCTA, FTF_MONTO_PESOS
             FROM CIERREN.TTAFOGRAL_MOV_RCV
-            WHERE FTD_FEH_LIQUIDACION BETWEEN DATE  :start AND :end
+            WHERE FTD_FEH_LIQUIDACION BETWEEN :start AND :end
         
             UNION ALL
         
             SELECT FTC_FOLIO, FTC_FOLIO_REL, FTN_NUM_CTA_INVDUAL, FCN_ID_TIPO_SUBCTA, FTF_MONTO_PESOS
             FROM CIERREN.TTAFOGRAL_MOV_GOB
-            WHERE FTD_FEH_LIQUIDACION BETWEEN DATE :start AND :end
+            WHERE FTD_FEH_LIQUIDACION BETWEEN :start AND :end
         
             UNION ALL
         
             SELECT FTC_FOLIO, FTC_FOLIO_REL, FTN_NUM_CTA_INVDUAL, FCN_ID_TIPO_SUBCTA, FTF_MONTO_PESOS
             FROM CIERREN.TTAFOGRAL_MOV_VIV
-            WHERE FTD_FEH_LIQUIDACION BETWEEN DATE :start AND :end
+            WHERE FTD_FEH_LIQUIDACION BETWEEN :start AND :end
         
             UNION ALL
         
@@ -453,7 +453,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                               AND RET.FTD_FEH_CRE = SHMAXIMO.FTD_FEH_CRE
                               AND RET.FTC_TMC_DESC_ITGY = SHMAXIMO.FTC_TMC_DESC_ITGY
                     INNER JOIN cierren.TCAFOGRAL_VALOR_ACCION VA
-                        ON VA.FCD_FEH_ACCION = DATE '2023-03-01'
+                        ON VA.FCD_FEH_ACCION = :start
                        AND SH.FCN_ID_SIEFORE = VA.FCN_ID_SIEFORE AND R.FCN_ID_REGIMEN = VA.FCN_ID_REGIMEN
             ) X
             GROUP BY FCN_CUENTA,FTN_TIPO_AHORRO,
