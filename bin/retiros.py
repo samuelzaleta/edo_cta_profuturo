@@ -598,6 +598,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
 
         _write_spark_dataframe(df, configure_postgres_spark, '"HECHOS"."TTHECHOS_RETIRO"')
 
+        df = df.drop(col("FTD_FECHA_EMISION"))
         # Convert PySpark DataFrame to pandas DataFrame
         pandas_df = df.toPandas()
 
