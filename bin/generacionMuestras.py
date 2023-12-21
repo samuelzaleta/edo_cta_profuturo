@@ -37,13 +37,23 @@ def find_samples(samples_cursor: CursorResult):
                     print("Cantidad de registros: " + str(i))
                     return samples
 
+    result = tuple(list(configurations.keys()))
+    print(result)
+
+    descripcion_consar = postgres.execute(text("""
+        SELECT "FTC_DESCRIPCION" FROM "MAESTROS"."TCDATMAE_MOVIMIENTO_CONSAR"
+        WHERE "FTN_ID_MOVIMIENTO_CONSAR" IN :consar
+        """), {'consar': result}).fetchone()
+
+    print(descripcion_consar)
+
     notify(
         postgres,
         'No se encontraron suficientes registros para los movimientos CONSAR',
         phase,
         area,
         term_id,
-        f"No se encontraron suficientes muestras para los movimientos CONSAR con los IDs {','.join(configurations.keys())}",
+        f"No se encontraron suficientes muestras para los Conceptos CONSAR: {descripcion_consar}",
         aprobar=False,
         descarga=False,
         reproceso=False,
