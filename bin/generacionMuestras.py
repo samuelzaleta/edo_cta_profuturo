@@ -5,6 +5,7 @@ from profuturo.extraction import _write_spark_dataframe, extract_terms, _get_spa
 from pyspark.sql.functions import concat, col, row_number, lit, lpad
 from pyspark.sql.window import Window
 from sqlalchemy import text
+import pandas as pd
 import requests
 import sys
 import random
@@ -43,17 +44,22 @@ def find_samples(samples_cursor: CursorResult):
     descripcion_consar = postgres.execute(text("""
         SELECT "FTC_DESCRIPCION" FROM "MAESTROS"."TCDATMAE_MOVIMIENTO_CONSAR"
         WHERE "FTN_ID_MOVIMIENTO_CONSAR" IN :consar
-        """), {'consar': result}).fetchone()
+        """), {'consar': result}).fetchall()
 
     print(descripcion_consar)
 
+    # Creating a DataFrame
+    df = pd.DataFrame(descripcion_consar, columns=['Concepto Consar'])  # Replace 'Column_Name' with an appropriate column name
+    html_table = df.to_html()
+
     notify(
         postgres,
-        'No se encontraron suficientes registros para los movimientos CONSAR',
+        'No se encontraron suficientes registros para los Conceptos CONSAR',
         phase,
         area,
         term_id,
-        f"No se encontraron suficientes muestras para los Conceptos CONSAR: {descripcion_consar}",
+        message=f"No se encontraron suficientes muestras para los Conceptos CONSAR:",
+        details=html_table,
         aprobar=False,
         descarga=False,
         reproceso=False,
@@ -62,8 +68,8 @@ def find_samples(samples_cursor: CursorResult):
     return samples
 
 
+url = "https://procesos-api-service-qa-2ky75pylsa-uk.a.run.app/procesos/generarEstadosCuentaRecaudaciones/muestras "
 #url = "https://procesos-api-service-dev-e46ynxyutq-uk.a.run.app/procesos/generarEstadosCuentaRecaudaciones/muestras"
-url = "https://procesos-api-service-dev-e46ynxyutq-uk.a.run.app/procesos/generarEstadosCuentaRecaudaciones/muestras"
 
 postgres_pool = get_postgres_pool()
 bigquery_pool = get_bigquery_pool()
@@ -97,7 +103,7 @@ with define_extraction(phase, area, postgres_pool, bigquery_pool) as (postgres, 
 
             cursor = postgres.execute(text("""
             SELECT "FCN_ID_MOVIMIENTO_CONSAR", "FTN_CANTIDAD"
-            FROM "GESTOR"."TTGESPRO_CONFIGURACION_MUESTRA_AUTOMATICA"
+            FROM "GESTOR"."TTGESPRO_CONFIGURACION_MUESTRA_AUTOMATICA" WHERE "FTB_VIGENTE" = TRUE
             """))
             configurations = {str(configuration[0]): configuration[1] for configuration in cursor.fetchall()}
             print("configuracion", configurations)
@@ -109,10 +115,11 @@ with define_extraction(phase, area, postgres_pool, bigquery_pool) as (postgres, 
                 FROM "HECHOS"."TTHECHOS_MOVIMIENTO" M
                     INNER JOIN "GESTOR"."TTGESPRO_MOV_PROFUTURO_CONSAR" PC ON M."FCN_ID_CONCEPTO_MOVIMIENTO" = PC."FCN_ID_MOVIMIENTO_PROFUTURO"
                 WHERE M."FTD_FEH_LIQUIDACION" between :end - INTERVAL '4 MONTH' and :end
+                AND "FTB_VIGENTE" = TRUE
                 GROUP BY M."FCN_CUENTA", PC."FCN_ID_MOVIMIENTO_CONSAR"
             ) AS CC
             INNER JOIN "GESTOR"."TTGESPRO_CONFIGURACION_MUESTRA_AUTOMATICA" MC ON CC."FCN_ID_MOVIMIENTO_CONSAR" = MC."FCN_ID_MOVIMIENTO_CONSAR"
-            WHERE "FCN_CUENTA" IN (SELECT "FCN_CUENTA" FROM "MAESTROS"."TCDATMAE_CLIENTE")
+            WHERE "FCN_CUENTA" IN (SELECT "FCN_CUENTA" FROM "MAESTROS"."TCDATMAE_CLIENTE") 
             GROUP BY "FCN_CUENTA"
             ORDER BY sum(1.0 / "FTN_CANTIDAD") DESC
             """), {'end': end_month})
