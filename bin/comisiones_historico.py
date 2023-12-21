@@ -111,7 +111,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
 
             if c == 0:
                 #Fix para Dataframe que inserta en postgres - Se elimina al final
-                data.append((1,1,1,1,1,1,1,float(0.0),float(0.0),fecha_liquida, hoy, v_historico, 1))
+                data.append((111111,1111,1,1,1,1,1,float(0.0),float(0.0),fecha_liquida, hoy, v_historico, 1))
                 c+=1
                       
             #Busqueda de subcuenta
@@ -222,8 +222,8 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
         StructField("FCN_ID_TIPO_MOVIMIENTO", IntegerType(), True),
         StructField("FCN_ID_SIEFORE", IntegerType(), True),
         StructField("FTC_FOLIO", StringType(), True),
-        StructField("FTF_MONTO_ACCIONES", DecimalType(), True),
-        StructField("FTF_MONTO_PESOS", DecimalType(), True),
+        StructField("FTF_MONTO_ACCIONES", DoubleType(), True),
+        StructField("FTF_MONTO_PESOS", DoubleType(), True),
         StructField("FTD_FEH_LIQUIDACION", DateType(), True),
         StructField("FTD_FECHA_INGESTA", TimestampType(), True),
         StructField("FTC_EXTRACTOR_INGESTA", StringType(), True),
@@ -235,9 +235,9 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
     df_insert = df_insert.filter(df_insert.row_id != 0)
     df_insert = df_insert.withColumn("FTF_MONTO_ACCIONES", col("FTF_MONTO_ACCIONES").cast(DecimalType(12, 6)))
     df_insert = df_insert.drop(col("row_id"))
-    print(df_insert.printSchema())
-    df_insert.show(2)
-
+    
+    #print(df_insert.printSchema())
+    df_insert.show(3)
 
     _write_spark_dataframe(df_insert, configure_postgres_spark, '"HECHOS"."TTHECHOS_COMISION"')
 
