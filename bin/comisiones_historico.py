@@ -100,104 +100,63 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
     idSubCta:int = None
     idmov:int = None
     v_historico:str = 'HISTORICO'
+    monto:float = 0
     try:
 
         for df in saldosDFfile2.collect():
             anio = int(df['periodo'][0:4])
             mes = int(df['periodo'][4:6])
             fecha_liquida = last_day_of_month(datetime.date(anio, mes, 1))
-            #id_resuSiefore = resuSiefore['fcn_id_siefore'].values
             cuenta = df['cuenta']
 
             if c == 0:
                 #Fix para Dataframe que inserta en postgres - Se elimina al final
                 data.append((111111,1111,1,1,1,1,1,float(0.0),float(0.0),fecha_liquida, hoy, v_historico, 1))
                 c+=1
-                      
+               
             #Busqueda de subcuenta
-            if float(df['COM_RETIRO']) > 0:
-                var = 'COM_RETIRO'
-                resuSbcta = listaSubctaDF[(listaSubctaDF['fcn_code_var_comision']==var)]
-                #idSubCta = resuSbcta['id_tipo_sbcta'].values
-                #resMov = listaMovimientosDF[(listaMovimientosDF['FTN_ID_TIPO_SUBCTA'] == int(idSubCta[0]))]
-                #idmov = resMov['FTN_ID_MOVIMIENTO_PROFUTURO'].values
-                #data.append((int(df['cuenta']), int(df['periodo']), int(idmov[0]), None, 9486, None, None, 0, float(df[var]), fecha_liquida, hoy, v_historico, int(idSubCta[0])))
-                #c+=1
-
-            if float(df['COM_CYVSOC']) > 0:
-                var = 'COM_CYVSOC'
-                resuSbcta = listaSubctaDF[(listaSubctaDF['fcn_code_var_comision']==var)]
-                idSubCta = resuSbcta['id_tipo_sbcta'].values
-                resMov = listaMovimientosDF[(listaMovimientosDF['FTN_ID_TIPO_SUBCTA'] == int(idSubCta[0]))]
-                #idmov = resMov['FTN_ID_MOVIMIENTO_PROFUTURO'].values
-                #data.append((int(df['cuenta']), int(df['periodo']), int(idmov[0]), None, 9486, None, None, 0, float(df[var]), fecha_liquida, hoy, v_historico, int(idSubCta[0])))
-                #c+=1
-
-            #COM_SAR_IM
-            if float(df['COM_SAR_IM']) > 0:
+            #Listo
+            if (float(df['COM_SAR_IM']) > 0 or float(df['COM_SAR_IS']) > 0):
                 var = 'COM_SAR_IM'
+                monto = float(df[var]) + float(df['COM_SAR_IS'])
                 resuSbcta = listaSubctaDF[(listaSubctaDF['fcn_code_var_comision']==var)]
                 idSubCta = resuSbcta['id_tipo_sbcta'].values
                 resMov = listaMovimientosDF[(listaMovimientosDF['FTN_ID_TIPO_SUBCTA'] == int(idSubCta[0]))]
                 idmov = resMov['FTN_ID_MOVIMIENTO_PROFUTURO'].values
-                data.append((int(df['cuenta']), int(df['periodo']), int(idmov[0]), None, 9486, None, None, float(0.0), Decimal(df[var]), fecha_liquida, hoy, v_historico, int(idSubCta[0])))
+                data.append((int(df['cuenta']), int(df['periodo']), int(idmov[0]), None, 9486, None, None, float(0.0), float(monto), fecha_liquida, hoy, v_historico, int(idSubCta[0])))
                 c+=1
-
-            #COM_SAR_IS
-            if float(df['COM_SAR_IS']) > 0:
-                var = 'COM_SAR_IS'
-                resuSbcta = listaSubctaDF[(listaSubctaDF['fcn_code_var_comision']==var)]
-                idSubCta = resuSbcta['id_tipo_sbcta'].values
-                #resMov = listaMovimientosDF[(listaMovimientosDF['FTN_ID_TIPO_SUBCTA'] == int(idSubCta[0]))]
-                #idmov = resMov['FTN_ID_MOVIMIENTO_PROFUTURO'].values
-                #data.append((int(df['cuenta']), int(df['periodo']), int(idmov[0]), None, 9486, None, None, 0, float(df[var]), fecha_liquida, hoy, v_historico, int(idSubCta[0])))
-                #c+=1
             
+            #Listo
             if float(df['COM_AVOL']) > 0:
                 var = 'COM_AVOL'
                 resuSbcta = listaSubctaDF[(listaSubctaDF['fcn_code_var_comision']==var)]
                 idSubCta = resuSbcta['id_tipo_sbcta'].values
                 resMov = listaMovimientosDF[(listaMovimientosDF['FTN_ID_TIPO_SUBCTA'] == int(idSubCta[0]))]
                 idmov = resMov['FTN_ID_MOVIMIENTO_PROFUTURO'].values
-                data.append((int(df['cuenta']), int(df['periodo']), int(idmov[0]), None, 9486, None, None, float(0.0), Decimal(df[var]), fecha_liquida, hoy, v_historico, int(idSubCta[0])))
+                data.append((int(df['cuenta']), int(df['periodo']), int(idmov[0]), None, 9486, None, None, float(0.0), float(df[var]), fecha_liquida, hoy, v_historico, int(idSubCta[0])))
                 c+=1
             
-            if float(df['COM_ACR']) > 0:
+            #Listo
+            if (float(df['COM_ACR']) > 0 or float(df['COM_ALP']) > 0):
                 var = 'COM_ACR'
+                monto = float(df[var]) + float(df['COM_ALP'])
                 resuSbcta = listaSubctaDF[(listaSubctaDF['fcn_code_var_comision']==var)]
                 idSubCta = resuSbcta['id_tipo_sbcta'].values
                 resMov = listaMovimientosDF[(listaMovimientosDF['FTN_ID_TIPO_SUBCTA'] == int(idSubCta[0]))]
                 idmov = resMov['FTN_ID_MOVIMIENTO_PROFUTURO'].values
-                data.append((int(df['cuenta']), int(df['periodo']), int(idmov[0]), None, 9486, None, None, float(0.0), Decimal(df[var]), fecha_liquida, hoy, v_historico, int(idSubCta[0])))
+                data.append((int(df['cuenta']), int(df['periodo']), int(idmov[0]), None, 9486, None, None, float(0.0), float(monto), fecha_liquida, hoy, v_historico, int(idSubCta[0])))
                 c+=1
 
-            #COM_ALP
-            if float(df['COM_ALP']) > 0:
-                var = 'COM_ALP'    
-                resuSbcta = listaSubctaDF[(listaSubctaDF['fcn_code_var_comision']==var)]
-                idSubCta = resuSbcta['id_tipo_sbcta'].values
-                #resMov = listaMovimientosDF[(listaMovimientosDF['FTN_ID_TIPO_SUBCTA'] == int(idSubCta[0]))]
-                #idmov = resMov['FTN_ID_MOVIMIENTO_PROFUTURO'].values
-                #data.append((int(df['cuenta']), int(df['periodo']), int(idmov[0]), None, 9486, None, None, 0, float(df[var]), fecha_liquida, hoy, v_historico, int(idSubCta[0])))
-                #c+=1
             
-            if float(df['COM_RCV_IS']) > 0:
-                var = 'COM_RCV_IS'          
+            if (float(df['COM_RCV_IS']) > 0 or float(df['COM_AHO_SOL']) or float(df['COM_RETIRO']) > 0 or float(df['COM_CYVSOC']) > 0):
+                var = 'COM_RCV_IS' 
+                monto = float(df[var]) + float(df['COM_AHO_SOL']) + float(df['COM_RETIRO']) + float(df['COM_CYVSOC'])
                 resuSbcta = listaSubctaDF[(listaSubctaDF['fcn_code_var_comision']==var)]
                 idSubCta = resuSbcta['id_tipo_sbcta'].values
                 resMov = listaMovimientosDF[(listaMovimientosDF['FTN_ID_TIPO_SUBCTA'] == int(idSubCta[0]))]
                 idmov = resMov['FTN_ID_MOVIMIENTO_PROFUTURO'].values
-                data.append((int(df['cuenta']), int(df['periodo']), int(idmov[0]), None, 9486, None, None, float(0.0), Decimal(df[var]), fecha_liquida, hoy, v_historico, int(idSubCta[0])))
+                data.append((int(df['cuenta']), int(df['periodo']), int(idmov[0]), None, 9486, None, None, float(0.0), float(monto), fecha_liquida, hoy, v_historico, int(idSubCta[0])))
                 c+=1
-            
-            if float(df['COM_AHO_SOL']) > 0:
-                var = 'COM_AHO_SOL'
-                resuSbcta = listaSubctaDF[(listaSubctaDF['fcn_code_var_comision']==var)]
-                idSubCta = resuSbcta['id_tipo_sbcta'].values
-                # resMov = listaMovimientosDF[(listaMovimientosDF['FTN_ID_TIPO_SUBCTA'] == int(idSubCta[0]))]
-                # idmov = resMov['FTN_ID_MOVIMIENTO_PROFUTURO'].values
-                # data.append((int(df['cuenta']), int(df['periodo']), int(idmov[0]), None, 9486, None, None, 0, float(df[var]), fecha_liquida, hoy, v_historico, int(idSubCta[0])))
-                # c+=1
     
     except Exception as error:
         print('error: ')
