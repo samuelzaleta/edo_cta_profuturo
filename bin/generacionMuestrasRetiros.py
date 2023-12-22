@@ -42,7 +42,7 @@ with define_extraction(phase, area, postgres_pool,bigquery_pool) as (postgres, b
         DISTINCT
         C."FTN_CUENTA" as "FCN_ID_EDOCTA",
         C."FTN_CUENTA" AS "FCN_NUMERO_CUENTA",
-        202304 AS "FCN_ID_PERIODO",
+        :termid AS "FCN_ID_PERIODO",
         concat_ws(' ', C."FTC_NOMBRE", C."FTC_AP_PATERNO", C."FTC_AP_MATERNO") AS "FTC_NOMBRE",
         C."FTC_CALLE" AS "FTC_CALLE_NUMERO",
         C."FTC_COLONIA",
@@ -53,11 +53,13 @@ with define_extraction(phase, area, postgres_pool,bigquery_pool) as (postgres, b
         C."FTC_RFC",
         C."FTC_NSS",
         --now() AS "FECHAHORA_ALTA",
-        '0' AS FTC_USUARIO_ALTA
+        :user AS FTC_USUARIO_ALTA
         FROM "HECHOS"."TTHECHOS_RETIRO" F
         INNER JOIN "MAESTROS"."TCDATMAE_CLIENTE" C ON F."FCN_CUENTA" = C."FTN_CUENTA"
         INNER JOIN "HECHOS"."TTHECHOS_CARGA_ARCHIVO" CA ON CA."FCN_CUENTA" = C."FTN_CUENTA" AND CA."FCN_ID_INDICADOR" = 32
+        AND CA."FCN_ID_AREA" = :area
         where C."FTN_CUENTA" is not null
+        and ca."FTC_USUARIO_CARGA" = :use
         """, "edoCtaGenerales", params={"term": term_id, "start": start_month, "end": end_month, "user": str(user)})
         general_df = spark.sql("""
         select * from edoCtaGenerales
@@ -65,51 +67,42 @@ with define_extraction(phase, area, postgres_pool,bigquery_pool) as (postgres, b
 
         read_table_insert_temp_view(configure_postgres_spark,
           """
-              SELECT
-                DISTINCT
-                cast("FCN_CUENTA" as BIGINT) AS "FCN_ID_EDOCTA",
-                cast("FCN_CUENTA" as BIGINT)  AS "FCN_NUMERO_CUENTA",
-                202304 AS "FCN_ID_PERIODO",
-                "FTF_SALDO_INI" AS "FTN_SDO_INI_AHO_RET",
-                "FTF_SALDO_INI" AS "FTN_SDO_INI_AHO_VIV",
-                "FTF_MONTO_LIQ" "FTN_SDO_TRA_AHO_RET",
-                "FTF_MONTO_LIQ" "FTN_SDO_TRA_AHO_VIV",
-                ("FTF_SALDO_INI" - "FTF_MONTO_LIQ") AS "FTN_SDO_REM_AHO_RET",
-                ("FTF_SALDO_INI" - "FTF_MONTO_LIQ") AS "FTN_SDO_REM_AHO_VIV",
-                --"FTC_TIPO_TRAMITE",
-                "FTC_LEY_PENSION" AS "FTC_LEY_PENSION",
-                --"FTC_TIPO_PRESTACION",
-                "FTC_REGIMEN" AS "FTC_REGIMEN",
-                "FTC_TPSEGURO" AS "FTC_SEGURO",
-                "FTC_TPPENSION" AS "FTC_TIPO_PENSION",
-                --"FTC_TPSEGURO" AS FTC_SEGURO,
-                --"FTC_TPPENSION" AS FTC_TIPO_PENSION,
-                --"FTC_REGIMEN" AS FTC_REGIMEN,
-                "FTC_FON_ENTIDAD" AS "FTC_FON_ENTIDAD",
-                NULL AS "FTC_FON_NUMERO_POLIZA",
-                "FTF_MONTO_LIQ" AS "FTN_FON_MONTO_TRANSF",
-                --DATE '2023-03-01' AS "FTD_FON_FECHA_TRANSF",
-                "FTN_ISR_LIQ" AS "TFN_FON_RETENCION_ISR",
-                "FCC_TIPO_BANCO" AS "FTC_AFO_ENTIDAD",
-                "FCC_MEDIO_PAGO" AS "FTC_AFO_MEDIO_PAGO",
-                "FTF_MONTO_LIQ" AS "FTC_AFO_RECURSOS_ENTREGA",
-                --NULL AS "FTD_AFO_FECHA_ENTREGA",
-                "FTN_ISR_LIQ" AS "FTC_AFO_RETENCION_ISR",
-                TIMESTAMP '2023-11-23 12:34:56' AS "FTD_FECHA_EMISION",
-                TIMESTAMP '2023-11-23 12:34:56' AS "FTD_FECHA_INICIO_PENSION",
-                "FTC_TMC_DESC_ITGY" AS "FTN_TIPO_TRAMITE",
-                ("FTF_SALDO_INI" - "FTF_MONTO_LIQ")  AS "FTN_SALDO_FINAL",
-                "ARCHIVO" AS "FTC_ARCHIVO",
-                '0' AS "FTC_USUARIO_ALTA"
-                FROM (
                 SELECT
-                row_number() over (PARTITION BY R."FCN_CUENTA" order by "FTN_TIPO_AHORRO") as rowid,
-                R.*
+                R."FCN_CUENTA",
+                "FTC_FOLIO",
+                "FTN_SDO_INI_AHORRORET",
+                "FTN_SDO_INI_VIVIENDA",
+                "FTN_SDO_TRA_AHORRORET",
+                "FTN_SDO_TRA_VIVIENDA",
+                "FTN_SDO_INI_AHORRORET" - "FTN_SDO_TRA_AHORRORET" AS "FTN_SALDO_REM_AHORRORET",
+                "FTN_SDO_INI_VIVIENDA" - "FTN_SDO_TRA_VIVIENDA" AS "FTN_SALDO_REM_VIVIENDA",
+                "FTC_LEY_PENSION",
+                "FTC_REGIMEN",
+                "FTC_TPSEGURO",
+                "FTC_TPPENSION",
+                "FTC_FON_ENTIDAD",
+                CASE
+                WHEN "FTC_FON_ENTIDAD" is not null then "FTN_SDO_TRA_VIVIENDA" + "FTN_SDO_TRA_AHORRORET"
+                ELSE 0
+                END FTN_MONTO_TRANSFERIDO,
+                TO_CHAR("FTD_FECHA_EMISION",'YYYYMMDD') AS "FTD_FECHA_EMISION",
+                "FTC_ENT_REC_TRAN",
+                "FCC_MEDIO_PAGO",
+                CASE
+                WHEN "FTC_FON_ENTIDAD" is null then "FTN_SDO_TRA_VIVIENDA" + "FTN_SDO_TRA_AHORRORET" - "FTN_AFO_ISR"
+                ELSE 0
+                END "FTN_MONTO_TRANSFERIDO_AFORE",
+                "FTN_AFO_ISR" AS "FTN_AFORE_RETENCION_ISR",
+                "FTN_FEH_INI_PEN",
+                "FTN_FEH_RES_PEN",
+                "FTC_TIPO_TRAMITE",
+                "FTN_ARCHIVO"
                 FROM "HECHOS"."TTHECHOS_RETIRO" R
                 INNER JOIN "HECHOS"."TTHECHOS_CARGA_ARCHIVO" CA ON CA."FCN_CUENTA" = R."FCN_CUENTA" AND CA."FCN_ID_INDICADOR" = 32
-                WHERE "FTN_TIPO_AHORRO" = 0
-                ) x where rowid =1
-                """, "edoCtaAnverso", params={"term": term_id, "start": start_month,"end": end_month, "user": str(user)})
+                AND "FCN_ID_AREA" = :area
+                WHERE R."FCN_ID_PERIODO" = :term
+                and ca."FTC_USUARIO_CARGA" = :user
+                """, "edoCtaAnverso", params={"term": term_id, "start": start_month,"end": end_month, "user": str(user), "area": area})
         anverso_df = spark.sql("select * from edoCtaAnverso")
 
 
