@@ -42,7 +42,7 @@ with define_extraction(phase, area, postgres_pool,bigquery_pool) as (postgres, b
         DISTINCT
         C."FTN_CUENTA" as "FCN_ID_EDOCTA",
         C."FTN_CUENTA" AS "FCN_NUMERO_CUENTA",
-        :termid AS "FCN_ID_PERIODO",
+        :term AS "FCN_ID_PERIODO",
         concat_ws(' ', C."FTC_NOMBRE", C."FTC_AP_PATERNO", C."FTC_AP_MATERNO") AS "FTC_NOMBRE",
         C."FTC_CALLE" AS "FTC_CALLE_NUMERO",
         C."FTC_COLONIA",
