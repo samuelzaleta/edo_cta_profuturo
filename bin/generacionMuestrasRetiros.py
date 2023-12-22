@@ -59,7 +59,7 @@ with define_extraction(phase, area, postgres_pool,bigquery_pool) as (postgres, b
         INNER JOIN "HECHOS"."TTHECHOS_CARGA_ARCHIVO" CA ON CA."FCN_CUENTA" = C."FTN_CUENTA" AND CA."FCN_ID_INDICADOR" = 32
         AND CA."FCN_ID_AREA" = :area
         where C."FTN_CUENTA" is not null
-        and ca."FTC_USUARIO_CARGA" = :use
+        and ca."FTC_USUARIO_CARGA" = :user
         """, "edoCtaGenerales", params={"term": term_id, "start": start_month, "end": end_month, "user": str(user)})
         general_df = spark.sql("""
         select * from edoCtaGenerales
