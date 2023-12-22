@@ -68,7 +68,7 @@ def find_samples(samples_cursor: CursorResult):
     return samples
 
 
-url = "https://procesos-api-service-qa-2ky75pylsa-uk.a.run.app/procesos/generarEstadosCuentaRecaudaciones/muestras "
+url = "https://procesos-api-service-qa-2ky75pylsa-uk.a.run.app/procesos/generarEstadosCuentaRecaudaciones/muestras"
 #url = "https://procesos-api-service-dev-e46ynxyutq-uk.a.run.app/procesos/generarEstadosCuentaRecaudaciones/muestras"
 
 postgres_pool = get_postgres_pool()
