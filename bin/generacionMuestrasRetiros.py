@@ -60,7 +60,7 @@ with define_extraction(phase, area, postgres_pool,bigquery_pool) as (postgres, b
         AND CA."FCN_ID_AREA" = :area
         where C."FTN_CUENTA" is not null
         and ca."FTC_USUARIO_CARGA" = :user
-        """, "edoCtaGenerales", params={"term": term_id, "start": start_month, "end": end_month, "user": str(user)})
+        """, "edoCtaGenerales", params={"term": term_id, "user": str(user), "area": area})
         general_df = spark.sql("""
         select * from edoCtaGenerales
         """)
@@ -102,7 +102,7 @@ with define_extraction(phase, area, postgres_pool,bigquery_pool) as (postgres, b
                 AND "FCN_ID_AREA" = :area
                 WHERE R."FCN_ID_PERIODO" = :term
                 and ca."FTC_USUARIO_CARGA" = :user
-                """, "edoCtaAnverso", params={"term": term_id, "start": start_month,"end": end_month, "user": str(user), "area": area})
+                """, "edoCtaAnverso", params={"term": term_id, "user": str(user), "area": area})
         anverso_df = spark.sql("select * from edoCtaAnverso")
 
 
