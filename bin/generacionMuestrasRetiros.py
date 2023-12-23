@@ -142,7 +142,7 @@ with define_extraction(phase, area, postgres_pool,bigquery_pool) as (postgres, b
 
         response = requests.get(url)
 
-        time.sleep(400)
+        time.sleep(40)
 
         # Verifica si la petición fue exitosa
         if response.status_code == 200:
@@ -153,7 +153,7 @@ with define_extraction(phase, area, postgres_pool,bigquery_pool) as (postgres, b
             # Si la petición no fue exitosa, puedes imprimir el código de estado para obtener más información
             print(f"La solicitud no fue exitosa. Código de estado: {response.status_code}")
 
-        time.sleep(400)
+        time.sleep(40)
 
         notify(
             postgres,
