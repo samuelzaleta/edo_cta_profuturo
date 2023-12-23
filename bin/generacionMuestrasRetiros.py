@@ -4,6 +4,8 @@ from profuturo.extraction import _write_spark_dataframe, extract_terms,  _get_sp
 from pyspark.sql.functions import udf, concat, col, current_date , row_number,lit, current_timestamp
 import sys
 import requests
+import time
+
 
 
 url = "https://procesos-api-service-dev-e46ynxyutq-uk.a.run.app/procesos/generarEstadosCuentaRetiros/muestras"
@@ -51,9 +53,7 @@ with define_extraction(phase, area, postgres_pool,bigquery_pool) as (postgres, b
         C."FTC_ENTIDAD_FEDERATIVA" AS "FTC_ENTIDAD",
         C."FTC_CURP",
         C."FTC_RFC",
-        C."FTC_NSS",
-        --now() AS "FECHAHORA_ALTA",
-        :user AS FTC_USUARIO_ALTA
+        C."FTC_NSS"
         FROM "HECHOS"."TTHECHOS_RETIRO" F
         INNER JOIN "MAESTROS"."TCDATMAE_CLIENTE" C ON F."FCN_CUENTA" = C."FTN_CUENTA"
         INNER JOIN "HECHOS"."TTHECHOS_CARGA_ARCHIVO" CA ON CA."FCN_CUENTA" = C."FTN_CUENTA" AND CA."FCN_ID_INDICADOR" = 32
@@ -68,42 +68,51 @@ with define_extraction(phase, area, postgres_pool,bigquery_pool) as (postgres, b
         read_table_insert_temp_view(configure_postgres_spark,
           """
                 SELECT
-                R."FCN_CUENTA",
-                "FTC_FOLIO",
-                "FTN_SDO_INI_AHORRORET",
-                "FTN_SDO_INI_VIVIENDA",
-                "FTN_SDO_TRA_AHORRORET",
-                "FTN_SDO_TRA_VIVIENDA",
-                "FTN_SDO_INI_AHORRORET" - "FTN_SDO_TRA_AHORRORET" AS "FTN_SALDO_REM_AHORRORET",
-                "FTN_SDO_INI_VIVIENDA" - "FTN_SDO_TRA_VIVIENDA" AS "FTN_SALDO_REM_VIVIENDA",
+                R."FCN_CUENTA" AS "FCN_NUMERO_CUENTA",
+                --"FTC_FOLIO",
+                "FTN_SDO_INI_AHORRORET" AS "FTN_SDO_INI_AHO_RET",
+                "FTN_SDO_INI_VIVIENDA" AS "FTN_SDO_INI_AHO_VIV",
+                "FTN_SDO_TRA_AHORRORET" AS "FTN_SDO_TRA_AHO_RET",
+                "FTN_SDO_TRA_VIVIENDA" AS "FTN_SDO_TRA_AHO_VIV",
+                "FTN_SDO_INI_AHORRORET" - "FTN_SDO_TRA_AHORRORET" AS "FTN_SDO_REM_AHO_RET",
+                "FTN_SDO_INI_VIVIENDA" - "FTN_SDO_TRA_VIVIENDA" AS "FTN_SDO_REM_AHO_VIV",
                 "FTC_LEY_PENSION",
                 "FTC_REGIMEN",
-                "FTC_TPSEGURO",
-                "FTC_TPPENSION",
+                "FTC_TPSEGURO" AS "FTC_SEGURO",
+                "FTC_TPPENSION" AS "FTC_TIPO_PENSION",
                 "FTC_FON_ENTIDAD",
                 CASE
                 WHEN "FTC_FON_ENTIDAD" is not null then "FTN_SDO_TRA_VIVIENDA" + "FTN_SDO_TRA_AHORRORET"
                 ELSE 0
-                END FTN_MONTO_TRANSFERIDO,
-                TO_CHAR("FTD_FECHA_EMISION",'YYYYMMDD') AS "FTD_FECHA_EMISION",
-                "FTC_ENT_REC_TRAN",
-                "FCC_MEDIO_PAGO",
+                END "FTN_FON_MONTO_TRANSF",
+                0.0 AS "TFN_FON_RETENCION_ISR",
+                "FTD_FECHA_EMISION" AS "FTD_FECHA_EMISION",
+                "FTC_ENT_REC_TRAN" AS "FTC_AFO_ENTIDAD",
+                "FCC_MEDIO_PAGO" AS "FTC_AFO_MEDIO_PAGO",
                 CASE
                 WHEN "FTC_FON_ENTIDAD" is null then "FTN_SDO_TRA_VIVIENDA" + "FTN_SDO_TRA_AHORRORET" - "FTN_AFO_ISR"
                 ELSE 0
-                END "FTN_MONTO_TRANSFERIDO_AFORE",
-                "FTN_AFO_ISR" AS "FTN_AFORE_RETENCION_ISR",
-                "FTN_FEH_INI_PEN",
-                "FTN_FEH_RES_PEN",
-                "FTC_TIPO_TRAMITE",
-                "FTN_ARCHIVO"
+                END "FTC_AFO_RECURSOS_ENTREGA",
+                "FTD_FECHA_EMISION" AS "FTD_AFO_FECHA_ENTREGA",
+                "FTN_AFO_ISR" AS "FTC_AFO_RETENCION_ISR",
+                CAST("FTN_FEH_INI_PEN" AS INT) AS "FTC_FECHA_INICIO_PENSION",
+                CAST("FTN_FEH_RES_PEN" as INT) AS "FTC_FECHA_EMISION",
+                "FTC_TIPO_TRAMITE" As "FTN_TIPO_TRAMITE",
+                "FTN_ARCHIVO" AS "FTC_ARCHIVO"
                 FROM "HECHOS"."TTHECHOS_RETIRO" R
                 INNER JOIN "HECHOS"."TTHECHOS_CARGA_ARCHIVO" CA ON CA."FCN_CUENTA" = R."FCN_CUENTA" AND CA."FCN_ID_INDICADOR" = 32
                 AND "FCN_ID_AREA" = :area
                 WHERE R."FCN_ID_PERIODO" = :term
                 and ca."FTC_USUARIO_CARGA" = :user
-                """, "edoCtaAnverso", params={"term": term_id, "user": str(user), "area": area})
+                """, "edoCtaAnverso", params={"term": term_id, "user":str(user), "area": area})
+
         anverso_df = spark.sql("select * from edoCtaAnverso")
+
+        anverso_df = anverso_df.withColumn("FCN_ID_EDOCTA", concat(
+            col("FCN_NUMERO_CUENTA"),
+            lit(term_id),
+            col("FTC_ARCHIVO"),
+        ).cast("bigint"))
 
 
         _write_spark_dataframe(general_df, configure_bigquery_spark, 'ESTADO_CUENTA.TTMUESTR_RETIRO_GENERAL')
@@ -133,6 +142,8 @@ with define_extraction(phase, area, postgres_pool,bigquery_pool) as (postgres, b
 
         response = requests.get(url)
 
+        time.sleep(400)
+
         # Verifica si la petición fue exitosa
         if response.status_code == 200:
             # Si la petición fue exitosa, puedes acceder al contenido de la respuesta de la siguiente manera:
@@ -142,13 +153,15 @@ with define_extraction(phase, area, postgres_pool,bigquery_pool) as (postgres, b
             # Si la petición no fue exitosa, puedes imprimir el código de estado para obtener más información
             print(f"La solicitud no fue exitosa. Código de estado: {response.status_code}")
 
+        time.sleep(400)
+
         notify(
             postgres,
             "Generacion muestras retiros",
             phase,
             area,
             term=term_id,
-            message="Se terminaron de generar las muestras de retiros de los estados de cuenta con éxito",
+            message="Se terminaron de generar las muestras de retiros de los estados de cuenta con éxito: por favor espere unos minutos",
             aprobar=False,
             descarga=False,
         )

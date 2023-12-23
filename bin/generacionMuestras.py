@@ -496,8 +496,10 @@ with define_extraction(phase, area, postgres_pool, bigquery_pool) as (postgres, 
               AND "FCN_ID_AREA" = :area
             """), {"term": term_id, "area": area})
 
-        time.sleep(40)
+
         response = requests.get(url)
+
+        time.sleep(400)
         # Verifica si la petición fue exitosa
         if response.status_code == 200:
             # Si la petición fue exitosa, puedes acceder al contenido de la respuesta de la siguiente manera:
@@ -507,13 +509,15 @@ with define_extraction(phase, area, postgres_pool, bigquery_pool) as (postgres, 
             # Si la petición no fue exitosa, puedes imprimir el código de estado para obtener más información
             print(f"La solicitud no fue exitosa. Código de estado: {response.status_code}")
 
+        time.sleep(400)
+
         notify(
             postgres,
             "Generacion muestras",
             phase,
             area,
             term=term_id,
-            message="Se terminaron de generar las muestras de los estados de cuenta con éxito",
+            message="Se terminaron de generar las muestras de los estados de cuenta con éxito: por favor espere unos minutos",
             aprobar=False,
             descarga=False,
         )
