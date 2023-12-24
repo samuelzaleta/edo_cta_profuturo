@@ -601,14 +601,50 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
 
         _write_spark_dataframe(df, configure_postgres_spark, '"HECHOS"."TTHECHOS_RETIRO"')
 
-        df = df.drop(col("FTD_FECHA_EMISION"))
+        query = """
+                select
+                R."FCN_CUENTA",
+                "FTC_FOLIO",
+                "FTN_SDO_INI_AHORRORET",
+                "FTN_SDO_INI_VIVIENDA",
+                "FTN_SDO_TRA_AHORRORET",
+                "FTN_SDO_TRA_VIVIENDA",
+                "FTN_SDO_INI_AHORRORET" - "FTN_SDO_TRA_AHORRORET" AS "FTN_SALDO_REM_AHORRORET",
+                "FTN_SDO_INI_VIVIENDA" - "FTN_SDO_TRA_VIVIENDA" AS "FTN_SALDO_REM_VIVIENDA",
+                "FTC_LEY_PENSION",
+                "FTC_REGIMEN",
+                "FTC_TPSEGURO",
+                "FTC_TPPENSION",
+                "FTC_FON_ENTIDAD",
+                case
+                when "FTC_FON_ENTIDAD" is not null then "FTN_SDO_TRA_VIVIENDA" + "FTN_SDO_TRA_AHORRORET"
+                    else 0
+                    end FTN_MONTO_TRANSFERIDO,
+                TO_CHAR("FTD_FECHA_EMISION",'YYYYMMDD') AS "FTD_FECHA_EMISION",
+                --0 AS FTN_RECURSO_RETENCION_ISR,
+                "FTC_ENT_REC_TRAN",
+                "FCC_MEDIO_PAGO",
+                case
+                when "FTC_FON_ENTIDAD" is null then "FTN_SDO_TRA_VIVIENDA" + "FTN_SDO_TRA_AHORRORET" - "FTN_AFO_ISR"
+                    else 0
+                    end "FTN_MONTO_TRANSFERIDO_AFORE",
+                "FTN_AFO_ISR" AS "FTN_AFORE_RETENCION_ISR",
+                "FTN_FEH_INI_PEN",
+                "FTN_FEH_RES_PEN",
+                "FTC_TIPO_TRAMITE",
+                "FTN_ARCHIVO"
+                from "HECHOS"."TTHECHOS_RETIRO" R
+                where R."FCN_ID_PERIODO" = :term
+                """
+
+        read_table_insert_temp_view(configure_postgres_spark, query, "retiros",
+                                    params={"term": term_id, "user": str(user), "area": area})
+        df = spark.sql(""" select * from retiros""")
         # Convert PySpark DataFrame to pandas DataFrame
         pandas_df = df.toPandas()
 
         # Convert pandas DataFrame to HTML
         html_table = pandas_df.to_html()
-
-        # Enviar notificación con la tabla HTML de este lote
 
         notify(
             postgres,

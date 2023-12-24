@@ -8,7 +8,7 @@ import time
 
 
 
-url = "https://procesos-api-service-dev-e46ynxyutq-uk.a.run.app/procesos/generarEstadosCuentaRetiros/muestras"
+url = "https://procesos-api-service-qa-2ky75pylsa-uk.a.run.app/procesos/generarEstadosCuentaRetiros/muestras"
 
 postgres_pool = get_postgres_pool()
 bigquery_pool = get_bigquery_pool()
@@ -141,13 +141,12 @@ with define_extraction(phase, area, postgres_pool,bigquery_pool) as (postgres, b
         _write_spark_dataframe(df, configure_postgres_spark, '"GESTOR"."TCGESPRO_MUESTRA"')
 
         response = requests.get(url)
-
-        time.sleep(40)
-
+        print(url)
         # Verifica si la petición fue exitosa
         if response.status_code == 200:
             # Si la petición fue exitosa, puedes acceder al contenido de la respuesta de la siguiente manera:
             content = response.content
+            print(url)
             print(content)
         else:
             # Si la petición no fue exitosa, puedes imprimir el código de estado para obtener más información
