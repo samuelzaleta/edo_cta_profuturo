@@ -98,7 +98,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
         df_anverso_aho = (
             df_anverso_general.filter(
                 (f.col("FTC_SECCION").isin(["AHO", "PEN"])) & (f.col("FCN_ID_EDOCTA").isin(clients)))
-            .select(df_anverso_general.FCN_NUMERO_CUENTA, "FTC_CONCEPTO_NEGOCIO",
+            .select("FTC_NUMERO_CUENTA_ANVERSO", "FTC_CONCEPTO_NEGOCIO",
                     f.col("FTN_SALDO_ANTERIOR").cast("decimal(16, 2)"),
                     f.col("FTF_APORTACION").cast("decimal(16, 2)"),
                     f.col("FTN_RETIRO").cast("decimal(16, 2)"),
@@ -110,7 +110,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
 
         df_anverso_bon = (
             df_anverso_general.filter((f.col("FTC_SECCION") == "BON") & (f.col("FCN_ID_EDOCTA").isin(clients)))
-            .select(df_anverso_general.FCN_NUMERO_CUENTA, "FTC_CONCEPTO_NEGOCIO",
+            .select("FTC_NUMERO_CUENTA_ANVERSO", "FTC_CONCEPTO_NEGOCIO",
                     f.col("FTN_VALOR_ACTUAL_UDI").cast("decimal(16, 2)"),
                     f.col("FTN_VALOR_NOMINAL_UDI").cast("decimal(16, 2)"),
                     f.col("FTN_VALOR_ACTUAL_PESO").cast("decimal(16, 2)"),
@@ -120,7 +120,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
 
         df_anverso_sdo = (
             df_anverso_general.filter((f.col("FTC_SECCION") == "SDO") & (f.col("FCN_ID_EDOCTA").isin(clients)))
-            .select(df_anverso_general.FCN_NUMERO_CUENTA, "FTC_GRUPO_CONCEPTO", "FTC_CONCEPTO_NEGOCIO",
+            .select("FTC_NUMERO_CUENTA_ANVERSO", "FTC_GRUPO_CONCEPTO", "FTC_CONCEPTO_NEGOCIO",
                     f.col("FTN_SALDO_FINAL").cast("decimal(16, 2)"))
 
         )
