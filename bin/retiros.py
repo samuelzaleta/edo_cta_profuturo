@@ -46,16 +46,16 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
             WHERE FTB_IND_FOLIO_AGRUP = '1'
               AND FCN_ID_ESTATUS = 6649
               -- AND tthls.FCN_ID_PROCESO IN (4045, 4046, 4047, 4048, 4049, 4050, 4051)
-              AND FTD_FEH_CRE BETWEEN DATE '2023-03-01' AND DATE '2023-03-31' -- :start AND :end
+              AND FTD_FEH_CRE BETWEEN :start AND :end
               --AND  FTN_NUM_CTA_INVDUAL = 3200559346
             UNION ALL
-        
+
             SELECT FTC_FOLIO, FTC_FOLIO_REL, FTN_NUM_CTA_INVDUAL,
                    FCN_ID_PROCESO, FCN_ID_SUBPROCESO, FTD_FEH_CRE
             FROM BENEFICIOS.TTAFORETI_LIQ_SOLICITUDES ttls
             WHERE FTB_IND_FOLIO_AGRUP = '1'
               AND FCN_ID_ESTATUS = 6649
-              AND FTD_FEH_CRE BETWEEN DATE '2023-03-01' AND DATE '2023-03-31' -- :start AND :end
+              AND FTD_FEH_CRE BETWEEN :start AND :end
               --AND FTN_NUM_CTA_INVDUAL = 3200559346
         ) X
         INNER JOIN (
@@ -69,12 +69,12 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
         ) PT ON PT.FCN_ID_SUBPROCESO = X.FCN_ID_SUBPROCESO
         ), RESOLUCIONES AS (
         SELECT
-        resol.FTD_FEH_CRE,resol.FTN_NUM_CTA_INVDUAL, resol.FTD_FEH_INI_PEN,
+        resol.FTD_FEH_CRE, resol.FTD_FEH_INI_PEN,
         resol.FTD_FEH_EMI_RES,resol.FTC_CVE_TIPO_SEG,resol.FTC_SEC_PENSION,
         resol.FTC_CVE_REGIMEN,resol.FTC_TIPO_PRESTACION, resol.FTC_NSS, resol.FTC_CURP
         FROM TTAFORETI_RESOLUCIONES resol
         WHERE resol.FTD_FEH_INI_PEN IS NOT NULL
-        AND (resol.FTD_FEH_CRE,resol.FTN_NUM_CTA_INVDUAL) IN (SELECT MAX( resol.FTD_FEH_CRE),resol.FTN_NUM_CTA_INVDUAL FROM TTAFORETI_RESOLUCIONES resol GROUP BY resol.FTN_NUM_CTA_INVDUAL)
+        AND (resol.FTD_FEH_CRE,resol.FTC_NSS) IN (SELECT MAX( resol.FTD_FEH_CRE),resol.FTC_NSS FROM TTAFORETI_RESOLUCIONES resol GROUP BY resol.FTC_NSS)
         )
         , DIS_TRANS AS (
         SELECT ROW_NUMBER() OVER (PARTITION BY FCN_CUENTA,FTC_FOLIO ORDER BY FTD_FEH_CRE DESC) rown,
@@ -82,7 +82,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                FTC_TPSEGURO, FTC_REGIMEN, FTC_TPPENSION, FTC_TMC_DESC_ITGY, FTC_TMC_DESC_NCI,
                FTN_TMN_CVE_NCI, FTN_FEH_INI_PEN, FTN_FEH_RES_PEN, FTD_FEH_CRE
         FROM (
-                        SELECT L.FTN_NUM_CTA_INVDUAL AS FCN_CUENTA, L.FTC_FOLIO AS FTC_FOLIO,
+                   SELECT L.FTN_NUM_CTA_INVDUAL AS FCN_CUENTA, L.FTC_FOLIO AS FTC_FOLIO,
                    L.FTC_FOLIO_REL AS FTC_FOLIO_REL, L.FCN_ID_PROCESO AS FCN_ID_PROCESO,
                    L.FCN_ID_SUBPROCESO AS FCN_ID_SUBPROCESO, T.FTC_TIPO_TRAMITE,
                    T.FTC_CVE_TIPO_SEG FTC_TPSEGURO, T.FTC_CVE_REGIMEN FTC_REGIMEN,
@@ -95,10 +95,10 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                 INNER JOIN BENEFICIOS.TTAFORETI_TRAMITE T ON L.FTC_FOLIO = T.FTC_FOLIO
                 LEFT JOIN TTAFOGRAL_CTA_INVDUAL ctaind ON L.FTN_NUM_CTA_INVDUAL = ctaind.FTN_NUM_CTA_INVDUAL
                 LEFT JOIN RESOLUCIONES resol ON ctaind.FTN_NSS =  resol.FTC_NSS
-                AND T.FTC_CVE_TIPO_SEG = resol.FTC_CVE_TIPO_SEG
-                AND T.FTC_CVE_TIPO_PEN = resol.FTC_SEC_PENSION
-                AND T.FTC_CVE_REGIMEN = resol.FTC_CVE_REGIMEN
-                AND T.FTC_TIPO_PRESTACION = resol.FTC_TIPO_PRESTACION
+                --AND T.FTC_CVE_TIPO_SEG = resol.FTC_CVE_TIPO_SEG
+                --AND T.FTC_CVE_TIPO_PEN = resol.FTC_SEC_PENSION
+                --AND T.FTC_CVE_REGIMEN = resol.FTC_CVE_REGIMEN
+                --AND T.FTC_TIPO_PRESTACION = resol.FTC_TIPO_PRESTACION
             WHERE L.TMC_DESC_ITGY IN ('T73', 'TNP', 'TPP', 'T97', 'TPR', 'TED', 'RJP', 'TRE', 'TJU', 'TEX', 'TGF', 'TPG', 'TRU', 'TIV')
 
             UNION ALL
@@ -223,7 +223,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
             FROM BENEFICIOS.TTCRXGRAL_PAGO ttcp
                 INNER JOIN CIERREN.TCCRXGRAL_CAT_CATALOGO thccc ON ttcp.FCC_CVE_BANCO = thccc.FCN_ID_CAT_CATALOGO
                 INNER JOIN CIERREN.TCCRXGRAL_CAT_CATALOGO thcccc ON ttcp.FCN_TIPO_PAGO = thcccc.FCN_ID_CAT_CATALOGO
-            WHERE ttcp.FTD_FEH_CRE BETWEEN DATE '2023-03-01' AND DATE '2023-03-31' -- :start AND :end
+            WHERE ttcp.FTD_FEH_CRE BETWEEN :start AND :end
               AND (FTC_FOLIO, FTN_ID_ASOCIADO, FTN_NUM_REEXP) IN (
                   SELECT FTC_FOLIO,FTN_ID_ASOCIADO, MAX(FTN_NUM_REEXP)
                   FROM BENEFICIOS.TTCRXGRAL_PAGO ttcp
@@ -267,43 +267,43 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
         FROM (
             SELECT FTC_FOLIO, FTC_FOLIO_REL, FTN_NUM_CTA_INVDUAL, FCN_ID_TIPO_SUBCTA, FTF_MONTO_PESOS
             FROM CIERREN.TTAFOGRAL_MOV_RCV
-            WHERE FTD_FEH_LIQUIDACION BETWEEN DATE '2023-03-01' AND DATE '2023-03-31' --:start AND :end
+            WHERE FTD_FEH_LIQUIDACION BETWEEN :start AND :end
         
             UNION ALL
         
             SELECT FTC_FOLIO, FTC_FOLIO_REL, FTN_NUM_CTA_INVDUAL, FCN_ID_TIPO_SUBCTA, FTF_MONTO_PESOS
             FROM CIERREN.TTAFOGRAL_MOV_GOB
-            WHERE FTD_FEH_LIQUIDACION BETWEEN DATE '2023-03-01' AND DATE '2023-03-31' --:start AND :end
+            WHERE FTD_FEH_LIQUIDACION BETWEEN :start AND :end
         
             UNION ALL
         
             SELECT FTC_FOLIO, FTC_FOLIO_REL, FTN_NUM_CTA_INVDUAL, FCN_ID_TIPO_SUBCTA, FTF_MONTO_PESOS
             FROM CIERREN.TTAFOGRAL_MOV_VIV
-            WHERE FTD_FEH_LIQUIDACION BETWEEN DATE '2023-03-01' AND DATE '2023-03-31' --:start AND :end
+            WHERE FTD_FEH_LIQUIDACION BETWEEN :start AND :end
         
             UNION ALL
         
             SELECT FTC_FOLIO, FTC_FOLIO_REL, FTN_NUM_CTA_INVDUAL, FCN_ID_TIPO_SUBCTA, FTF_MONTO_PESOS
             FROM CIERREN.TTAFOGRAL_MOV_COMP
-            WHERE FTD_FEH_LIQUIDACION BETWEEN DATE '2023-03-01' AND DATE '2023-03-31' --:start AND :end
+            WHERE FTD_FEH_LIQUIDACION BETWEEN :start AND :end
         
             UNION ALL
         
             SELECT FTC_FOLIO, FTC_FOLIO_REL, FTN_NUM_CTA_INVDUAL, FCN_ID_TIPO_SUBCTA, FTF_MONTO_PESOS
             FROM CIERREN.TTAFOGRAL_MOV_SAR
-            WHERE FTD_FEH_LIQUIDACION BETWEEN DATE '2023-03-01' AND DATE '2023-03-31' --:start AND :end
+            WHERE FTD_FEH_LIQUIDACION BETWEEN :start AND :end
         
             UNION ALL
         
             SELECT FTC_FOLIO, FTC_FOLIO_REL, FTN_NUM_CTA_INVDUAL, FCN_ID_TIPO_SUBCTA, FTF_MONTO_PESOS
             FROM CIERREN.TTAFOGRAL_MOV_AVOL
-            WHERE FTD_FEH_LIQUIDACION BETWEEN DATE '2023-03-01' AND DATE '2023-03-31' --:start AND :end
+            WHERE FTD_FEH_LIQUIDACION BETWEEN :start AND :end
         
             UNION ALL
         
             SELECT FTC_FOLIO, FTC_FOLIO_REL, FTN_NUM_CTA_INVDUAL, FCN_ID_TIPO_SUBCTA, FTF_MONTO_PESOS
             FROM CIERREN.TTAFOGRAL_MOV_BONO
-            WHERE FTD_FEH_LIQUIDACION BETWEEN DATE '2023-03-01' AND DATE '2023-03-31' --:start AND :end
+            WHERE FTD_FEH_LIQUIDACION BETWEEN :start AND :end
         ) X
         GROUP BY FTC_FOLIO, FTC_FOLIO_REL, FTN_NUM_CTA_INVDUAL
         """
@@ -320,7 +320,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
             WHERE FTB_IND_FOLIO_AGRUP = '1'
               AND FCN_ID_ESTATUS = 6649
               -- AND tthls.FCN_ID_PROCESO IN (4045, 4046, 4047, 4048, 4049, 4050, 4051)
-              AND FTD_FEH_CRE BETWEEN DATE '2023-03-01' AND DATE '2023-03-31' -- :start AND :end
+              AND FTD_FEH_CRE BETWEEN :start AND :end
               --AND  FTN_NUM_CTA_INVDUAL = 3200559346
             UNION ALL
         
@@ -329,7 +329,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
             FROM BENEFICIOS.TTAFORETI_LIQ_SOLICITUDES ttls
             WHERE FTB_IND_FOLIO_AGRUP = '1'
               AND FCN_ID_ESTATUS = 6649
-              AND FTD_FEH_CRE BETWEEN DATE '2023-03-01' AND DATE '2023-03-31' -- :start AND :end
+              AND FTD_FEH_CRE BETWEEN  :start AND :end
               --AND FTN_NUM_CTA_INVDUAL = 3200559346
         ) X
         INNER JOIN (
@@ -337,7 +337,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
             FROM TMSISGRAL_MAP_NCI_ITGY tms
                 INNER JOIN TTCRXGRAL_PAGO ttc ON tms.TMN_CVE_NCI = ttc.FCN_ID_SUBPROCESO
             WHERE tms.TMC_DESC_ITGY IN (
-                'TGF','TPG','TRJ','TRU','TIV'
+                'TGF','TPG','TRJ','TRU','TIV','TNP'
             )
         ) PT ON PT.FCN_ID_SUBPROCESO = X.FCN_ID_SUBPROCESO
         )
@@ -347,11 +347,12 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                FROM BENEFICIOS.TTCRXGRAL_PAGO_SUBCTA PS
                  INNER JOIN LIQ_SOLICITUDES RET
                  ON PS.FTC_FOLIO = RET.FTC_FOLIO
-        WHERE (PS.FTC_FOLIO, PS.FTN_NUM_REEXP) IN (
-                            SELECT PSMAX.FTC_FOLIO,MAX(PSMAX.FTN_NUM_REEXP)FROM BENEFICIOS.TTCRXGRAL_PAGO_SUBCTA PSMAX
-                            GROUP BY PSMAX.FTC_FOLIO)
+        WHERE (PS.FTC_FOLIO, PS.FCN_ID_TIPO_SUBCTA, PS.FTN_NUM_REEXP) IN (
+                            SELECT PSMAX.FTC_FOLIO, PSMAX.FCN_ID_TIPO_SUBCTA,MAX(PSMAX.FTN_NUM_REEXP)FROM BENEFICIOS.TTCRXGRAL_PAGO_SUBCTA PSMAX
+                            GROUP BY PSMAX.FTC_FOLIO, PSMAX.FCN_ID_TIPO_SUBCTA)
         --AND RET.FTN_NUM_CTA_INVDUAL = 3200559346
-        GROUP BY PS.FTC_FOLIO, RET.FTN_NUM_CTA_INVDUAL,RET.FTC_FOLIO_REL """
+        GROUP BY PS.FTC_FOLIO, RET.FTN_NUM_CTA_INVDUAL,RET.FTC_FOLIO_REL
+         """
 
         query_saldos ="""
         WITH RETIROS AS (
@@ -365,7 +366,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                 WHERE FTB_IND_FOLIO_AGRUP = '1'
                   AND FCN_ID_ESTATUS = 6649
                   -- AND tthls.FCN_ID_PROCESO IN (4045, 4046, 4047, 4048, 4049, 4050, 4051)
-                  AND FTD_FEH_CRE BETWEEN DATE '2023-03-01' AND DATE '2023-03-31' -- :start AND :end
+                  AND FTD_FEH_CRE BETWEEN :start AND :end
 
                 UNION ALL
 
@@ -374,7 +375,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                 FROM BENEFICIOS.TTAFORETI_LIQ_SOLICITUDES
                 WHERE FTB_IND_FOLIO_AGRUP = '1'
                   AND FCN_ID_ESTATUS = 6649
-                  AND FTD_FEH_CRE BETWEEN DATE '2023-03-01' AND DATE '2023-03-31'
+                  AND FTD_FEH_CRE BETWEEN :start AND :end
             ) X
             INNER JOIN (
                 SELECT distinct tms.TMC_DESC_ITGY,tms.TMC_DESC_NCI, tms.TMN_CVE_NCI, ttc.FCN_ID_SUBPROCESO
@@ -453,7 +454,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                               AND RET.FTD_FEH_CRE = SHMAXIMO.FTD_FEH_CRE
                               AND RET.FTC_TMC_DESC_ITGY = SHMAXIMO.FTC_TMC_DESC_ITGY
                     INNER JOIN cierren.TCAFOGRAL_VALOR_ACCION VA
-                        ON VA.FCD_FEH_ACCION = DATE '2023-03-01'
+                        ON VA.FCD_FEH_ACCION = :start
                        AND SH.FCN_ID_SIEFORE = VA.FCN_ID_SIEFORE AND R.FCN_ID_REGIMEN = VA.FCN_ID_REGIMEN
             ) X
             GROUP BY FCN_CUENTA,FTN_TIPO_AHORRO,
@@ -467,7 +468,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                        FCN_ID_SIEFORE, r.FTD_FEH_CRE,SUM(FTN_DIA_PESOS) PESOS
                 FROM TTAFOGRAL_BALANCE_MOVS_CHEQ q
                     INNER JOIN RETIROS r ON q.FTN_NUM_CTA_INVDUAL = r.FCN_CUENTA
-                WHERE FTD_FEH_LIQUIDACION < DATE '2023-03-01' -- :start
+                WHERE FTD_FEH_LIQUIDACION < :start
                   AND q.FCN_ID_SUBPROCESO NOT IN (10562,10573)
                  -- AND R.FTC_TMC_DESC_ITGY IN ('TJU', 'TGF', 'TPG', 'TRJ', 'TRU', 'TIV')
                 GROUP BY FTN_NUM_CTA_INVDUAL, FCN_ID_TIPO_SUBCTA, FCN_ID_SIEFORE, r.FTC_TMC_DESC_ITGY, r.FTD_FEH_CRE
@@ -500,28 +501,28 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
             configure_mit_spark,
             query_retiros,
             "RETIROS",
-            params={"end": end_month}
+            params={"end": end_month, 'start': start_month, 'term': term_id}
         )
 
         read_table_insert_temp_view(
             configure_mit_spark,
             query_saldo_liquidaciones_sin_transferencias,
             "SALDOS_LIQUIDACIONES",
-            params={"end": end_month}
+            params={"end": end_month, 'start': start_month, 'term': term_id}
         )
 
         read_table_insert_temp_view(
             configure_mit_spark,
             query_saldo_liquidaciones_transferencias,
             "SALDOS_LIQUIDACIONES_TRANSFERENCIAS",
-            params={"end": end_month}
+            params={"end": end_month, 'start': start_month, 'term': term_id}
         )
 
         read_table_insert_temp_view(
             configure_mit_spark,
             query_saldos,
             "SALDOS_INICIALES",
-            params={"end": end_month}
+            params={"end": end_month,'start': start_month, 'term': term_id}
         )
 
         df = spark.sql("""
@@ -536,15 +537,17 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
         FROM RETIROS RET
             INNER JOIN SALDOS_LIQUIDACIONES SL ON RET.FTC_FOLIO = SL.FTC_FOLIO AND RET.FTC_FOLIO_REL = SL.FTC_FOLIO_REL
         WHERE RET.FTC_TMC_DESC_ITGY IN (
-            'T73', 'TNP' ,'TPP', 'T97', 'TPR', 'TED', 'RJP', 'TRE', 'TEX',
-            'TIX', 'TEI', 'TPI', 'TNI', 'TJI', 'PPI', 'RCI', 'TAI','TIV'
+            'T73' ,'TPP', 'T97', 'TPR', 'TED', 'RJP', 'TRE', 'TEX',
+            'TIX', 'TEI', 'TPI', 'TNI', 'TJI', 'PPI', 'RCI', 'TAI'
         )
 
         UNION ALL
 
         SELECT DISTINCT RET.FCN_CUENTA, RET.FTC_FOLIO, RET.FCN_ID_PROCESO,
                RET.FCN_ID_SUBPROCESO, SL.SALDO_TRANSFERIDO_VIVIENDA  FTN_SALDO_TRANSFERIDO_VIVIENDA,
-               SL.SALDO_TRANSFERIDO_AHORRORET - RET.FTN_ISR AS FTN_SALDO_TRANSFERIDO_AHORRORET,
+               CASE 
+               WHEN RET.FTC_TMC_DESC_ITGY = 'TNP' THEN SL.SALDO_TRANSFERIDO_AHORRORET
+                 ELSE SL.SALDO_TRANSFERIDO_AHORRORET - RET.FTN_ISR END FTN_SALDO_TRANSFERIDO_AHORRORET,
                RET.FTN_ISR AS FTN_ISR_LIQ_RET, 0 AS FTN_ISR_LIQ_VIV, 
                RET.FTC_TPSEGURO, RET.FTC_REGIMEN, RET.FTC_TPPENSION,
                RET.FCC_TIPO_BANCO, RET.FCC_MEDIO_PAGO, RET.FTC_TMC_DESC_ITGY,
@@ -552,7 +555,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                RET.FTN_ARCHIVO, RET.FTC_LEY_PENSION, RET.FTC_FON_ENTIDAD, RET.FTD_FEH_CRE
         FROM RETIROS RET
             INNER JOIN SALDOS_LIQUIDACIONES_TRANSFERENCIAS SL ON RET.FCN_CUENTA = SL.FTN_NUM_CTA_INVDUAL
-        WHERE RET.FTC_TMC_DESC_ITGY IN ('TJU', 'TGF', 'TPG', 'TRJ', 'TRU')
+        WHERE RET.FTC_TMC_DESC_ITGY IN ('TJU', 'TGF', 'TPG', 'TRJ', 'TRU','TIV','TNP')
         """)
 
         df.show()
@@ -598,14 +601,51 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
 
         _write_spark_dataframe(df, configure_postgres_spark, '"HECHOS"."TTHECHOS_RETIRO"')
 
+        query = """
+                select
+                R."FCN_CUENTA",
+                "FTC_FOLIO",
+                "FTN_SDO_INI_AHORRORET",
+                "FTN_SDO_INI_VIVIENDA",
+                "FTN_SDO_TRA_AHORRORET",
+                "FTN_SDO_TRA_VIVIENDA",
+                "FTN_SDO_INI_AHORRORET" - "FTN_SDO_TRA_AHORRORET" AS "FTN_SALDO_REM_AHORRORET",
+                "FTN_SDO_INI_VIVIENDA" - "FTN_SDO_TRA_VIVIENDA" AS "FTN_SALDO_REM_VIVIENDA",
+                "FTC_LEY_PENSION",
+                "FTC_REGIMEN",
+                "FTC_TPSEGURO",
+                "FTC_TPPENSION",
+                "FTC_FON_ENTIDAD",
+                case
+                when "FTC_FON_ENTIDAD" is not null then "FTN_SDO_TRA_VIVIENDA" + "FTN_SDO_TRA_AHORRORET"
+                    else 0
+                    end FTN_MONTO_TRANSFERIDO,
+                TO_CHAR("FTD_FECHA_EMISION",'YYYYMMDD') AS "FTD_FECHA_EMISION",
+                --0 AS FTN_RECURSO_RETENCION_ISR,
+                "FTC_ENT_REC_TRAN",
+                "FCC_MEDIO_PAGO",
+                case
+                when "FTC_FON_ENTIDAD" is null then "FTN_SDO_TRA_VIVIENDA" + "FTN_SDO_TRA_AHORRORET" - "FTN_AFO_ISR"
+                    else 0
+                    end "FTN_MONTO_TRANSFERIDO_AFORE",
+                "FTN_AFO_ISR" AS "FTN_AFORE_RETENCION_ISR",
+                "FTN_FEH_INI_PEN",
+                "FTN_FEH_RES_PEN",
+                "FTC_TIPO_TRAMITE",
+                "FTN_ARCHIVO"
+                from "HECHOS"."TTHECHOS_RETIRO" R
+                where R."FCN_ID_PERIODO" = :term
+                """
+
+        read_table_insert_temp_view(configure_postgres_spark, query, "retiros",
+                                    params={"term": term_id, "user": str(user), "area": area})
+        df = spark.sql(""" select * from retiros""")
         # Convert PySpark DataFrame to pandas DataFrame
-        #pandas_df = df.toPandas()
+        pandas_df = df.toPandas()
 
         # Convert pandas DataFrame to HTML
-        #html_table = pandas_df.to_html()
+        html_table = pandas_df.to_html()
 
-        # Enviar notificación con la tabla HTML de este lote
-        """
         notify(
             postgres,
             f"retiros",
@@ -616,4 +656,4 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
             details=html_table,
             visualiza=False
         )
-        """
+

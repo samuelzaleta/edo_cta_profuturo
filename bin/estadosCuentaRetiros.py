@@ -8,7 +8,7 @@ import time
 
 
 
-url = "https://procesos-api-service-qa-2ky75pylsa-uk.a.run.app/procesos/generarEstadosCuentaRetiros/muestras"
+url = "https://procesos-api-service-dev-e46ynxyutq-uk.a.run.app/procesos/generarEstadosCuentaRetiros/muestras"
 
 postgres_pool = get_postgres_pool()
 bigquery_pool = get_bigquery_pool()
@@ -25,25 +25,14 @@ with define_extraction(phase, area, postgres_pool,bigquery_pool) as (postgres, b
 
     with register_time(postgres_pool, phase, term_id, user, area):
         truncate_table(postgres, 'TCGESPRO_MUESTRA', term=term_id, area=area)
-        truncate_table(bigquery, 'ESTADO_CUENTA.TTMUESTR_RETIRO_GENERAL')
-        truncate_table(bigquery, 'ESTADO_CUENTA.TTMUESTR_RETIRO')
-
-        read_table_insert_temp_view(configure_postgres_spark, """
-                SELECT
-                DISTINCT
-                CA."FTC_USUARIO_CARGA",
-                C."FTN_CUENTA" AS "FCN_NUMERO_CUENTA"
-                FROM "HECHOS"."TTHECHOS_RETIRO" F
-                INNER JOIN "MAESTROS"."TCDATMAE_CLIENTE" C ON F."FCN_CUENTA" = C."FTN_CUENTA"
-                INNER JOIN "HECHOS"."TTHECHOS_CARGA_ARCHIVO" CA ON CA."FCN_CUENTA" = C."FTN_CUENTA" AND CA."FCN_ID_INDICADOR" = 32
-                where C."FTN_CUENTA" is not null
-                """, "user", params={"term": term_id, "start": start_month, "end": end_month, "user": str(user)})
+        truncate_table(bigquery, 'ESTADO_CUENTA.TTEDOCTA_RETIRO_GENERAL')
+        truncate_table(bigquery, 'ESTADO_CUENTA.TTEDOCTA_RETIRO')
 
         read_table_insert_temp_view(configure_postgres_spark, """
         SELECT
         DISTINCT
-        C."FTN_CUENTA" as "FCN_ID_EDOCTA",
         C."FTN_CUENTA" AS "FCN_NUMERO_CUENTA",
+        F."FTN_ARCHIVO" AS "FTC_ARCHIVO"
         :term AS "FCN_ID_PERIODO",
         concat_ws(' ', C."FTC_NOMBRE", C."FTC_AP_PATERNO", C."FTC_AP_MATERNO") AS "FTC_NOMBRE",
         C."FTC_CALLE" AS "FTC_CALLE_NUMERO",
@@ -56,14 +45,19 @@ with define_extraction(phase, area, postgres_pool,bigquery_pool) as (postgres, b
         C."FTC_NSS"
         FROM "HECHOS"."TTHECHOS_RETIRO" F
         INNER JOIN "MAESTROS"."TCDATMAE_CLIENTE" C ON F."FCN_CUENTA" = C."FTN_CUENTA"
-        INNER JOIN "HECHOS"."TTHECHOS_CARGA_ARCHIVO" CA ON CA."FCN_CUENTA" = C."FTN_CUENTA" AND CA."FCN_ID_INDICADOR" = 32
-        AND CA."FCN_ID_AREA" = :area
-        where C."FTN_CUENTA" is not null
-        and ca."FTC_USUARIO_CARGA" = :user
+         WHERE F."FCN_ID_PERIODO" = :term
         """, "edoCtaGenerales", params={"term": term_id, "user": str(user), "area": area})
         general_df = spark.sql("""
         select * from edoCtaGenerales
         """)
+
+        general_df = general_df.withColumn("FCN_ID_EDOCTA", concat(
+            col("FCN_NUMERO_CUENTA"),
+            lit(term_id),
+            col("FTC_ARCHIVO"),
+        ).cast("bigint"))
+
+        general_df = general_df.drop(col("FTC_ARCHIVO"))
 
         read_table_insert_temp_view(configure_postgres_spark,
           """
@@ -100,10 +94,7 @@ with define_extraction(phase, area, postgres_pool,bigquery_pool) as (postgres, b
                 "FTC_TIPO_TRAMITE" As "FTN_TIPO_TRAMITE",
                 "FTN_ARCHIVO" AS "FTC_ARCHIVO"
                 FROM "HECHOS"."TTHECHOS_RETIRO" R
-                INNER JOIN "HECHOS"."TTHECHOS_CARGA_ARCHIVO" CA ON CA."FCN_CUENTA" = R."FCN_CUENTA" AND CA."FCN_ID_INDICADOR" = 32
-                AND "FCN_ID_AREA" = :area
                 WHERE R."FCN_ID_PERIODO" = :term
-                and ca."FTC_USUARIO_CARGA" = :user
                 """, "edoCtaAnverso", params={"term": term_id, "user":str(user), "area": area})
 
         anverso_df = spark.sql("select * from edoCtaAnverso")
@@ -115,44 +106,22 @@ with define_extraction(phase, area, postgres_pool,bigquery_pool) as (postgres, b
         ).cast("bigint"))
 
 
-        _write_spark_dataframe(general_df, configure_bigquery_spark, 'ESTADO_CUENTA.TTMUESTR_RETIRO_GENERAL')
-        _write_spark_dataframe(anverso_df, configure_bigquery_spark, 'ESTADO_CUENTA.TTMUESTR_RETIRO')
-
-        df = spark.sql("""
-        SELECT 
-         FCN_NUMERO_CUENTA AS FCN_CUENTA,
-         CAST(FTC_USUARIO_CARGA as int)  FTC_USUARIO_CARGA
-        FROM user
-        """)
-
-        df.show()
-
-        df = df.withColumn("FCN_ID_PERIODO", lit(term_id))
-        df = df.withColumn("FCN_ID_USUARIO", col("FTC_USUARIO_CARGA").cast("int"))
-        df = df.drop("FTC_USUARIO_CARGA")
-        df = df.withColumn("FCN_ID_AREA", lit(area))
-        df = df.withColumn("FTD_FECHAHORA_ALTA", lit(current_timestamp()))
-        df = df.withColumn("FTC_URL_PDF_ORIGEN", concat(
-            lit("https://storage.googleapis.com/edo_cuenta_profuturo_dev_b/profuturo-archivos/"),
-            col("FCN_CUENTA"),
-            lit(".pdf"),
-        ))
-
-        _write_spark_dataframe(df, configure_postgres_spark, '"GESTOR"."TCGESPRO_MUESTRA"')
+        _write_spark_dataframe(general_df, configure_bigquery_spark, 'ESTADO_CUENTA.TTEDOCTA_RETIRO_GENERAL')
+        _write_spark_dataframe(anverso_df, configure_bigquery_spark, 'ESTADO_CUENTA.TTEDOCTA_RETIRO')
 
         response = requests.get(url)
-        print(url)
+
+
         # Verifica si la petición fue exitosa
         if response.status_code == 200:
             # Si la petición fue exitosa, puedes acceder al contenido de la respuesta de la siguiente manera:
             content = response.content
-            print(url)
             print(content)
         else:
             # Si la petición no fue exitosa, puedes imprimir el código de estado para obtener más información
             print(f"La solicitud no fue exitosa. Código de estado: {response.status_code}")
 
-        time.sleep(40)
+        time.sleep(400)
 
         notify(
             postgres,
