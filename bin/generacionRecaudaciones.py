@@ -64,7 +64,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
         df_general = df_general.join(df_indicador, df_general.FCN_ID_EDOCTA == df_indicador.FCN_CUENTA,
                                              'left')
 
-        df_anverso = extract_bigquery('ESTADO_CUENTA.TTEDOCTA_ANVERSO')
+        df_anverso = extract_bigquery('ESTADO_CUENTA.TTEDOCTA_ANVERSO').withColumnRenamed("FTC_NUMERO_CUENTA_ANVERSO", "FTC_NUMERO_CUENTA")
 
         df_anverso_general = df_anverso.join(df_general, "FCN_ID_EDOCTA").fillna(value="")
 
