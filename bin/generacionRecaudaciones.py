@@ -45,7 +45,10 @@ def process_dataframe(df, identifier):
 
 def str_to_gcs(data, name, term_id):
     blob = bucket.blob(f"correspondencia/{name}_{term_id}.txt")
-    blob.upload_from_string(data)
+    # with open(f"{name}_{term_id}.txt", "w") as f:
+    #    f.write(data)
+    # blob.upload_from_filename(f"{name}_{term_id}.pdf")
+    blob.upload_from_string(data, content_type="text/plain")
 
 
 with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, _):
@@ -60,14 +63,26 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
             extract_bigquery('ESTADO_CUENTA.TTEDOCTA_CLIENTE_INDICADOR')
             .filter((f.col("FTB_IMPRESION") == True) & (f.col("FTB_ENVIO") == False))
         )
-        df_general = extract_bigquery('ESTADO_CUENTA.TTEDOCTA_GENERAL').filter(f"FCN_ID_PERIODO == {term_id}")
+        df_general = (
+            extract_bigquery('ESTADO_CUENTA.TTEDOCTA_GENERAL').filter(f"FCN_ID_PERIODO == {term_id}")
+            .withColumn("FCN_NUMERO_CUENTA", f.lpad(f.col("FCN_NUMERO_CUENTA").cast("string"), 10, "0"))
+        )
         df_general = df_general.join(df_indicador, df_general.FCN_ID_EDOCTA == df_indicador.FCN_CUENTA,
                                      'left')
 
-        df_anverso = extract_bigquery('ESTADO_CUENTA.TTEDOCTA_ANVERSO').withColumnRenamed("FCN_NUMERO_CUENTA",
-                                                                                          "FCN_NUMERO_CUENTA_ANVERSO")
+        df_anverso = (
+            extract_bigquery('ESTADO_CUENTA.TTEDOCTA_ANVERSO')
+            .withColumnRenamed("FCN_NUMERO_CUENTA", "FCN_NUMERO_CUENTA_ANVERSO")
+            .withColumn("FCN_NUMERO_CUENTA_ANVERSO", f.lpad(f.col("FCN_NUMERO_CUENTA_ANVERSO").cast("string"), 10, "0"))
+        )
 
         df_anverso_general = df_anverso.join(df_general, "FCN_ID_EDOCTA").fillna(value="")
+
+        df_anverso_general = (
+            df_anverso_general
+            .withColumn("FTC_CONCEPTO_NEGOCIO", f.when(df_anverso_general.FTC_CONCEPTO_NEGOCIO == "NO APLICA", "")
+                        .otherwise(df_anverso_general.FTC_CONCEPTO_NEGOCIO))
+        )
 
         df_general = (
             df_general.withColumn("FTD_FECHA_GRAL_INICIO", f.to_date(f.col("FTD_FECHA_GRAL_INICIO"), "ddMMyyyy"))
@@ -168,7 +183,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
         final_reverso = res + reverso_final_row
         str_to_gcs(final_reverso, "recaudacion_reverso", term_id)
 
-        notify(
+        """notify(
             postgres,
             f"Generacion de archivos Recaudaciones",
             phase,
@@ -177,4 +192,4 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
             message=f"Se han exportado recaudaciones para el periodo {time_period}",
             aprobar=False,
             descarga=False
-        )
+        )"""
