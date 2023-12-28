@@ -45,10 +45,7 @@ def process_dataframe(df, identifier):
 
 def str_to_gcs(data, name, term_id):
     blob = bucket.blob(f"correspondencia/{name}_{term_id}.txt")
-    # with open(f"{name}_{term_id}.txt", "w") as f:
-    #    f.write(data)
-    # blob.upload_from_filename(f"{name}_{term_id}.pdf")
-    blob.upload_from_string(data, content_type="text/plain")
+    blob.upload_from_string(data.encode("iso_8859_1"), content_type="text/plain")
 
 
 with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, _):
@@ -183,7 +180,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
         final_reverso = res + reverso_final_row
         str_to_gcs(final_reverso, "recaudacion_reverso", term_id)
 
-        """notify(
+        notify(
             postgres,
             f"Generacion de archivos Recaudaciones",
             phase,
@@ -192,4 +189,4 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
             message=f"Se han exportado recaudaciones para el periodo {time_period}",
             aprobar=False,
             descarga=False
-        )"""
+        )
