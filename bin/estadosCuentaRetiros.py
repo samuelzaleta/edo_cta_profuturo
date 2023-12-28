@@ -8,8 +8,8 @@ import time
 
 
 
-url = "https://procesos-api-service-dev-e46ynxyutq-uk.a.run.app/procesos/generarEstadosCuentaRetiros/muestras"
-
+#url = "https://procesos-api-service-dev-e46ynxyutq-uk.a.run.app/procesos/generarEstadosCuentaRetiros/muestras"
+url = "https://procesos-api-service-qa-2ky75pylsa-uk.a.run.app/procesos/generarEstadosCuentaRecaudaciones/definitivos"
 postgres_pool = get_postgres_pool()
 bigquery_pool = get_bigquery_pool()
 phase = int(sys.argv[1])
@@ -32,7 +32,7 @@ with define_extraction(phase, area, postgres_pool,bigquery_pool) as (postgres, b
         SELECT
         DISTINCT
         C."FTN_CUENTA" AS "FCN_NUMERO_CUENTA",
-        F."FTN_ARCHIVO" AS "FTC_ARCHIVO"
+        F."FTN_ARCHIVO" AS "FTC_ARCHIVO",
         :term AS "FCN_ID_PERIODO",
         concat_ws(' ', C."FTC_NOMBRE", C."FTC_AP_PATERNO", C."FTC_AP_MATERNO") AS "FTC_NOMBRE",
         C."FTC_CALLE" AS "FTC_CALLE_NUMERO",
@@ -92,7 +92,10 @@ with define_extraction(phase, area, postgres_pool,bigquery_pool) as (postgres, b
                 CAST("FTN_FEH_INI_PEN" AS INT) AS "FTC_FECHA_INICIO_PENSION",
                 CAST("FTN_FEH_RES_PEN" as INT) AS "FTC_FECHA_EMISION",
                 "FTC_TIPO_TRAMITE" As "FTN_TIPO_TRAMITE",
-                "FTN_ARCHIVO" AS "FTC_ARCHIVO"
+                "FTN_ARCHIVO" AS "FTC_ARCHIVO",
+                "FTD_FECHA_EMISION" AS "FTD_FECHA_LIQUIDACION",
+                ("FTN_SDO_INI_AHORRORET" - "FTN_SDO_TRA_AHORRORET") +  ("FTN_SDO_INI_VIVIENDA" - "FTN_SDO_TRA_VIVIENDA") AS "FTN_SALDO_FINAL",
+                :user AS "FTC_USUARIO_ALTA"
                 FROM "HECHOS"."TTHECHOS_RETIRO" R
                 WHERE R."FCN_ID_PERIODO" = :term
                 """, "edoCtaAnverso", params={"term": term_id, "user":str(user), "area": area})

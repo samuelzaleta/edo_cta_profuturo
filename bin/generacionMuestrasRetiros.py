@@ -98,7 +98,10 @@ with define_extraction(phase, area, postgres_pool,bigquery_pool) as (postgres, b
                 CAST("FTN_FEH_INI_PEN" AS INT) AS "FTC_FECHA_INICIO_PENSION",
                 CAST("FTN_FEH_RES_PEN" as INT) AS "FTC_FECHA_EMISION",
                 "FTC_TIPO_TRAMITE" As "FTN_TIPO_TRAMITE",
-                "FTN_ARCHIVO" AS "FTC_ARCHIVO"
+                "FTN_ARCHIVO" AS "FTC_ARCHIVO",
+                "FTD_FECHA_EMISION" AS "FTD_FECHA_LIQUIDACION",
+                ("FTN_SDO_INI_AHORRORET" - "FTN_SDO_TRA_AHORRORET") +  ("FTN_SDO_INI_VIVIENDA" - "FTN_SDO_TRA_VIVIENDA") AS "FTN_SALDO_FINAL",
+                :user AS "FTC_USUARIO_ALTA"
                 FROM "HECHOS"."TTHECHOS_RETIRO" R
                 INNER JOIN "HECHOS"."TTHECHOS_CARGA_ARCHIVO" CA ON CA."FCN_CUENTA" = R."FCN_CUENTA" AND CA."FCN_ID_INDICADOR" = 32
                 AND "FCN_ID_AREA" = :area

@@ -305,7 +305,7 @@ with define_extraction(phase, area, postgres_pool, bigquery_pool) as (postgres, 
                CASE
                WHEN MC."FTB_INTEGRACION_DIAS_COTIZADOS_SALARIO_BASE" THEN R."FTN_SUA_ULTIMO_SALARIO_INT_PER"
                END "FTN_SALARIO_BASE",
-               -- now() AS "FTD_FECHAHORA_ALTA",
+               now() AS "FTD_FECHAHORA_ALTA",
                :user AS FTC_USUARIO_ALTA
         FROM "GESTOR"."TTGESPRO_CONFIGURACION_FORMATO_ESTADO_CUENTA" F
             INNER JOIN "GESTOR"."TCGESPRO_PERIODICIDAD" PG ON F."FCN_ID_PERIODICIDAD_REVERSO" = PG."FTN_ID_PERIODICIDAD"
@@ -404,7 +404,8 @@ with define_extraction(phase, area, postgres_pool, bigquery_pool) as (postgres, 
             null AS "FTN_VALOR_NOMINAL_PESO",
             null AS "FTN_VALOR_NOMINAL_UDI",
             C."FTC_AHORRO" AS "FTC_TIPO_AHORRO",
-            :user AS FTC_USUARIO_ALTA
+            C."FTN_ORDEN_SDO" AS "FTN_ORDEN_SDO",
+            :user AS "FTC_USUARIO_ALTA"
             FROM "GESTOR"."TTGESPRO_CONFIGURACION_FORMATO_ESTADO_CUENTA" F
             INNER JOIN "GESTOR"."TCGESPRO_CONFIGURACION_ANVERSO" C ON F."FCN_ID_GENERACION" = C."FCN_GENERACION"
             INNER JOIN "GESTOR"."TCGESPRO_PERIODICIDAD" P ON F."FCN_ID_PERIODICIDAD_GENERACION" = P."FTN_ID_PERIODICIDAD"
@@ -420,7 +421,8 @@ with define_extraction(phase, area, postgres_pool, bigquery_pool) as (postgres, 
                  C."FTC_AHORRO",
                  C."FTC_DES_CONCEPTO",
                  C."FTC_SECCION",
-                 D."FTN_ID_FORMATO"
+                 D."FTN_ID_FORMATO",
+                 C."FTN_ORDEN_SDO"
             UNION ALL
             SELECT
             TCB."FCN_CUENTA" AS FCN_NUMERO_CUENTA,
@@ -437,7 +439,8 @@ with define_extraction(phase, area, postgres_pool, bigquery_pool) as (postgres, 
             TCB."FTF_BON_NOM_PES"::numeric(16, 2)  AS "FTN_VALOR_NOMINAL_PESO",
             TCB."FTF_BON_NOM_ACC"::numeric(16, 2) AS "FTN_VALOR_NOMINAL_UDI",
             NULL AS "FTC_TIPO_AHORRO",
-            :user AS FTC_USUARIO_ALTA
+            NULL AS "FTN_ORDEN_SDO",
+            :user AS "FTC_USUARIO_ALTA"
             FROM "HECHOS"."TTCALCUL_BONO" TCB
             INNER JOIN dataset D ON D."FCN_NUMERO_CUENTA" = TCB."FCN_CUENTA"
             WHERE TCB."FCN_ID_PERIODO" = :term
