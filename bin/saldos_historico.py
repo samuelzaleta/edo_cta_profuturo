@@ -113,7 +113,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                 .withColumn("SAL-SALD-SDOV92_PESOS", saldosDFfile["value"][720:20]) \
                 .withColumn("SAL-SALD-SDOV97_PESOS", saldosDFfile["value"][740:20]) \
                 .withColumn("SAL-SALD-SDOBUD_PESOS", saldosDFfile["value"][760:20]) \
-                .withColumn("TIPO_CAMBIO", saldosDFfile["value"][780:4])
+                .withColumn("TIPO_CAMBIO", saldosDFfile["value"][780:5])
 
     saldosDFfile2 = saldosDFfile2.withColumn("SAL_SALD_RETS", regexp_replace("SAL_SALD_RETS", ' ', ''))\
                              .withColumn("SAL_SALD_RET8S", regexp_replace("SAL_SALD_RET8S", ' ', ''))\
@@ -184,9 +184,10 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
 
             if c==0:
                 data.append((1,1,float(0.0),1,1,fecha_liquida, feh_accion, 'F',float(0.0),hoy,v_historico))
+                c+=1
 
             # Busqueda de subcuenta
-            if float(df['SAL_SALD_RETS']) > 0 or float(df['SAL_SALD_RETS']) < 0:
+            if float(df['SAL_SALD_RETS']):
                 var = 'SAL-SALD-RETS'
                 resuSbcta = listaSubctaDF[(listaSubctaDF['fcc_var_integrity'] == var) & (
                             listaSubctaDF['fcc_registro'].astype(int) == int(df['service']))]
@@ -197,8 +198,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                              v_historico))
                 c += 1
 
-            if float(str(df['SAL_SALD_RET8S']).replace(' ', '')) > 0 or float(
-                    str(df['SAL_SALD_RET8S']).replace(' ', '')) < 0:
+            if float(str(df['SAL_SALD_RET8S'])):
                 var = 'SAL-SALD-RET8S'
                 resuSbcta = listaSubctaDF[(listaSubctaDF['fcc_var_integrity'] == var) & (
                             listaSubctaDF['fcc_registro'].astype(int) == int(df['service']))]
@@ -208,7 +208,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                              float(str(df['SAL_SALD_RET8S_PESOS']).replace(' ', '')), hoy, v_historico))
                 c += 1
 
-            if float(df['SAL-SALD-CYVS']) > 0 or float(df['SAL-SALD-CYVS']) < 0:
+            if float(df['SAL-SALD-CYVS']):
                 var = 'SAL-SALD-CYVS'
                 resuSbcta = listaSubctaDF[(listaSubctaDF['fcc_var_integrity'] == var) & (
                             listaSubctaDF['fcc_registro'].astype(int) == int(df['service']))]
@@ -218,7 +218,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                              v_historico))
                 c += 1
 
-            if float(df['SAL-SALD-CYVTS']) > 0 or float(df['SAL-SALD-CYVTS']) < 0:
+            if float(df['SAL-SALD-CYVTS']):
                 var = 'SAL-SALD-CYVTS'
                 # r = ()
                 # i = 0
@@ -232,7 +232,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                              hoy, v_historico))
                 c += 1
 
-            if float(df['SAL-SALD-CSOS']) > 0 or float(df['SAL-SALD-CSOS']) < 0:
+            if float(df['SAL-SALD-CSOS']):
                 var = 'SAL-SALD-CSOS'
                 resuSbcta = listaSubctaDF[(listaSubctaDF['fcc_var_integrity'] == var) & (
                             listaSubctaDF['fcc_registro'].astype(int) == int(df['service']))]
@@ -242,7 +242,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                              v_historico))
                 c += 1
 
-            if float(df['SAL-SALD-ESTS']) > 0 or float(df['SAL-SALD-ESTS']) < 0:
+            if float(df['SAL-SALD-ESTS']):
                 var = 'SAL-SALD-ESTS'
                 resuSbcta = listaSubctaDF[(listaSubctaDF['fcc_var_integrity'] == var) & (
                             listaSubctaDF['fcc_registro'].astype(int) == int(df['service']))]
@@ -252,7 +252,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                              v_historico))
                 c += 1
 
-            if float(df['SAL-SALD-ESPS']) > 0 or float(df['SAL-SALD-ESPS']) < 0:
+            if float(df['SAL-SALD-ESPS']):
                 var = 'SAL-SALD-ESPS'
                 resuSbcta = listaSubctaDF[(listaSubctaDF['fcc_var_integrity'] == var) & (
                             listaSubctaDF['fcc_registro'].astype(int) == int(df['service']))]
@@ -262,7 +262,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                              v_historico))
                 c += 1
 
-            if float(df['SAL-SALD-CRES']) > 0 or float(df['SAL-SALD-CRES']) < 0:
+            if float(df['SAL-SALD-CRES']):
                 var = 'SAL-SALD-CRES'
                 resuSbcta = listaSubctaDF[(listaSubctaDF['fcc_var_integrity'] == var) & (
                             listaSubctaDF['fcc_registro'].astype(int) == int(df['service']))]
@@ -272,7 +272,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                              v_historico))
                 c += 1
 
-            if float(df['SAL-SALD-CREDS']) > 0 or float(df['SAL-SALD-CREDS']) < 0:
+            if float(df['SAL-SALD-CREDS']):
                 var = 'SAL-SALD-CREDS'
                 resuSbcta = listaSubctaDF[(listaSubctaDF['fcc_var_integrity'] == var) & (
                             listaSubctaDF['fcc_registro'].astype(int) == int(df['service']))]
@@ -285,7 +285,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                 else:
                     print('no subcta' + cuenta + ' - serv' + str(df['service']))
 
-            if float(df['SAL-SALD-SARS']) > 0 or float(df['SAL-SALD-SARS']) < 0:
+            if float(df['SAL-SALD-SARS']):
                 var = 'SAL-SALD-SARS'
                 resuSbcta = listaSubctaDF[(listaSubctaDF['fcc_var_integrity'] == var) & (
                             listaSubctaDF['fcc_registro'].astype(int) == int(df['service']))]
@@ -295,7 +295,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                              v_historico))
                 c += 1
 
-            if float(df['SAL-SALD-AVDS']) > 0 or float(df['SAL-SALD-AVDS']) < 0:
+            if float(df['SAL-SALD-AVDS']):
                 var = 'SAL-SALD-AVDS'
                 resuSbcta = listaSubctaDF[(listaSubctaDF['fcc_var_integrity'] == var) & (
                             listaSubctaDF['fcc_registro'].astype(int) == int(df['service']))]
@@ -305,7 +305,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                              v_historico))
                 c += 1
 
-            if float(df['SAL-SALD-AVPS']) > 0 or float(df['SAL-SALD-AVPS']) < 0:
+            if float(df['SAL-SALD-AVPS']):
                 var = 'SAL-SALD-AVPS'
                 resuSbcta = listaSubctaDF[(listaSubctaDF['fcc_var_integrity'] == var) & (
                             listaSubctaDF['fcc_registro'].astype(int) == int(df['service']))]
@@ -315,7 +315,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                              v_historico))
                 c += 1
 
-            if float(df['SAL-SALD-AVES']) > 0 or float(df['SAL-SALD-AVES']) < 0:
+            if float(df['SAL-SALD-AVES']):
                 var = 'SAL-SALD-AVES'
                 resuSbcta = listaSubctaDF[(listaSubctaDF['fcc_var_integrity'] == var) & (
                             listaSubctaDF['fcc_registro'].astype(int) == int(df['service']))]
@@ -323,7 +323,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                 # data.append((int(df['cuenta']),int(df['periodo']),float(df['SAL-SALD-AVES']),int(id_resuSiefore[0]),int(id_postgres[0]),fecha_liquida,feh_accion,'F',float(df['SAL-SALD-AVES']),hoy,None))
                 #c += 1
 
-            if float(df['SAL-SALD-ALPS']) > 0 or float(df['SAL-SALD-ALPS']) < 0:
+            if float(df['SAL-SALD-ALPS']):
                 var = 'SAL-SALD-ALPS'
                 resuSbcta = listaSubctaDF[(listaSubctaDF['fcc_var_integrity'] == var) & (
                             listaSubctaDF['fcc_registro'].astype(int) == int(df['service']))]
@@ -333,7 +333,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                              v_historico))
                 c += 1
 
-            if float(df['SAL-SALD-ALPDS']) > 0 or float(df['SAL-SALD-ALPDS']) < 0:
+            if float(df['SAL-SALD-ALPDS']):
                 var = 'SAL-SALD-ALPDS'
                 resuSbcta = listaSubctaDF[(listaSubctaDF['fcc_var_integrity'] == var) & (
                             listaSubctaDF['fcc_registro'].astype(int) == int(df['service']))]
@@ -343,7 +343,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                              hoy, v_historico))
                 c += 1
 
-            if float(df['SAL-SALD-ALPES']) > 0 or float(df['SAL-SALD-ALPES']) < 0:
+            if float(df['SAL-SALD-ALPES']):
                 var = 'SAL-SALD-ALPES'
                 resuSbcta = listaSubctaDF[(listaSubctaDF['fcc_var_integrity'] == var) & (
                             listaSubctaDF['fcc_registro'].astype(int) == int(df['service']))]
@@ -353,7 +353,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                              hoy, v_historico))
                 c += 1
 
-            if float(df['SAL-SALD-SDOV92']) > 0 or float(df['SAL-SALD-SDOV92']) < 0:
+            if float(df['SAL-SALD-SDOV92']):
                 var = 'SAL-SALD-SDOV92'
                 resuSbcta = listaSubctaDF[(listaSubctaDF['fcc_var_integrity'] == var) & (
                             listaSubctaDF['fcc_registro'].astype(int) == int(df['service']))]
@@ -364,7 +364,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                             hoy, v_historico))
                 c += 1
 
-            if float(df['SAL-SALD-SDOV97']) > 0 or float(df['SAL-SALD-SDOV97']) < 0:
+            if float(df['SAL-SALD-SDOV97']):
                 var = 'SAL-SALD-SDOV97'
                 resuSbcta = listaSubctaDF[(listaSubctaDF['fcc_var_integrity'] == var) & (
                             listaSubctaDF['fcc_registro'].astype(int) == int(df['service']))]
@@ -375,7 +375,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                             hoy, v_historico))
                 c += 1
 
-            if float(df['SAL-SALD-SDOBUD']) > 0 or float(df['SAL-SALD-SDOBUD']) < 0:
+            if float(df['SAL-SALD-SDOBUD']):
                 var = 'SAL-SALD-SDOBUD'
                 resuSbcta = listaSubctaDF[(listaSubctaDF['fcc_var_integrity'] == var) & (
                             listaSubctaDF['fcc_registro'].astype(int) == int(df['service']))]
