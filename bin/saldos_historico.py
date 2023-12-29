@@ -425,7 +425,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
 
     #to postgres
     print('Rows inserted:')
-    #print(c)
+    print(c)
 
     fin = time.time()
     print("execution time")
