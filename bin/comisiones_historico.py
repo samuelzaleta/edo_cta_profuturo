@@ -69,7 +69,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
     hoy = today.today()
     print(inicio, hoy)
 
-    saldosDFfile = spark.read.text("gs://dataproc-spark-dev/COMISXSALDO_202301_CORTO_muestra.TXT")
+    saldosDFfile = spark.read.text("gs://dataproc-spark-dev/COMISXSALDO_202204_12_CORTO.txt")
 
     saldosDFfile2 = saldosDFfile.withColumn("cuenta", saldosDFfile["value"][0:10])\
                             .withColumn("periodo", saldosDFfile["value"][11:6])\

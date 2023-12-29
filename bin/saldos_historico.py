@@ -160,7 +160,6 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
     #saldosDFfile2.show(2)
 
     saldosDFfile2.printSchema()
-
     var:str = ''
     mes:int = 0
     anio:int = 0
@@ -220,10 +219,6 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
 
             if float(df['SAL-SALD-CYVTS']):
                 var = 'SAL-SALD-CYVTS'
-                # r = ()
-                # i = 0
-                # r, c = busca_subcuenta(var, df, listaSubctaDF, id_resuSiefore, fecha_liquida, feh_accion, hoy, v_historico)
-                # data.append(r)
                 resuSbcta = listaSubctaDF[(listaSubctaDF['fcc_var_integrity'] == var) & (
                             listaSubctaDF['fcc_registro'].astype(int) == int(df['service']))]
                 id_postgres = resuSbcta['id_tipo_sbcta'].values
@@ -264,13 +259,11 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
 
             if float(df['SAL-SALD-CRES']):
                 var = 'SAL-SALD-CRES'
-                resuSbcta = listaSubctaDF[(listaSubctaDF['fcc_var_integrity'] == var) & (
-                            listaSubctaDF['fcc_registro'].astype(int) == int(df['service']))]
+                #smatest = smatest + float(df['SAL-SALD-CRES'])
+                resuSbcta = listaSubctaDF[(listaSubctaDF['fcc_var_integrity']==var) & (listaSubctaDF['fcc_registro'].astype(int) == int(df['service']))]
                 id_postgres = resuSbcta['id_tipo_sbcta'].values
-                data.append((int(df['cuenta']), int(df['periodo']), float(df['SAL-SALD-CRES']), int(id_resuSiefore[0]),
-                             int(id_postgres[0]), fecha_liquida, feh_accion, 'F', float(df['SAL-SALD-CRES_PESOS']), hoy,
-                             v_historico))
-                c += 1
+                data.append((int(df['cuenta']),int(df['periodo']),float(df['SAL-SALD-CRES']),int(id_resuSiefore[0]),int(id_postgres[0]),fecha_liquida,feh_accion,'F',float(df['SAL-SALD-CRES_PESOS']),hoy,v_historico))
+                c+=1
 
             if float(df['SAL-SALD-CREDS']):
                 var = 'SAL-SALD-CREDS'
