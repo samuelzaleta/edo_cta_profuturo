@@ -192,7 +192,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
     df_insert = spark.createDataFrame(data, schema)
     df_insert = df_insert.withColumn("row_id", monotonically_increasing_id())
     df_insert = df_insert.filter(df_insert.row_id != 0)
-    df_insert = df_insert.filter(df_insert.FCN_ID_PERIODO != 111111)
+    df_insert = df_insert.filter(df_insert.FCN_ID_PERIODO != 1111)
     df_insert = df_insert.drop(col("row_id"))
     
     #print(df_insert.printSchema())
