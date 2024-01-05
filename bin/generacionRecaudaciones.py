@@ -89,7 +89,6 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
 
         unique_clients = df_anverso_general.select("FCN_ID_EDOCTA").distinct().rdd.collect()
         clients = [row.FCN_ID_EDOCTA for row in unique_clients]
-        df_general = df_general.withColumn("vacio", f.lit(None))
 
         df_general = (
             df_general.filter(f.col("FCN_ID_EDOCTA").isin(clients))
@@ -99,7 +98,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                     f.date_format("FTD_FECHA_GRAL_INICIO", "ddMMyyyy").alias("FTD_FECHA_GRAL_INICIO"),
                     f.date_format("FTD_FECHA_GRAL_FIN", "ddMMyyyy").alias("FTD_FECHA_GRAL_FIN"),
                     "FTN_ID_FORMATO",
-                    "FTN_ID_SIEFORE", f.date_format("FTD_FECHA_CORTE", "ddMMyyyy").alias("FTD_FECHA_CORTE"), "vacio",
+                    "FTN_ID_SIEFORE", f.date_format("FTD_FECHA_CORTE", "ddMMyyyy").alias("FTD_FECHA_CORTE"),
                     f.col("FTN_SALDO_SUBTOTAL").cast("decimal(16, 2)"),
                     f.col("FTN_SALDO_TOTAL").cast("decimal(16, 2)"),
                     f.col("FTN_PENSION_MENSUAL").cast("decimal(16, 2)"), "FTC_TIPO_TRABAJADOR",
