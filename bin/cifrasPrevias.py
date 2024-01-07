@@ -63,7 +63,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                 INNER JOIN "HECHOS"."TCHECHOS_CLIENTE" I ON C."FCN_CUENTA" = I."FCN_CUENTA" AND C."FCN_ID_PERIODO" = I."FCN_ID_PERIODO"
                 INNER JOIN "MAESTROS"."TCDATMAE_SIEFORE" S ON C."FCN_ID_SIEFORE" = S."FTN_ID_SIEFORE"
                 INNER JOIN "GESTOR"."TCGESPRO_MOVIMIENTO_PROFUTURO" MP ON MP."FTN_ID_MOVIMIENTO_PROFUTURO" = C."FCN_ID_CONCEPTO_MOVIMIENTO"
-            WHERE R."FCN_ID_PERIODO"
+            WHERE C."FCN_ID_PERIODO"
                     BETWEEN cast(TO_CHAR(DATE_TRUNC('MONTH', :start - INTERVAL '4 month'), 'YYYYMM') as int) and cast( TO_CHAR(DATE_TRUNC('MONTH', :end), 'YYYYMM') as int)
             GROUP BY  I."FTC_GENERACION", I."FTC_VIGENCIA", I."FTC_TIPO_CLIENTE", I."FTC_ORIGEN", S."FTC_DESCRIPCION_CORTA", MP."FTC_DESCRIPCION"
             """,

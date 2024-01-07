@@ -253,9 +253,11 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                 SELECT
                 PG.FTN_NUM_CTA_INVDUAL AS FCN_CUENTA,
                 CASE
-                WHEN PG.FCN_ID_SUBPROCESO = 310 THEN 'PENSIÓN MÍNIMA GARANTIZADA ISSSTE'
-                    ELSE 'PENSIÓN MÍNIMA GARANTIZADA IMSS'
-                    END FTC_TIPO_PENSION,
+                WHEN PG.FCN_ID_SUBPROCESO = 310 THEN 'Pensión garantizada'
+                WHEN PG.FCN_ID_SUBPROCESO = 309 THEN 'Pensión garantizada'
+                WHEN PG.FCN_ID_SUBPROCESO = 330 THEN 'Retiro programado'
+                ELSE 'Retiro programado'
+                END FTC_TIPO_PENSION,
                 SUM(PGS.FTN_MONTO_PESOS) AS FTN_MONTO_PEN
                 FROM BENEFICIOS.TTCRXGRAL_PAGO PG
                     INNER JOIN BENEFICIOS.TTCRXGRAL_PAGO_SUBCTA PGS
@@ -263,7 +265,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                     INNER JOIN BENEFICIOS.TTAFORETI_TRAMITE TR
                     ON TR.FTN_FOLIO_TRAMITE = PG.FTN_FOLIO_TRAMITE
                 WHERE PG.FCN_ID_PROCESO IN (4050,4051)
-                        AND PG.FCN_ID_SUBPROCESO IN (309, 310)
+                        AND PG.FCN_ID_SUBPROCESO IN (309, 310, 330,331)
                         AND PGS.FCN_ID_TIPO_SUBCTA NOT IN (15,16,17,18)
                         AND TRUNC(PG.FTD_FEH_LIQUIDACION) <= :end
                 GROUP BY
