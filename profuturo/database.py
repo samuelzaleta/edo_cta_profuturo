@@ -156,6 +156,21 @@ def configure_buc_spark(connection: SparkConnection, table: str, reading: bool) 
         .option("password", password)
 
 
+def configure_mitedocta_spark(connection: SparkConnection, table: str, reading: bool) -> SparkConnection:
+    host = "172.22.164.19"  #os.getenv("MITEDOCTA_HOST")
+    port = 16161 #int(os.getenv("MITEDOCTA_PORT"))
+    service_name = "QA34" #os.getenv("MITEDOCTA_DATABASE")
+    user = "CLUNICO" #os.getenv("MITEDOCTA_USER")
+    password = "temp4now13" #os.getenv("MITEDOCTA_PASSWORD")
+
+    return configure_jdbc_spark(connection, table, reading) \
+        .option("url", f"jdbc:oracle:thin:@//{host}:{port}/{service_name}") \
+        .option("driver", "oracle.jdbc.driver.OracleDriver") \
+        .option("oracle.jdbc.timezoneAsRegion", False) \
+        .option("user", user) \
+        .option("password", password)
+
+
 def configure_integrity_spark(database: str) -> SparkConnectionConfigurator:
     def creator(connection, table, reading):
         host = os.getenv("INTEGRITY_HOST")

@@ -1,6 +1,6 @@
 from profuturo.common import register_time, define_extraction, notify
-from profuturo.database import get_postgres_pool, get_mit_pool
-from profuturo.extraction import upsert_dataset, extract_terms, _get_spark_session
+from profuturo.database import get_postgres_pool, get_mit_pool, configure_postgres_spark, configure_bigquery_spark, get_bigquery_pool, configure_mitedocta_spark
+from profuturo.extraction import upsert_dataset, extract_terms, _get_spark_session, _write_spark_dataframe, _create_spark_dataframe
 import sys
 
 postgres_pool = get_postgres_pool()
@@ -17,6 +17,7 @@ with define_extraction(phase, area, postgres_pool, mit_pool) as (postgres, mit):
     spark = _get_spark_session()
 
     with register_time(postgres_pool, phase, term_id, user, area):
+
         upsert_dataset(mit, postgres, """
         SELECT S.FCN_ID_SIEFORE AS id, C.FCC_VALOR AS description
         FROM TCCRXGRAL_SIEFORE S

@@ -69,7 +69,8 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
     hoy = today.today()
     print(inicio, hoy)
 
-    saldosDFfile = spark.read.text("gs://dataproc-spark-dev/COMISXSALDO_202301_CORTO_muestra.TXT")
+    #saldosDFfile = spark.read.text("gs://dataproc-spark-dev/COMISXSALDO_202204_12_CORTO.txt")
+    saldosDFfile = spark.read.text("gs://cargas_historico/COMISXSALDO_202204_12_CORTO.txt")
 
     saldosDFfile2 = saldosDFfile.withColumn("cuenta", saldosDFfile["value"][0:10])\
                             .withColumn("periodo", saldosDFfile["value"][11:6])\
@@ -83,7 +84,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                             .withColumn("COM_RCV_IS", saldosDFfile["value"][150:18])\
                             .withColumn("COM_AHO_SOL", saldosDFfile["value"][169:18])
                             #.withColumn("cuenta", saldosDFfile["value"].cast(IntegerType()))
-    print(saldosDFfile2.printSchema())
+    #print(saldosDFfile2.printSchema())
     #print(saldosDFfile2.select("COM_AVOL").collect())
     #print(saldosDFfile2.show())
 
@@ -192,14 +193,15 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
     df_insert = spark.createDataFrame(data, schema)
     df_insert = df_insert.withColumn("row_id", monotonically_increasing_id())
     df_insert = df_insert.filter(df_insert.row_id != 0)
-    df_insert = df_insert.withColumn("FTF_MONTO_ACCIONES", col("FTF_MONTO_ACCIONES").cast(DecimalType(12, 6)))
+    df_insert = df_insert.filter(df_insert.FCN_ID_PERIODO != 1111)
     df_insert = df_insert.drop(col("row_id"))
     
     #print(df_insert.printSchema())
-    df_insert.show(3)
+    df_insert.show(5)
 
     _write_spark_dataframe(df_insert, configure_postgres_spark, '"HECHOS"."TTHECHOS_COMISION"')
 
+    print(data[:5])
     print('Rows to insert:')
     print(c)
 

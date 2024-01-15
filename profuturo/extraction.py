@@ -1,5 +1,5 @@
 from pyspark.sql import SparkSession, DataFrame as SparkDataFrame
-from pyspark.sql.functions import lit
+from pyspark.sql.functions import lit, array
 from sqlalchemy.sql.compiler import Compiled
 from sqlalchemy.engine import Row, RowMapping, Connection
 from sqlalchemy import text
@@ -66,16 +66,19 @@ def update_indicator_spark(
     term: int = None,
     params: Dict[str, Any] = None,
     limit: int = None,
+    area: int = None
 ):
     def transform(df: SparkDataFrame) -> SparkDataFrame:
+        print(indicator["FTB_DISPONIBLE"])
         return df \
             .withColumn('FCN_ID_INDICADOR', lit(indicator["FTN_ID_INDICADOR"])) \
-            .withColumn('FTN_EVALUA_INDICADOR', lit(
-                (indicator["FTB_DISPONIBLE"] << 3) +
-                (indicator["FTB_IMPRESION"] << 2) +
-                (indicator["FTB_ENVIO"] << 1) +
-                indicator["FTB_GENERACION"]
-            ))
+            .withColumn('FCN_ID_AREA', lit(area)) \
+                        .withColumn('FTA_EVALUA_INDICADOR', array(
+            lit(indicator["FTB_DISPONIBLE"]),
+            lit(indicator["FTB_ENVIO"]),
+            lit(indicator["FTB_IMPRESION"]),
+            lit(indicator["FTB_GENERACION"])
+        ))
 
     try:
         extract_dataset_spark(

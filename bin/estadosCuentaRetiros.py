@@ -128,7 +128,7 @@ with define_extraction(phase, area, postgres_pool,bigquery_pool) as (postgres, b
 
         notify(
             postgres,
-            "Generacion muestras retiros",
+            "Generacion estados de cuenta retiros",
             phase,
             area,
             term=term_id,
