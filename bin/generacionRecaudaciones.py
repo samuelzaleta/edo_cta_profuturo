@@ -1,7 +1,7 @@
 import sys
-import paramiko
 import smtplib
 import random
+import paramiko
 from profuturo.common import register_time, define_extraction, notify
 from profuturo.database import get_postgres_pool
 from profuturo.extraction import extract_terms, _get_spark_session
@@ -35,12 +35,6 @@ def get_buckets():
 
 bucket = storage_client.get_bucket(get_buckets())
 
-def generate_password(length=12, chars="abcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()-_=+[]{}()<>,.?/;'"):
-    characters = list(chars)
-    random.shuffle(characters)
-    password = "".join([characters.pop() for _ in range(length)])
-    return password
-
 
 def extract_bigquery(table):
     df = spark.read.format('bigquery') \
@@ -71,7 +65,7 @@ def get_months(cuatrimestre):
 def upload_file_to_sftp(hostname, username, password, local_file_path, remote_file_path, data):
     with open(f"{local_file_path}", "w") as file:
         file.write(data)
-
+        
     try:
         transport = paramiko.Transport((hostname, 22))
         transport.connect(username=username, password=password)
@@ -92,7 +86,7 @@ def upload_file_to_sftp(hostname, username, password, local_file_path, remote_fi
 
 def send_email(host, port, from_address, to_address, subject, body):
     username = "Profuturo"
-    password = generate_password()
+    password = ""
     server = smtplib.SMTP(host, port)
     server.login(username, password)
     message = "Subject: {}\n\n{}".format(subject, body)
@@ -222,14 +216,14 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
             final_row = f"\n5|{general_count}|{ahorro_count}|{bono_count}|{saldo_count}|{total_count}"
             data_strings = res + final_row
 
-            name_anverso = f"recaudacion_anverso_mensual_{month[:4]}_{month[-2:]}_1-1.txt" if type(
-                month) == int else f"recaudacion_anverso_cuatrimestral_{cuatrimestre[:4]}_{cuatrimestre[-2:]}_1-1.txt"
+            name_anverso = f"recaudacion_anverso_mensual_{str(month)[:4]}_{str(month)[-2:]}_1-1.txt" if type(
+                month) == int else f"recaudacion_anverso_cuatrimestral_{str(cuatrimestre)[:4]}_{str(cuatrimestre)[-2:]}_1-1.txt"
 
             str_to_gcs(data_strings, name_anverso)
 
-            #upload_file_to_sftp("", "", "", name_anverso, "", data_strings)
+            upload_file_to_sftp("", "", "", name_anverso, "", data_strings)
 
-            #body_message += f"Se generó el archivo de {name_anverso} con un total de {total_count} registros\n"
+            body_message += f"Se generó el archivo de {name_anverso} con un total de {total_count} registros\n"
 
             df_edo_reverso = extract_bigquery('ESTADO_CUENTA.TTEDOCTA_REVERSO')
 
@@ -254,18 +248,18 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
             reverso_final_row = f"\n2|{ret}|{vol}|{viv}|{total}"
             final_reverso = res + reverso_final_row
 
-            name_reverso = f"recaudacion_reverso_mensual_{month[:4]}_{month[-2:]}_1-1.txt" if type(
-                month) == int else f"recaudacion_reverso_cuatrimestral_{cuatrimestre[:4]}_{cuatrimestre[-2:]}_1-1.txt"
+            name_reverso = f"recaudacion_reverso_mensual_{str(month)[:4]}_{str(month)[-2:]}_1-1.txt" if type(
+                month) == int else f"recaudacion_reverso_cuatrimestral_{str(cuatrimestre)[:4]}_{str(cuatrimestre)[-2:]}_1-1.txt"
 
             str_to_gcs(final_reverso, name_reverso)
-        """
+
             upload_file_to_sftp("", "", "", name_reverso, "", final_reverso)
 
             body_message += f"Se generó el archivo de {name_reverso} con un total de {total} registros\n"
 
         send_email(
-            host="smtp.example.com",
-            port=587,
+            host="cluster4.us.messagelabs.com",
+            port=25,
             from_address="sender@example.com",
             to_address="alfredo.guerra@profuturo.com.mx",
             subject="Generacion de los archivos de recaudacion",
@@ -281,4 +275,4 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
             message=f"Se han exportado recaudaciones para el cuatrimestre {cuatrimestre}",
             aprobar=False,
             descarga=False
-        )"""
+        )

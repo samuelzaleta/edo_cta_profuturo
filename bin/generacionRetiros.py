@@ -9,7 +9,6 @@ from profuturo.reporters import HtmlReporter
 from google.cloud import storage, bigquery
 import pyspark.sql.functions as f
 
-
 spark = _get_spark_session()
 
 html_reporter = HtmlReporter()
@@ -25,19 +24,15 @@ bigquery_client = bigquery.Client()
 bigquery_project = bigquery_client.project
 
 
-def generate_password(length=12, chars="abcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()-_=+[]{}()<>,.?/;'"):
-    characters = list(chars)
-    random.shuffle(characters)
-    password = "".join([characters.pop() for _ in range(length)])
-    return password
-
-
 def get_buckets():
     buckets = storage_client.list_buckets()
 
     for bucket in buckets:
         if bucket.name.startswith("edo_cuenta_profuturo"):
             return bucket.name
+
+
+bucket = storage_client.get_bucket(get_buckets())
 
 
 def extract_bigquery(table):
@@ -86,7 +81,7 @@ def upload_file_to_sftp(hostname, username, password, local_file_path, remote_fi
 
 def send_email(host, port, from_address, to_address, subject, body):
     username = "Profuturo"
-    password = generate_password()
+    password = ""
     server = smtplib.SMTP(host, port)
     server.login(username, password)
     message = "Subject: {}\n\n{}".format(subject, body)
@@ -106,34 +101,23 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
         full_months = months + [months]
         body_message = ""
 
-        retiros_general_columns = ["FCN_NUMERO_CUENTA", "FTC_NOMBRE", "FTC_CALLE_NUMERO", "FTC_COLONIA", "FTC_MUNICIPIO"
-            , "FTC_CP", "FTC_ENTIDAD", "FTC_CURP", "FTC_RFC", "FTC_NSS"]
-        retiros_columns = ["FCN_NUMERO_CUENTA", "FTD_FECHA_EMISION", "FTN_SDO_INI_AHO_RET", "FTN_SDO_INI_AHO_VIV",
-                           "FTN_SDO_TRA_AHO_RET", "FTN_SDO_TRA_AHO_VIV", "FTN_SDO_REM_AHO_RET", "FTN_SDO_REM_AHO_VIV",
-                           "FTC_LEY_PENSION", "FTC_REGIMEN", "FTC_SEGURO", "FTC_TIPO_PENSION", "FTC_FON_ENTIDAD",
-                           "FTC_FON_NUMERO_POLIZA", "FTN_FON_MONTO_TRANSF", "FTD_FON_FECHA_TRANSF",
-                           "TFN_FON_RETENCION_ISR", "FTC_AFO_ENTIDAD", "FTC_AFO_MEDIO_PAGO", "FTC_AFO_RECURSOS_ENTREGA",
-                           "FTD_AFO_FECHA_ENTREGA", "FTC_AFO_RETENCION_ISR", "FTC_INFNVT_ENTIDAD",
-                           "FTC_INFNVT_CTA_BANCARIA", "FTC_INFNVT_RECURSOS_ENTREGA", "FTC_INFNVT_FECHA_ENTREGA",
-                           "FTC_INFNVT_RETENCION_ISR", "FTD_FECHA_INICIO_PENSION",
-                           "FTN_PENSION_INSTITUTO_SEG", "FTN_SALDO_FINAL"]
-
         for month in full_months:
 
             if type(month) == list:
                 retiros_general = (
-                    extract_bigquery('ESTADO_CUENTA.TTMUESTR_RETIRO_GENERAL').filter(f.col("FCN_ID_PERIODO").isin(month))
+                    extract_bigquery('ESTADO_CUENTA.TTEDOCTA_RETIRO_GENERAL').filter(
+                        f.col("FCN_ID_PERIODO").isin(month))
                 )
                 retiros = (
-                    extract_bigquery('ESTADO_CUENTA.TTMUESTR_RETIRO').filter(f.col("FCN_ID_PERIODO").isin(month))
+                    extract_bigquery('ESTADO_CUENTA.TTEDOCTA_RETIRO').filter(f.col("FCN_ID_PERIODO").isin(month))
                 )
             else:
                 retiros_general = (
-                    extract_bigquery('ESTADO_CUENTA.TTMUESTR_RETIRO_GENERAL').filter(
+                    extract_bigquery('ESTADO_CUENTA.TTEDOCTA_RETIRO_GENERAL').filter(
                         f.col("FCN_ID_PERIODO") == month)
                 )
                 retiros = (
-                    extract_bigquery('ESTADO_CUENTA.TTMUESTR_RETIRO').filter(f.col("FCN_ID_PERIODO") == month)
+                    extract_bigquery('ESTADO_CUENTA.TTEDOCTA_RETIRO').filter(f.col("FCN_ID_PERIODO") == month)
                 )
 
             retiros_general = (
@@ -144,35 +128,45 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
 
             retiros = (
                 retiros
-                .select("FCN_NUMERO_CUENTA", "FTD_FECHA_EMISION", "FTN_SDO_INI_AHO_RET", "FTN_SDO_INI_AHO_VIV",
-                        "FTN_SDO_TRA_AHO_RET", "FTN_SDO_TRA_AHO_VIV", "FTN_SDO_REM_AHO_RET", "FTN_SDO_REM_AHO_VIV",
+                .select("FCN_NUMERO_CUENTA", f.date_format("FTD_FECHA_EMISION", "ddMMyyyy").alias("FTD_FECHA_EMISION"),
+                        f.col("FTN_SDO_INI_AHO_RET").cast("decimal(16, 2)"),
+                        f.col("FTN_SDO_INI_AHO_VIV").cast("decimal(16, 2)"),
+                        f.col("FTN_SDO_TRA_AHO_RET").cast("decimal(16, 2)"),
+                        f.col("FTN_SDO_TRA_AHO_VIV").cast("decimal(16, 2)"),
+                        f.col("FTN_SDO_REM_AHO_RET").cast("decimal(16, 2)"),
+                        f.col("FTN_SDO_REM_AHO_VIV").cast("decimal(16, 2)"),
                         "FTC_LEY_PENSION", "FTC_REGIMEN", "FTC_SEGURO", "FTC_TIPO_PENSION", "FTC_FON_ENTIDAD",
-                        "FTC_FON_NUMERO_POLIZA", "FTN_FON_MONTO_TRANSF", "FTD_FON_FECHA_TRANSF",
-                        "TFN_FON_RETENCION_ISR", "FTC_AFO_ENTIDAD", "FTC_AFO_MEDIO_PAGO", "FTC_AFO_RECURSOS_ENTREGA",
-                        "FTD_AFO_FECHA_ENTREGA", "FTC_AFO_RETENCION_ISR", "FTC_INFNVT_ENTIDAD",
+                        "FTC_FON_NUMERO_POLIZA", f.col("FTN_FON_MONTO_TRANSF").cast("decimal(16, 2)"),
+                        f.date_format("FTD_FON_FECHA_TRANSF", "ddMMyyyy").alias("FTD_FON_FECHA_TRANSF"),
+                        f.col("TFN_FON_RETENCION_ISR").cast("decimal(16, 2)"), "FTC_AFO_ENTIDAD", "FTC_AFO_MEDIO_PAGO",
+                        "FTC_AFO_RECURSOS_ENTREGA",
+                        f.date_format("FTD_AFO_FECHA_ENTREGA", "ddMMyyyy").alias("FTD_AFO_FECHA_ENTREGA"),
+                        "FTC_AFO_RETENCION_ISR", "FTC_INFNVT_ENTIDAD",
                         "FTC_INFNVT_CTA_BANCARIA", "FTC_INFNVT_RECURSOS_ENTREGA", "FTC_INFNVT_FECHA_ENTREGA",
-                        "FTC_INFNVT_RETENCION_ISR", f.col("FTD_FECHA_EMISION").alias("FTD_FECHA_EMISION_2"),
-                        "FTD_FECHA_INICIO_PENSION", "FTN_PENSION_INSTITUTO_SEG", "FTN_SALDO_FINAL")
+                        "FTC_INFNVT_RETENCION_ISR",
+                        f.date_format("FTD_FECHA_EMISION", "ddMMyyyy").alias("FTD_FECHA_EMISION_2"),
+                        f.date_format("FTD_FECHA_INICIO_PENSION", "ddMMyyyy").alias("FTD_FECHA_INICIO_PENSION"),
+                        f.col("FTN_PENSION_INSTITUTO_SEG").cast("decimal(16, 2)"),
+                        f.col("FTN_SALDO_FINAL").cast("decimal(16, 2)"))
             )
 
-            bucket = get_buckets()
             df = retiros_general.join(retiros, 'FCN_NUMERO_CUENTA').drop(retiros['FCN_NUMERO_CUENTA'])
             total = df.count()
             processed_data = df.rdd.flatMap(lambda row: [([row[i] for i in range(len(row))])]).collect()
             res = "\n".join("|".join(str(item) for item in row) for row in processed_data)
 
-            name = f"retiros_mensual_{month[:4]}_{month[-2:]}_1-1.txt" if type(
-                month) == int else f"retiros_cuatrimestral_{cuatrimestre[:4]}_{cuatrimestre[-2:]}_1-1.txt"
+            name = f"retiros_mensual_{str(month)[:4]}_{str(month)[-2:]}_1-1.txt" if type(
+                month) == int else f"retiros_cuatrimestral_{str(cuatrimestre)[:4]}_{str(cuatrimestre)[-2:]}_1-1.txt"
 
             str_to_gcs(res, name)
-        """
+
             upload_file_to_sftp("", "", "", name, "", res)
 
             body_message += f"Se generó el archivo de {name} con un total de {total} registros\n"
 
         send_email(
-            host="smtp.example.com",
-            port=587,
+            host="cluster4.us.messagelabs.com",
+            port=25,
             from_address="sender@example.com",
             to_address="alfredo.guerra@profuturo.com.mx",
             subject="Generacion de los archivos de recaudacion",
@@ -189,4 +183,4 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
             aprobar=False,
             descarga=False
         )
-        """
+
