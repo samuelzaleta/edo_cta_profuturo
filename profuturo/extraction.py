@@ -409,6 +409,7 @@ def _write_spark_dataframe(
 ) -> None:
     connection_configurator(df.write, table, False) \
         .mode(mode) \
+        .option("numRowsPerSparkPartition", 20000) \
         .save()
 
 
