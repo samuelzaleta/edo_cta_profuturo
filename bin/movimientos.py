@@ -25,7 +25,8 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
         # Extracción
         truncate_table(postgres, 'TTHECHOS_MOVIMIENTO', term=term_id)
         extract_dataset_spark(configure_mit_spark, configure_postgres_spark, """
-        SELECT DT.FTN_NUM_CTA_INVDUAL AS FCN_CUENTA,
+        SELECT DISTINCT 
+               DT.FTN_NUM_CTA_INVDUAL AS FCN_CUENTA,
                DT.FCN_ID_TIPO_MOV AS FCN_ID_TIPO_MOVIMIENTO,
                DT.FCN_ID_CONCEPTO_MOV AS FCN_ID_CONCEPTO_MOVIMIENTO,
                DT.FCN_ID_TIPO_SUBCTA AS FCN_ID_TIPO_SUBCTA,
@@ -53,7 +54,8 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
         WHERE FTD_FEH_LIQUIDACION BETWEEN :start AND :end
         """, table, term=term_id, params={"start": start_month, "end": end_month})
         extract_dataset_spark(configure_mit_spark, configure_postgres_spark, """
-        SELECT FTN_NUM_CTA_INVDUAL AS FCN_CUENTA,
+        SELECT DISTINCT 
+               FTN_NUM_CTA_INVDUAL AS FCN_CUENTA,
                FCN_ID_TIPO_MOV AS FCN_ID_TIPO_MOVIMIENTO,
                FCN_ID_CONCEPTO_MOV AS FCN_ID_CONCEPTO_MOVIMIENTO,
                FCN_ID_TIPO_SUBCTA,
@@ -67,7 +69,8 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
         WHERE FTD_FEH_LIQUIDACION BETWEEN :start AND :end
         """, table, term=term_id, params={"start": start_month, "end": end_month})
         extract_dataset_spark(configure_mit_spark, configure_postgres_spark, """
-        SELECT DT.FTN_NUM_CTA_INVDUAL AS FCN_CUENTA,
+        SELECT DISTINCT 
+               DT.FTN_NUM_CTA_INVDUAL AS FCN_CUENTA,
                DT.FCN_ID_TIPO_MOV AS FCN_ID_TIPO_MOVIMIENTO,
                DT.FCN_ID_CONCEPTO_MOV AS FCN_ID_CONCEPTO_MOVIMIENTO,
                DT.FCN_ID_TIPO_SUBCTA AS FCN_ID_TIPO_SUBCTA,
@@ -94,7 +97,8 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
         WHERE FTD_FEH_LIQUIDACION BETWEEN :start AND :end
         """, table, term=term_id, params={"start": start_month, "end": end_month})
         extract_dataset_spark(configure_mit_spark, configure_postgres_spark, """
-        SELECT FTN_NUM_CTA_INVDUAL AS FCN_CUENTA,
+        SELECT DISTINCT 
+               FTN_NUM_CTA_INVDUAL AS FCN_CUENTA,
                FCN_ID_TIPO_MOV AS FCN_ID_TIPO_MOVIMIENTO,
                FCN_ID_CONCEPTO_MOV AS FCN_ID_CONCEPTO_MOVIMIENTO,
                FCN_ID_TIPO_SUBCTA,
@@ -108,7 +112,8 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
         WHERE FTD_FEH_LIQUIDACION BETWEEN :start AND :end
         """, table, term=term_id, params={"start": start_month, "end": end_month})
         extract_dataset_spark(configure_mit_spark, configure_postgres_spark, """
-        SELECT DT.FTN_NUM_CTA_INVDUAL AS FCN_CUENTA,
+        SELECT DISTINCT 
+               DT.FTN_NUM_CTA_INVDUAL AS FCN_CUENTA,
                DT.FCN_ID_TIPO_MOV AS FCN_ID_TIPO_MOVIMIENTO,
                DT.FCN_ID_CONCEPTO_MOV AS FCN_ID_CONCEPTO_MOVIMIENTO,
                DT.FCN_ID_TIPO_SUBCTA AS FCN_ID_TIPO_SUBCTA,
@@ -135,7 +140,8 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
         WHERE FTD_FEH_LIQUIDACION BETWEEN :start AND :end
         """, table, term=term_id, params={"start": start_month, "end": end_month})
         extract_dataset_spark(configure_mit_spark, configure_postgres_spark, """
-        SELECT FTN_NUM_CTA_INVDUAL AS FCN_CUENTA,
+        SELECT DISTINCT 
+               FTN_NUM_CTA_INVDUAL AS FCN_CUENTA,
                FCN_ID_TIPO_MOV AS FCN_ID_TIPO_MOVIMIENTO,
                FCN_ID_CONCEPTO_MOV AS FCN_ID_CONCEPTO_MOVIMIENTO,
                FCN_ID_TIPO_SUBCTA,
@@ -149,7 +155,8 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
         WHERE FTD_FEH_LIQUIDACION BETWEEN :start AND :end
         """, table, term=term_id, params={"start": start_month, "end": end_month})
         extract_dataset_spark(configure_mit_spark, configure_postgres_spark, """
-        SELECT FTN_NUM_CTA_INVDUAL AS FCN_CUENTA,
+        SELECT DISTINCT 
+               FTN_NUM_CTA_INVDUAL AS FCN_CUENTA,
                FCN_ID_TIPO_MOV AS FCN_ID_TIPO_MOVIMIENTO,
                FCN_ID_CONCEPTO_MOV AS FCN_ID_CONCEPTO_MOVIMIENTO,
                FCN_ID_TIPO_SUBCTA,

@@ -16,8 +16,10 @@ def load_secrets():
 
     secrets = client.list_secrets(parent=f'projects/{os.getenv("GCP_PROJECT")}')
     for secret in secrets:
-        secret_id = secret.name.split('/').pop()
-        response = client.access_secret_version(name=f"{secret.name}/versions/latest")
-
-        os.environ[secret_id] = response.payload.data.decode("utf-8")
+        try:
+            secret_id = secret.name.split('/').pop()
+            response = client.access_secret_version(name=f"{secret.name}/versions/latest")
+            os.environ[secret_id] = response.payload.data.decode("utf-8")
+        except Exception:
+            pass
     print("Loaded secrets from Secret Manager")
