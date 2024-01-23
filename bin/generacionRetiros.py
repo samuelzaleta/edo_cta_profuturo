@@ -129,7 +129,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                 f.col("FTC_INFNVT_FECHA_ENTREGA").cast("string"),
                 f.col("FTC_INFNVT_RETENCION_ISR").cast("decimal(16, 2)"),
                 "FTD_FECHA_EMISION_2",
-                f.date_format("FTC_FECHA_INICIO_PENSION", "yyyyMMdd").alias("FTD_FECHA_INICIO_PENSION"),
+                f.date_format("FTC_FECHA_INICIO_PENSION", "yyyyMMdd").alias("FTC_FECHA_INICIO_PENSION"),
                 f.col("FTN_PENSION_INSTITUTO_SEG").cast("decimal(16, 2)"),
                 f.col("FTN_SALDO_FINAL").cast("decimal(16, 2)"))
         )
