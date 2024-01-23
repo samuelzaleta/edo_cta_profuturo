@@ -1,12 +1,11 @@
 import sys
 import smtplib
-import random
 import paramiko
 from profuturo.common import register_time, define_extraction, notify
 from profuturo.database import get_postgres_pool
 from profuturo.extraction import extract_terms, _get_spark_session
 from profuturo.reporters import HtmlReporter
-from google.cloud import storage, bigquery
+from google.cloud import storage, bigquery, secretmanager
 import pyspark.sql.functions as f
 
 
@@ -23,6 +22,17 @@ area = int(sys.argv[4])
 storage_client = storage.Client()
 bigquery_client = bigquery.Client()
 bigquery_project = bigquery_client.project
+
+client = secretmanager.SecretManagerServiceClient()
+"""smtp_host = client.access_secret_version(name="SMTP_HOST").payload.data.decode("UTF-8")
+smtp_port = client.access_secret_version(name="SMTP_PORT").payload.data.decode("UTF-8")
+smtp_user = client.access_secret_version(name="SMTP_ADDRESS_SENDER").payload.data.decode("UTF-8")
+smtp_pass = client.access_secret_version(name="SMTP_PASSWORD_SENDER").payload.data.decode("UTF-8")
+sftp_host = client.access_secret_version(name="SFTP_HOST").payload.data.decode("UTF-8")
+sftp_port = client.access_secret_version(name="SFTP_PORT").payload.data.decode("UTF-8")
+sftp_user = client.access_secret_version(name="SFTP_USERNAME").payload.data.decode("UTF-8")
+sftp_pass = client.access_secret_version(name="SFTP_PASSWORD").payload.data.decode("UTF-8")
+sftp_remote_file_path = client.access_secret_version(name="SFTP_CARPETA_DESTINO").payload.data.decode("UTF-8")"""
 
 
 def get_buckets():
@@ -84,9 +94,7 @@ def upload_file_to_sftp(hostname, username, password, local_file_path, remote_fi
         transport.close()
 
 
-def send_email(host, port, from_address, to_address, subject, body):
-    username = "Profuturo"
-    password = ""
+def send_email(host, port, username, password, from_address, to_address, subject, body):
     server = smtplib.SMTP(host, port)
     server.login(username, password)
     message = "Subject: {}\n\n{}".format(subject, body)
@@ -204,10 +212,10 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
             saldo_count = df_anverso_sdo.count()
 
             processed_data = []
-            processed_data += process_dataframe(df_general, 1)
-            processed_data += process_dataframe(df_anverso_aho, 2)
-            processed_data += process_dataframe(df_anverso_bon, 3)
-            processed_data += process_dataframe(df_anverso_sdo, 4)
+            processed_data += process_dataframe(df_general.fillna("").fillna(0), 1)
+            processed_data += process_dataframe(df_anverso_aho.fillna("").fillna(0), 2)
+            processed_data += process_dataframe(df_anverso_bon.fillna("").fillna(0), 3)
+            processed_data += process_dataframe(df_anverso_sdo.fillna("").fillna(0), 4)
 
             res = "\n".join("|".join(str(item) for item in row) for row in processed_data)
 
@@ -221,7 +229,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
 
             str_to_gcs(data_strings, name_anverso)
 
-            upload_file_to_sftp("", "", "", name_anverso, "", data_strings)
+            #upload_file_to_sftp(sftp_host, sftp_user, sftp_pass, name_anverso, sftp_remote_file_path, data_strings)
 
             body_message += f"Se generó el archivo de {name_anverso} con un total de {total_count} registros\n"
 
@@ -237,7 +245,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                                           f.col("FTN_MONTO").cast("decimal(16, 2)"))
             )
 
-            reverso_data = process_dataframe(df_reverso_general, 1)
+            reverso_data = process_dataframe(df_reverso_general.fillna("").fillna(0), 1)
 
             res = "\n".join("|".join(str(item) for item in row) for row in reverso_data)
 
@@ -253,14 +261,16 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
 
             str_to_gcs(final_reverso, name_reverso)
 
-            upload_file_to_sftp("", "", "", name_reverso, "", final_reverso)
+            #upload_file_to_sftp(sftp_host, sftp_user, sftp_pass, name_reverso, "", final_reverso)
 
             body_message += f"Se generó el archivo de {name_reverso} con un total de {total} registros\n"
 
-        send_email(
-            host="cluster4.us.messagelabs.com",
-            port=25,
-            from_address="sender@example.com",
+        """send_email(
+            host=smtp_host,
+            port=smtp_port,
+            username=smtp_user,
+            password=smtp_pass,
+            from_address=smtp_user,
             to_address="alfredo.guerra@profuturo.com.mx",
             subject="Generacion de los archivos de recaudacion",
             body=body_message
@@ -275,4 +285,4 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
             message=f"Se han exportado recaudaciones para el cuatrimestre {cuatrimestre}",
             aprobar=False,
             descarga=False
-        )
+        )"""
