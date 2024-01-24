@@ -129,7 +129,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                 f.col("FTC_INFNVT_FECHA_ENTREGA").cast("string"),
                 f.col("FTC_INFNVT_RETENCION_ISR").cast("decimal(16, 2)"),
                 "FTD_FECHA_EMISION_2",
-                f.date_format("FTC_FECHA_INICIO_PENSION", "yyyyMMdd").alias("FTC_FECHA_INICIO_PENSION"),
+                retiros.FTC_FECHA_INICIO_PENSION.alias("FTC_FECHA_INICIO_PENSION"),
                 f.col("FTN_PENSION_INSTITUTO_SEG").cast("decimal(16, 2)"),
                 f.col("FTN_SALDO_FINAL").cast("decimal(16, 2)"))
         )
@@ -184,7 +184,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
             .withColumn("FTC_INFNVT_RETENCION_ISR",
                         f.lpad(f.translate(f.col("FTC_INFNVT_RETENCION_ISR").cast("string"), ".", ""), 10, "0"))
             .withColumn("FTD_FECHA_EMISION_2", f.rpad(f.col("FTD_FECHA_EMISION_2").cast("string"), 8, " "))
-            .withColumn("FTD_FECHA_INICIO_PENSION", f.rpad(f.col("FTD_FECHA_INICIO_PENSION").cast("string"), 8, " "))
+            .withColumn("FTC_FECHA_INICIO_PENSION", f.rpad(f.col("FTC_FECHA_INICIO_PENSION").cast("string"), 8, " "))
             .withColumn("FTN_PENSION_INSTITUTO_SEG", f.rpad(f.col("FTN_PENSION_INSTITUTO_SEG"), 13, " "))
             .withColumn("FTN_SALDO_FINAL",
                         f.lpad(f.translate(f.col("FTN_SALDO_FINAL").cast("string"), ".", ""), 10, "0"))
