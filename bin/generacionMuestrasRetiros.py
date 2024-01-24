@@ -69,7 +69,7 @@ with define_extraction(phase, area, postgres_pool,bigquery_pool) as (postgres, b
           """
                 SELECT
                 R."FCN_CUENTA" AS "FCN_NUMERO_CUENTA",
-                --"FTC_FOLIO",
+                :term AS "FCN_ID_PERIODO",
                 "FTN_SDO_INI_AHORRORET" AS "FTN_SDO_INI_AHO_RET",
                 "FTN_SDO_INI_VIVIENDA" AS "FTN_SDO_INI_AHO_VIV",
                 "FTN_SDO_TRA_AHORRORET" AS "FTN_SDO_TRA_AHO_RET",
