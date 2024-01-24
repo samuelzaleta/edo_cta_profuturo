@@ -31,16 +31,17 @@ with define_extraction(phase, area, postgres_pool, mit_pool) as (postgres, mit):
 
         upsert_dataset(mit, postgres, """
         SELECT S.FCN_ID_TIPO_SUBCTA AS id, S.FCN_ID_REGIMEN AS regime_id, S.FCN_ID_CAT_SUBCTA AS subacc_cat_id, 
-               C.FCC_VALOR AS description
+               C.FCC_VALOR AS description, CC.FCC_VALOR as description_siefore
         FROM TCCRXGRAL_TIPO_SUBCTA S
         INNER JOIN TCCRXGRAL_CAT_CATALOGO C ON S.FCN_ID_CAT_SUBCTA = C.FCN_ID_CAT_CATALOGO
+        INNER JOIN TCCRXGRAL_CAT_CATALOGO CC ON S.FCN_ID_REGIMEN = C.FCN_ID_CAT_CATALOGO
         """, """
-        INSERT INTO "TCDATMAE_TIPO_SUBCUENTA"("FTN_ID_TIPO_SUBCTA", "FCN_ID_REGIMEN", "FCN_ID_CAT_SUBCTA", "FCC_VALOR")
+        INSERT INTO "TCDATMAE_TIPO_SUBCUENTA"("FTN_ID_TIPO_SUBCTA", "FCN_ID_REGIMEN", "FCN_ID_CAT_SUBCTA", "FCC_VALOR", "FTC_TIPO_CLIENTE")
         VALUES (...)
         ON CONFLICT ("FTN_ID_TIPO_SUBCTA") DO UPDATE 
         SET "FCN_ID_REGIMEN" = EXCLUDED."FCN_ID_REGIMEN", "FCN_ID_CAT_SUBCTA" = EXCLUDED."FCN_ID_CAT_SUBCTA", 
-            "FCC_VALOR" = EXCLUDED."FCC_VALOR"
-        """, lambda i: [f":id_{i}", f":regime_id_{i}", f":subacc_cat_id_{i}", f":description_{i}"],
+            "FCC_VALOR" = EXCLUDED."FCC_VALOR", "FTC_TIPO_CLIENTE" = ECLUEDED."FTC_TIPO_CLIENTE"
+        """, lambda i: [f":id_{i}", f":regime_id_{i}", f":subacc_cat_id_{i}", f":description_{i}", f"description_siefore_{i}"],
                        "TCDATMAE_TIPO_SUBCUENTA")
 
         upsert_dataset(mit, postgres, """
