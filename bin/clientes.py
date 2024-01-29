@@ -1,6 +1,6 @@
 from profuturo.common import register_time, define_extraction, notify, truncate_table
 from profuturo.database import get_postgres_pool, configure_buc_spark, configure_mit_spark, configure_postgres_spark
-from profuturo.extraction import _get_spark_session, _write_spark_dataframe, read_table_insert_temp_view, extract_dataset_spark
+from profuturo.extraction import _get_spark_session, _write_spark_dataframe,_create_spark_dataframe, read_table_insert_temp_view, extract_dataset_spark
 from profuturo.reporters import HtmlReporter
 from profuturo.extraction import extract_terms
 from sqlalchemy import text
