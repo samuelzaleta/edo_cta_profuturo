@@ -25,6 +25,13 @@ with define_extraction(phase, area, postgres_pool, bigquery_pool) as (postgres,b
     with register_time(postgres_pool, phase, term_id, user, area):
         # Indicadores dinámicos
         truncate_table(postgres, "TCHECHOS_CLIENTE_INDICADOR", term=term_id, area=area)
+        postgres.execute(text("""
+        UPDATE "HECHOS"."TCHECHOS_CLIENTE"
+        SET "FTC_GENERACION" = 'DECIMO TRANSITORIO'
+        WHERE "FCN_CUENTA" IN (SELECT "FCN_CUENTA" FROM "HECHOS"."TTHECHOS_CARGA_ARCHIVO" WHERE "FCN_ID_INDICADOR" = 50)
+        AND "FCN_ID_PERIODO" = :term
+                    """), {"term": term_id, "area": area})
+
         indicators = postgres.execute(text("""
         SELECT "FTN_ID_INDICADOR", "FTC_DESCRIPCION", "FTB_DISPONIBLE", "FTB_IMPRESION", "FTB_ENVIO", "FTB_GENERACION"
         FROM "GESTOR"."TCGESPRO_INDICADOR" I

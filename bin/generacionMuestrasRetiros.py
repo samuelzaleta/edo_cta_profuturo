@@ -42,7 +42,7 @@ with define_extraction(phase, area, postgres_pool,bigquery_pool) as (postgres, b
         read_table_insert_temp_view(configure_postgres_spark, """
         SELECT
         DISTINCT
-        C."FTN_CUENTA" as "FCN_ID_EDOCTA",
+        CAST(CONCAT(C."FTN_CUENTA", cast(:term as varchar)) AS BIGINT)  as "FCN_ID_EDOCTA",
         C."FTN_CUENTA" AS "FCN_NUMERO_CUENTA",
         :term AS "FCN_ID_PERIODO",
         concat_ws(' ', C."FTC_NOMBRE", C."FTC_AP_PATERNO", C."FTC_AP_MATERNO") AS "FTC_NOMBRE",
@@ -69,7 +69,7 @@ with define_extraction(phase, area, postgres_pool,bigquery_pool) as (postgres, b
           """
                 SELECT
                 R."FCN_CUENTA" AS "FCN_NUMERO_CUENTA",
-                --"FTC_FOLIO",
+                :term AS "FCN_ID_PERIODO",
                 "FTN_SDO_INI_AHORRORET" AS "FTN_SDO_INI_AHO_RET",
                 "FTN_SDO_INI_VIVIENDA" AS "FTN_SDO_INI_AHO_VIV",
                 "FTN_SDO_TRA_AHORRORET" AS "FTN_SDO_TRA_AHO_RET",
@@ -113,8 +113,7 @@ with define_extraction(phase, area, postgres_pool,bigquery_pool) as (postgres, b
 
         anverso_df = anverso_df.withColumn("FCN_ID_EDOCTA", concat(
             col("FCN_NUMERO_CUENTA"),
-            lit(term_id),
-            col("FTC_ARCHIVO"),
+            lit(term_id)
         ).cast("bigint"))
 
 

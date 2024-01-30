@@ -120,6 +120,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
 
         df = spark.sql("""
                     SELECT 
+                    DISTINCT 
                     S.FCN_CUENTA,
                     ROUND(S.FTF_DIA_ACCIONES,6) AS FTF_BON_NOM_ACC, 
                     ROUND(S.FTF_SALDO_DIA,2) AS FTF_BON_NOM_PES,
