@@ -1,13 +1,13 @@
 import sys
 import smtplib
 import paramiko
+import math
 from profuturo.common import register_time, define_extraction, notify
 from profuturo.database import get_postgres_pool
 from profuturo.extraction import extract_terms, _get_spark_session
 from profuturo.reporters import HtmlReporter
 from google.cloud import storage, bigquery, secretmanager
 import pyspark.sql.functions as f
-
 
 spark = _get_spark_session()
 
@@ -75,7 +75,7 @@ def get_months(cuatrimestre):
 def upload_file_to_sftp(hostname, username, password, local_file_path, remote_file_path, data):
     with open(f"{local_file_path}", "w") as file:
         file.write(data)
-        
+
     try:
         transport = paramiko.Transport((hostname, 22))
         transport.connect(username=username, password=password)
@@ -210,6 +210,10 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
             ahorro_count = df_anverso_aho.count()
             bono_count = df_anverso_bon.count()
             saldo_count = df_anverso_sdo.count()
+            total_count = sum([general_count, ahorro_count, bono_count, saldo_count])
+
+            limit = 500000
+            num_parts_anverso = math.ceil(total_count / limit)
 
             processed_data = []
             processed_data += process_dataframe(df_general.fillna("").fillna(0), 1)
@@ -217,21 +221,21 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
             processed_data += process_dataframe(df_anverso_bon.fillna("").fillna(0), 3)
             processed_data += process_dataframe(df_anverso_sdo.fillna("").fillna(0), 4)
 
-            res = "\n".join("|".join(str(item) for item in row) for row in processed_data)
+            for part in range(1, num_parts_anverso + 1):
+                if len(processed_data) < limit:
+                    processed_data_part = processed_data
+                    res = "\n".join("|".join(str(item) for item in row) for row in processed_data_part)
+                    final_row = f"\n5|{general_count}|{ahorro_count}|{bono_count}|{saldo_count}|{total_count}"
+                    res = res + final_row
+                else:
+                    processed_data_part = processed_data[:limit]
+                    res = "\n".join("|".join(str(item) for item in row) for row in processed_data_part)
 
-            total_count = sum([general_count, ahorro_count, bono_count, saldo_count])
-
-            final_row = f"\n5|{general_count}|{ahorro_count}|{bono_count}|{saldo_count}|{total_count}"
-            data_strings = res + final_row
-
-            name_anverso = f"recaudacion_anverso_mensual_{str(month)[:4]}_{str(month)[-2:]}_1-1.txt" if type(
-                month) == int else f"recaudacion_anverso_cuatrimestral_{str(cuatrimestre)[:4]}_{str(cuatrimestre)[-2:]}_1-1.txt"
-
-            str_to_gcs(data_strings, name_anverso)
-
-            #upload_file_to_sftp(sftp_host, sftp_user, sftp_pass, name_anverso, sftp_remote_file_path, data_strings)
-
-            body_message += f"Se generó el archivo de {name_anverso} con un total de {total_count} registros\n"
+                name_anverso = f"recaudacion_anverso_mensual_{str(month)[:4]}_{str(month)[-2:]}_{part}-{num_parts_anverso}.txt" if type(
+                    month) == int else f"recaudacion_anverso_cuatrimestral_{str(cuatrimestre)[:4]}_{str(cuatrimestre)[-2:]}_{part}-{num_parts_anverso}.txt"
+                str_to_gcs(res, name_anverso)
+                # upload_file_to_sftp(sftp_host, sftp_user, sftp_pass, name_anverso, sftp_remote_file_path, res)
+                body_message += f"Se generó el archivo de {name_anverso} con un total de {len(processed_data_part)} registros\n"
 
             df_edo_reverso = extract_bigquery('ESTADO_CUENTA.TTEDOCTA_REVERSO')
 
@@ -244,26 +248,29 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                                           f.col("FTN_SALARIO_BASE").cast("decimal(16, 2)"),
                                           f.col("FTN_MONTO").cast("decimal(16, 2)"))
             )
-
-            reverso_data = process_dataframe(df_reverso_general.fillna("").fillna(0), 1)
-
-            res = "\n".join("|".join(str(item) for item in row) for row in reverso_data)
-
             ret = df_reverso_general.filter(f.col("FTC_SECCION") == "RET").count()
             vol = df_reverso_general.filter(f.col("FTC_SECCION") == "VOL").count()
             viv = df_reverso_general.filter(f.col("FTC_SECCION") == "VIV").count()
             total = df_reverso_general.count()
-            reverso_final_row = f"\n2|{ret}|{vol}|{viv}|{total}"
-            final_reverso = res + reverso_final_row
 
-            name_reverso = f"recaudacion_reverso_mensual_{str(month)[:4]}_{str(month)[-2:]}_1-1.txt" if type(
-                month) == int else f"recaudacion_reverso_cuatrimestral_{str(cuatrimestre)[:4]}_{str(cuatrimestre)[-2:]}_1-1.txt"
+            num_parts_reverso = math.ceil(total / limit)
+            reverso_data = process_dataframe(df_reverso_general.fillna("").fillna(0), 1)
 
-            str_to_gcs(final_reverso, name_reverso)
+            for part in range(1, num_parts_reverso + 1):
+                if len(reverso_data) < limit:
+                    reverso_data_part = reverso_data
+                    res = "\n".join("|".join(str(item) for item in row) for row in reverso_data_part)
+                    reverso_final_row = f"\n2|{ret}|{vol}|{viv}|{total}"
+                    res = res + reverso_final_row
+                else:
+                    reverso_data_part = reverso_data[:limit]
+                    res = "\n".join("|".join(str(item) for item in row) for row in reverso_data_part)
 
-            #upload_file_to_sftp(sftp_host, sftp_user, sftp_pass, name_reverso, "", final_reverso)
-
-            body_message += f"Se generó el archivo de {name_reverso} con un total de {total} registros\n"
+                name_reverso = f"recaudacion_reverso_mensual_{str(month)[:4]}_{str(month)[-2:]}_{part}-{num_parts_reverso}.txt" if type(
+                    month) == int else f"recaudacion_reverso_cuatrimestral_{str(cuatrimestre)[:4]}_{str(cuatrimestre)[-2:]}_{part}-{num_parts_reverso}.txt"
+                str_to_gcs(res, name_reverso)
+                # upload_file_to_sftp(sftp_host, sftp_user, sftp_pass, name_reverso, "", res)
+                body_message += f"Se generó el archivo de {name_reverso} con un total de {len(reverso_data_part)} registros\n"
 
         """send_email(
             host=smtp_host,

@@ -1,6 +1,7 @@
 import paramiko
 import smtplib
 import sys
+import math
 from profuturo.common import register_time, define_extraction, notify
 from profuturo.database import get_postgres_pool
 from profuturo.extraction import extract_terms, _get_spark_session
@@ -130,7 +131,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                 f.col("FTC_INFNVT_RETENCION_ISR").cast("decimal(16, 2)"),
                 "FTD_FECHA_EMISION_2",
                 retiros.FTC_FECHA_INICIO_PENSION.alias("FTC_FECHA_INICIO_PENSION"),
-                f.col("FTN_PENSION_INSTITUTO_SEG").cast("decimal(16, 2)"),
+                f.col("FTN_PENSION_INSTITUTO_SEG"),
                 f.col("FTN_SALDO_FINAL").cast("decimal(16, 2)"))
         )
         df = df.fillna("").fillna(0)
@@ -194,17 +195,20 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
         for regimen in regimenes:
             df_regimen = df.filter(f.col("FTC_REGIMEN") == regimen)
             total = df_regimen.count()
-            total = df_regimen.count()
+            limit = 500000
+            num_parts = math.ceil(total/limit)
             processed_data = df_regimen.rdd.flatMap(lambda row: [([row[i] for i in range(len(row))])]).collect()
-            res = "\n".join("".join(str(item) for item in row) for row in processed_data)
-
-            name = f"retiros_mensual_{regimen}_{str(term_id)[:4]}_{str(term_id)[-2:]}_1-1.txt"
-
-            str_to_gcs(res, name)
-
-            # upload_file_to_sftp(sftp_host, sftp_user, sftp_pass, name, sftp_remote_file_path, res)
-
-            body_message += f"Se generó el archivo de {name} con un total de {total} registros\n"
+            for part in range(1, num_parts + 1):
+                if len(processed_data) < limit:
+                    processed_data_part = processed_data[:len(processed_data)]
+                else:
+                    processed_data_part = processed_data[:limit]
+                res = "\n".join("".join(str(item) for item in row) for row in processed_data_part)
+                name = f"retiros_mensual_{regimen}_{str(term_id)[:4]}_{str(term_id)[-2:]}_{part}-{num_parts}.txt"
+                str_to_gcs(res, name)
+                # upload_file_to_sftp(sftp_host, sftp_user, sftp_pass, name, sftp_remote_file_path, res)
+                body_message += f"Se generó el archivo de {name} con un total de {len(processed_data_part)} registros\n"
+                processed_data = [i for i in processed_data if i not in processed_data_part]
             print(body_message)
 
         """send_email(
