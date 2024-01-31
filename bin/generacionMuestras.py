@@ -17,6 +17,7 @@ import random
 import string
 import time
 import os
+import json
 
 load_env()
 postgres_pool = get_postgres_pool()
@@ -238,12 +239,12 @@ with define_extraction(phase, area, postgres_pool, bigquery_pool) as (postgres, 
         else:
             filter_reprocessed_samples = 'INNER JOIN "GESTOR"."TCGESPRO_MUESTRA_SOL_RE_CONSAR" MR ON M."FTN_ID_MUESTRA" = MR."FCN_ID_MUESTRA"'
 
-        truncate_table(bigquery, 'ESTADO_CUENTA.TTMUESTR_REVERSO')
-        truncate_table(bigquery, 'ESTADO_CUENTA.TTMUESTR_ANVERSO')
-        truncate_table(bigquery, 'ESTADO_CUENTA.TTMUESTR_GENERAL')
+        truncate_table(postgres, 'TTMUESTR_REVERSO')
+        truncate_table(postgres, 'TTMUESTR_ANVERSO')
+        truncate_table(postgres, 'TTMUESTR_GENERAL')
 
         ###########################  IMAGENES   #################################################
-        truncate_table(bigquery, 'ESTADO_CUENTA.TTEDOCTA_IMAGEN')
+        truncate_table(postgres, 'TTEDOCTA_IMAGEN')
 
         delete_all_objects(bucket_name, prefix)
         delete_all_objects(bucket_name, 'profuturo-archivos')
@@ -277,7 +278,7 @@ with define_extraction(phase, area, postgres_pool, bigquery_pool) as (postgres, 
 
         df = spark.createDataFrame(blob_info_list, schema=schema)
 
-        _write_spark_dataframe(df, configure_bigquery_spark, 'ESTADO_CUENTA.TTEDOCTA_IMAGEN')
+        _write_spark_dataframe(df, configure_postgres_spark, '"ESTADO_CUENTA"."TTEDOCTA_IMAGEN"')
 
         ########################## GENERACIÓN DE MUESTRAS #################################################
         char1 = random.choice(string.ascii_letters).upper()
@@ -386,6 +387,7 @@ with define_extraction(phase, area, postgres_pool, bigquery_pool) as (postgres, 
             col("FCN_ID_PERIODO"),
             col("FTN_ID_FORMATO"),
         ).cast("bigint"))
+
         general_df = general_df.withColumn("consecutivo", row_number().over(Window.orderBy(lit(0))).cast("string"))
         # Fill the "consecutivo" column with 9-digit values
         general_df = general_df.withColumn("consecutivo", lpad("consecutivo", 9, '0'))
@@ -398,8 +400,8 @@ with define_extraction(phase, area, postgres_pool, bigquery_pool) as (postgres, 
         general_df = general_df.drop(col("consecutivo"))
         general_df.write.format("parquet").mode("overwrite").save(f"gs://{bucket_name}/{prefix}/general.parquet")
         general_df = spark.read.format("parquet").load(f"gs://{bucket_name}/{prefix}/general.parquet").repartition(10)
-        general_df.show()
         general_df.createOrReplaceTempView("general")
+        spark.sql("select FCN_FOLIO from general").show()
 
         reverso_df = _create_spark_dataframe(spark, configure_postgres_spark, f"""
         WITH data as (
@@ -414,7 +416,7 @@ with define_extraction(phase, area, postgres_pool, bigquery_pool) as (postgres, 
         INNER JOIN "GESTOR"."TCGESPRO_PERIODICIDAD" PR ON F."FCN_ID_PERIODICIDAD_REVERSO" = PR."FTN_ID_PERIODICIDAD"
         INNER JOIN "GESTOR"."TCGESPRO_PERIODO" P ON P."FTN_ID_PERIODO" = :term
         INNER JOIN "GESTOR"."TCGESPRO_MUESTRA" M ON P."FTN_ID_PERIODO" = M."FCN_ID_PERIODO"
-        --{filter_reprocessed_samples}
+        {filter_reprocessed_samples}
         -- QUITAR COMENT  CONDICION VALIDA PERO NO ES PERIODO CUATRIMESTRAL
         WHERE mod(extract(MONTH FROM to_date(P."FTC_PERIODO", 'MM/YYYY')), PG."FTN_MESES") = 0
         AND F."FTB_ESTATUS" = true
@@ -866,7 +868,16 @@ with define_extraction(phase, area, postgres_pool, bigquery_pool) as (postgres, 
 
 
         general_df = spark.sql("""
-        SELECT C.*, cast(ASS.FTN_MONTO as numeric(16,2)) AS FTN_SALDO_SUBTOTAL, cast(AST.FTN_MONTO as numeric(16,2)) AS FTN_SALDO_TOTAL
+        SELECT
+        C.FTN_ID_GRUPO_SEGMENTACION,C.FTC_CANDADO_APERTURA,C.FTN_ID_FORMATO,C.FCN_ID_PERIODO,
+        cast(C.FCN_NUMERO_CUENTA as bigint) FCN_NUMERO_CUENTA,C.FTD_FECHA_CORTE,C.FTD_FECHA_GRAL_INICIO,C.FTD_FECHA_GRAL_FIN,C.FTD_FECHA_MOV_INICIO,
+        C.FTD_FECHA_MOV_FIN,C.FTN_ID_SIEFORE,C.FTC_DESC_SIEFORE,C.FTC_TIPOGENERACION,C.FTC_DESC_TIPOGENERACION,
+        C.FTC_NOMBRE_COMPLETO,C.FTC_CALLE_NUMERO,C.FTC_COLONIA,C.FTC_DELEGACION,C.FTN_CP,C.FTC_ENTIDAD_FEDERATIVA,
+        C.FTC_NSS,C.FTC_RFC,C.FTC_CURP,C.FTC_TIPO_PENSION,C.FTN_PENSION_MENSUAL,C.FTC_FORMATO,C.FTC_TIPO_TRABAJADOR,
+        C.FTC_USUARIO_ALTA,
+        C.FCN_ID_EDOCTA,
+        C.FCN_FOLIO,
+        cast(ASS.FTN_MONTO as numeric(16,2)) AS FTN_SALDO_SUBTOTAL, cast(AST.FTN_MONTO as numeric(16,2)) AS FTN_SALDO_TOTAL
         FROM general C
             INNER JOIN (
                 SELECT FCN_NUMERO_CUENTA, FTN_ID_FORMATO, SUM(cast(FTN_SALDO_FINAL as numeric(16,2))) AS FTN_MONTO
@@ -882,11 +893,12 @@ with define_extraction(phase, area, postgres_pool, bigquery_pool) as (postgres, 
             ) AST ON C.FCN_NUMERO_CUENTA = AST.FCN_NUMERO_CUENTA
         -- WHERE C.FCN_ID_EDOCTA IS NOT NULL
         """).cache()
+        general_df.show()
 
         reverso_df = spark.sql("""
         SELECT 
-        G.FCN_ID_EDOCTA,
-        R.FCN_NUMERO_CUENTA,
+        cast(G.FCN_ID_EDOCTA as bigint) as FCN_ID_EDOCTA,
+        cast(R.FCN_NUMERO_CUENTA as bigint) as FCN_NUMERO_CUENTA,
         R.FTN_ID_CONCEPTO,
         R.FTC_DESC_CONCEPTO,
         R.FTC_SECCION,
@@ -909,7 +921,7 @@ with define_extraction(phase, area, postgres_pool, bigquery_pool) as (postgres, 
         cast(G.FCN_NUMERO_CUENTA as bigint) as FCN_NUMERO_CUENTA,
         null as FTN_ID_CONCEPTO,
         "Comisión del Periodo" as FTC_DESC_CONCEPTO,
-        cast(A.FTC_SECCION as varchar(10)) as FTC_SECCION,
+        cast(A.FTC_TIPO_AHORRO as varchar(10)) as FTC_SECCION,
         null as FTD_FECHA_MOVIMIENTO,
         null as FTN_SALARIO_BASE,
         null as FTN_DIA_COTIZADO,
@@ -920,12 +932,12 @@ with define_extraction(phase, area, postgres_pool, bigquery_pool) as (postgres, 
         A.FTN_ID_FORMATO    
         FROM anverso_cuatrimestral A
         INNER JOIN general G ON G.FCN_NUMERO_CUENTA = A.FCN_NUMERO_CUENTA AND G.FTN_ID_FORMATO = A.FTN_ID_FORMATO
-        WHERE A.FTC_SECCION IN ('RET', 'AHO')
+        WHERE A.FTC_TIPO_AHORRO IN ('RET', 'VIV', 'VOL')
         GROUP BY 
         G.FCN_ID_EDOCTA,
         A.FTN_ID_FORMATO,
         G.FCN_NUMERO_CUENTA,
-        A.FTC_SECCION,
+        A.FTC_TIPO_AHORRO,
         A.FTC_USUARIO_ALTA
         UNION ALL
         SELECT 
@@ -933,7 +945,7 @@ with define_extraction(phase, area, postgres_pool, bigquery_pool) as (postgres, 
         cast(G.FCN_NUMERO_CUENTA as bigint) as FCN_NUMERO_CUENTA,
         null as FTN_ID_CONCEPTO,
         "Rendimiento del Periodo" as FTC_DESC_CONCEPTO,
-        cast(A.FTC_SECCION as varchar(10)) as FTC_SECCION,
+        cast(A.FTC_TIPO_AHORRO as varchar(10)) as FTC_SECCION,
         null as FTD_FECHA_MOVIMIENTO,
         null as FTN_SALARIO_BASE,
         null as FTN_DIA_COTIZADO,
@@ -944,17 +956,23 @@ with define_extraction(phase, area, postgres_pool, bigquery_pool) as (postgres, 
         A.FTN_ID_FORMATO
         FROM anverso_cuatrimestral A
         INNER JOIN general G ON G.FCN_NUMERO_CUENTA = A.FCN_NUMERO_CUENTA AND G.FTN_ID_FORMATO = A.FTN_ID_FORMATO
-        WHERE A.FTC_SECCION IN ('RET', 'AHO')
+        WHERE A.FTC_TIPO_AHORRO IN ('RET', 'VIV','VOL')
         GROUP BY 
         G.FCN_ID_EDOCTA,
         A.FTN_ID_FORMATO,
         G.FCN_NUMERO_CUENTA,
-        A.FTC_SECCION,
+        A.FTC_TIPO_AHORRO,
         A.FTC_USUARIO_ALTA
         """)
 
         anverso_df = spark.sql("""
-        SELECT A.*, G.FCN_ID_EDOCTA 
+        SELECT
+        cast(A.FCN_NUMERO_CUENTA as bigint) FCN_NUMERO_CUENTA,A.FTC_CONCEPTO_NEGOCIO,
+        A.FTF_APORTACION, A.FTN_RETIRO,A.FTN_COMISION,A.FTN_SALDO_ANTERIOR,
+        A.FTN_SALDO_FINAL,A.FTC_SECCION,A.FTN_VALOR_ACTUAL_PESO,
+        A.FTN_VALOR_ACTUAL_UDI,A.FTN_VALOR_NOMINAL_PESO,
+        A.FTN_VALOR_NOMINAL_UDI,A.FTC_TIPO_AHORRO,A.FTN_ORDEN_SDO,
+        A.FTC_USUARIO_ALTA,A.FTN_RENDIMIENTO, cast(G.FCN_ID_EDOCTA as bigint) FCN_ID_EDOCTA
         FROM anverso A
             INNER JOIN general G ON G.FCN_NUMERO_CUENTA = A.FCN_NUMERO_CUENTA AND G.FTN_ID_FORMATO = A.FTN_ID_FORMATO
         """).cache()
@@ -965,11 +983,11 @@ with define_extraction(phase, area, postgres_pool, bigquery_pool) as (postgres, 
         reverso_df = reverso_df.drop(col("FTN_ID_FORMATO"))
 
         print("reverso")
-        _write_spark_dataframe(reverso_df, configure_bigquery_spark, 'ESTADO_CUENTA.TTMUESTR_REVERSO')
+        _write_spark_dataframe(reverso_df, configure_postgres_spark, '"ESTADO_CUENTA"."TTMUESTR_REVERSO"')
         print("anverso")
-        _write_spark_dataframe(anverso_df, configure_bigquery_spark, 'ESTADO_CUENTA.TTMUESTR_ANVERSO')
+        _write_spark_dataframe(anverso_df, configure_postgres_spark, '"ESTADO_CUENTA"."TTMUESTR_ANVERSO"')
         print("general")
-        _write_spark_dataframe(general_df, configure_bigquery_spark, 'ESTADO_CUENTA.TTMUESTR_GENERAL')
+        _write_spark_dataframe(general_df, configure_postgres_spark, '"ESTADO_CUENTA"."TTMUESTR_GENERAL"')
 
         reverso_df.unpersist()
         anverso_df.unpersist()
@@ -984,19 +1002,21 @@ with define_extraction(phase, area, postgres_pool, bigquery_pool) as (postgres, 
               AND "FCN_ID_AREA" = :area
             """), {"term": term_id, "area": area})
 
-
-        response = requests.get(url)
-
-        # Verifica si la petición fue exitosa
-        if response.status_code == 200:
-            # Si la petición fue exitosa, puedes acceder al contenido de la respuesta de la siguiente manera:
-            content = response.content
-            print(content)
-        else:
-            # Si la petición no fue exitosa, puedes imprimir el código de estado para obtener más información
-            print(f"La solicitud no fue exitosa. Código de estado: {response.status_code}")
-
-        time.sleep(80)
+        for i in range(1000):
+            response = requests.get(url)
+            print(response)
+            # Verifica si la petición fue exitosa
+            if response.status_code == 200:
+                # Si la petición fue exitosa, puedes acceder al contenido de la respuesta de la siguiente manera:
+                content = response.content.decode('utf-8')
+                data = json.loads(content)
+                if data['data']['statusText'] == 'finalizado':
+                    break
+                time.sleep(8)
+            else:
+                # Si la petición no fue exitosa, puedes imprimir el código de estado para obtener más información
+                print(f"La solicitud no fue exitosa. Código de estado: {response.status_code}")
+                break
 
         notify(
             postgres,
@@ -1004,7 +1024,7 @@ with define_extraction(phase, area, postgres_pool, bigquery_pool) as (postgres, 
             phase,
             area,
             term=term_id,
-            message="Se terminaron de generar las muestras de los estados de cuenta con éxito: por favor espere unos minutos",
+            message="Se terminaron de generar las muestras de los estados de cuenta con éxito",
             aprobar=False,
             descarga=False,
         )

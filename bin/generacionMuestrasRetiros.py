@@ -25,8 +25,8 @@ with define_extraction(phase, area, postgres_pool,bigquery_pool) as (postgres, b
 
     with register_time(postgres_pool, phase, term_id, user, area):
         truncate_table(postgres, 'TCGESPRO_MUESTRA', term=term_id, area=area)
-        truncate_table(bigquery, 'ESTADO_CUENTA.TTMUESTR_RETIRO_GENERAL')
-        truncate_table(bigquery, 'ESTADO_CUENTA.TTMUESTR_RETIRO')
+        truncate_table(postgres, 'TTMUESTR_RETIRO_GENERAL')
+        truncate_table(postgres, 'TTMUESTR_RETIRO')
 
         read_table_insert_temp_view(configure_postgres_spark, """
                 SELECT
@@ -43,7 +43,7 @@ with define_extraction(phase, area, postgres_pool,bigquery_pool) as (postgres, b
         SELECT
         DISTINCT
         CAST(CONCAT(C."FTN_CUENTA", cast(:term as varchar)) AS BIGINT)  as "FCN_ID_EDOCTA",
-        C."FTN_CUENTA" AS "FCN_NUMERO_CUENTA",
+        cast(C."FTN_CUENTA" as BIGINT) AS "FCN_NUMERO_CUENTA",
         :term AS "FCN_ID_PERIODO",
         concat_ws(' ', C."FTC_NOMBRE", C."FTC_AP_PATERNO", C."FTC_AP_MATERNO") AS "FTC_NOMBRE",
         C."FTC_CALLE" AS "FTC_CALLE_NUMERO",
@@ -68,7 +68,7 @@ with define_extraction(phase, area, postgres_pool,bigquery_pool) as (postgres, b
         read_table_insert_temp_view(configure_postgres_spark,
           """
                 SELECT
-                R."FCN_CUENTA" AS "FCN_NUMERO_CUENTA",
+               cast(R."FCN_CUENTA" as BIGINT) AS "FCN_NUMERO_CUENTA",
                 :term AS "FCN_ID_PERIODO",
                 "FTN_SDO_INI_AHORRORET" AS "FTN_SDO_INI_AHO_RET",
                 "FTN_SDO_INI_VIVIENDA" AS "FTN_SDO_INI_AHO_VIV",
@@ -117,8 +117,8 @@ with define_extraction(phase, area, postgres_pool,bigquery_pool) as (postgres, b
         ).cast("bigint"))
 
 
-        _write_spark_dataframe(general_df, configure_bigquery_spark, 'ESTADO_CUENTA.TTMUESTR_RETIRO_GENERAL')
-        _write_spark_dataframe(anverso_df, configure_bigquery_spark, 'ESTADO_CUENTA.TTMUESTR_RETIRO')
+        _write_spark_dataframe(general_df, configure_postgres_spark, '"ESTADO_CUENTA"."TTMUESTR_RETIRO_GENERAL"')
+        _write_spark_dataframe(anverso_df, configure_postgres_spark, '"ESTADO_CUENTA"."TTMUESTR_RETIRO"')
 
         df = spark.sql("""
         SELECT 
