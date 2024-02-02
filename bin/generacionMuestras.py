@@ -236,6 +236,7 @@ with define_extraction(phase, area, postgres_pool, bigquery_pool) as (postgres, 
             WHERE "FCN_ID_INDICADOR" = 32 AND "FCN_ID_AREA" = :area
               AND CA."FCN_ID_PERIODO" = :term
             """), {"term": term_id, "area": area})
+            print("muestra manuales")
         else:
             filter_reprocessed_samples = 'INNER JOIN "GESTOR"."TCGESPRO_MUESTRA_SOL_RE_CONSAR" MR ON M."FTN_ID_MUESTRA" = MR."FCN_ID_MUESTRA"'
 
@@ -841,7 +842,7 @@ with define_extraction(phase, area, postgres_pool, bigquery_pool) as (postgres, 
         INNER JOIN periodos ON R."FCN_ID_PERIODO" BETWEEN periodos.PERIODO_INICIAL AND periodos.PERIODO_FINAL and periodos."FCN_ID_FORMATO_ESTADO_CUENTA" = D."FTN_ID_FORMATO"
         INNER JOIN "GESTOR"."TCGESPRO_PERIODO" T ON R."FCN_ID_PERIODO" = T."FTN_ID_PERIODO"
         INNER JOIN "GESTOR"."TCGESPRO_PERIODO" PR ON PR."FTN_ID_PERIODO" = :term
-        --where "FTC_SECCION" <> 'SDO' and C."FTC_DES_CONCEPTO" = 'Ahorro para el retiro 92 y 97<sup>1</sup>'
+        where "FTC_SECCION" NOT IN ('SDO') AND "FTC_AHORRO" NOT IN ('VIV')
         ) X
         GROUP BY
         "FCN_NUMERO_CUENTA",
@@ -896,7 +897,8 @@ with define_extraction(phase, area, postgres_pool, bigquery_pool) as (postgres, 
         general_df.show()
 
         reverso_df = spark.sql("""
-        SELECT 
+        SELECT
+        DISTINCT 
         cast(G.FCN_ID_EDOCTA as bigint) as FCN_ID_EDOCTA,
         cast(R.FCN_NUMERO_CUENTA as bigint) as FCN_NUMERO_CUENTA,
         R.FTN_ID_CONCEPTO,
@@ -932,7 +934,7 @@ with define_extraction(phase, area, postgres_pool, bigquery_pool) as (postgres, 
         A.FTN_ID_FORMATO    
         FROM anverso_cuatrimestral A
         INNER JOIN general G ON G.FCN_NUMERO_CUENTA = A.FCN_NUMERO_CUENTA AND G.FTN_ID_FORMATO = A.FTN_ID_FORMATO
-        WHERE A.FTC_TIPO_AHORRO IN ('RET', 'VIV', 'VOL')
+        WHERE A.FTC_TIPO_AHORRO IN ('RET', 'VOL')
         GROUP BY 
         G.FCN_ID_EDOCTA,
         A.FTN_ID_FORMATO,
