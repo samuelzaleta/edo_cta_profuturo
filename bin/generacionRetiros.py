@@ -3,10 +3,10 @@ import smtplib
 import sys
 import math
 from profuturo.common import register_time, define_extraction, notify
-from profuturo.database import get_postgres_pool
-from profuturo.extraction import extract_terms, _get_spark_session
+from profuturo.database import get_postgres_pool, configure_postgres_spark
+from profuturo.extraction import extract_terms, _get_spark_session, read_table_insert_temp_view
 from profuturo.reporters import HtmlReporter
-from google.cloud import storage, bigquery, secretmanager
+from google.cloud import storage, secretmanager
 import pyspark.sql.functions as f
 
 spark = _get_spark_session()
@@ -19,8 +19,6 @@ user = int(sys.argv[3])
 area = int(sys.argv[4])
 
 storage_client = storage.Client()
-bigquery_client = bigquery.Client()
-bigquery_project = bigquery_client.project
 
 client = secretmanager.SecretManagerServiceClient()
 
@@ -44,15 +42,6 @@ def get_buckets():
 
 
 bucket = storage_client.get_bucket(get_buckets())
-
-
-def extract_bigquery(table):
-    df = spark.read.format('bigquery') \
-        .option('table', f'{bigquery_project}:{table}') \
-        .load()
-    print(f"SE EXTRAIDO EXITOSAMENTE {table}")
-    return df
-
 
 def str_to_gcs(data, name):
     blob = bucket.blob(f"correspondencia/{name}")
@@ -99,12 +88,34 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
     with register_time(postgres_pool, phase, term_id, user, area):
         body_message = ""
 
+        query_retiro_general = """
+                            SELECT * FROM "ESTADO_CUENTA"."TTEDOCTA_RETIRO_GENERAL"
+                                            """
+        read_table_insert_temp_view(
+            configure_postgres_spark,
+            query_retiro_general,
+            "retiros_general"
+        )
+
+        retiros_general = spark.sql("SELECT * FROM retiros_general")
+
         retiros_general = (
-            extract_bigquery('ESTADO_CUENTA.TTEDOCTA_RETIRO_GENERAL').filter(
+            retiros_general.filter(
                 f.col("FCN_ID_PERIODO") == term_id)
         )
+
+        query_retiro = """
+                                    SELECT * FROM "ESTADO_CUENTA"."TTEDOCTA_RETIRO"
+                                                    """
+        read_table_insert_temp_view(
+            configure_postgres_spark,
+            query_retiro,
+            "retiros"
+        )
+
+        retiros = spark.sql("SELECT * FROM retiros")
         retiros = (
-            extract_bigquery('ESTADO_CUENTA.TTEDOCTA_RETIRO').filter(f.col("FCN_ID_PERIODO") == term_id).withColumn(
+            retiros.filter(f.col("FCN_ID_PERIODO") == term_id).withColumn(
                 "FTD_FECHA_EMISION_2", f.date_format("FTD_FECHA_EMISION", "yyyyMMdd"))
         )
 
@@ -198,17 +209,19 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
             limit = 500000
             num_parts = math.ceil(total/limit)
             processed_data = df_regimen.rdd.flatMap(lambda row: [([row[i] for i in range(len(row))])]).collect()
+
             for part in range(1, num_parts + 1):
                 if len(processed_data) < limit:
                     processed_data_part = processed_data[:len(processed_data)]
                 else:
-                    processed_data_part = processed_data[:limit]
+                    processed_data_part = processed_data[:limit - 1]
                 res = "\n".join("".join(str(item) for item in row) for row in processed_data_part)
                 name = f"retiros_mensual_{regimen}_{str(term_id)[:4]}_{str(term_id)[-2:]}_{part}-{num_parts}.txt"
                 str_to_gcs(res, name)
                 # upload_file_to_sftp(sftp_host, sftp_user, sftp_pass, name, sftp_remote_file_path, res)
                 body_message += f"Se generó el archivo de {name} con un total de {len(processed_data_part)} registros\n"
                 processed_data = [i for i in processed_data if i not in processed_data_part]
+                del processed_data[:limit - 1]
             print(body_message)
 
         """send_email(
