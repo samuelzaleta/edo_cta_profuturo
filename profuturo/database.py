@@ -66,7 +66,7 @@ def get_postgres_conn():
         database=os.getenv("POSTGRES_DATABASE"),
         user=os.getenv("POSTGRES_USER"),
         password=os.getenv("POSTGRES_PASSWORD"),
-        options='-c search_path="MAESTROS","GESTOR","HECHOS","RESULTADOS"',
+        options='-c search_path="MAESTROS","GESTOR","HECHOS","RESULTADOS","ESTADO_CUENTA"',
     )
 
 
@@ -157,14 +157,23 @@ def configure_buc_spark(connection: SparkConnection, table: str, reading: bool) 
 
 
 def configure_mitedocta_spark(connection: SparkConnection, table: str, reading: bool) -> SparkConnection:
-    host = "172.22.164.19"  #os.getenv("MITEDOCTA_HOST")
-    port = 16161 #int(os.getenv("MITEDOCTA_PORT"))
-    service_name = "QA34" #os.getenv("MITEDOCTA_DATABASE")
-    user = "CLUNICO" #os.getenv("MITEDOCTA_USER")
-    password = "temp4now13" #os.getenv("MITEDOCTA_PASSWORD")
+    url = """jdbc:oracle:thin:@(DESCRIPTION =
+    (ADDRESS_LIST =
+      (ADDRESS = (PROTOCOL = TCP)(HOST = 172.22.164.19)(PORT = 16161))
+      (ADDRESS = (PROTOCOL = TCP)(HOST = 172.22.164.20)(PORT = 16161))
+      (ADDRESS = (PROTOCOL = TCP)(HOST = 172.22.164.21)(PORT = 16161))
+      (LOAD_BALANCE = yes)
+    )
+    (CONNECT_DATA =
+      (SERVER = DEDICATED)
+      (SERVICE_NAME = QA34)
+    )
+  )"""
+    user = os.getenv(")BUC_USER")
+    password = os.getenv("BUC_PASSWORD")
 
     return configure_jdbc_spark(connection, table, reading) \
-        .option("url", f"jdbc:oracle:thin:@//{host}:{port}/{service_name}") \
+        .option("url", url) \
         .option("driver", "oracle.jdbc.driver.OracleDriver") \
         .option("oracle.jdbc.timezoneAsRegion", False) \
         .option("user", user) \
@@ -198,7 +207,7 @@ def configure_postgres_spark(connection: SparkConnection, table: str, reading: b
     return configure_jdbc_spark(connection, table, reading) \
         .option("url", f"jdbc:postgresql://{host}:{port}/{database}") \
         .option("driver", "org.postgresql.Driver") \
-        .option("search_path", '"MAESTROS","GESTOR","HECHOS","RESULTADOS"') \
+        .option("search_path", '"MAESTROS","GESTOR","HECHOS","RESULTADOS","ESTADO_CUENTA"') \
         .option("user", user) \
         .option("password", password)
 

@@ -1,9 +1,10 @@
 from profuturo.common import register_time, define_extraction, notify, truncate_table
 from profuturo.database import get_postgres_pool, get_buc_pool, configure_postgres_spark, configure_mit_spark,configure_bigquery_spark,get_bigquery_pool
-from profuturo.extraction import _get_spark_session, _write_spark_dataframe, read_table_insert_temp_view, upsert_dataset,extract_dataset_spark
+from profuturo.extraction import _get_spark_session, _write_spark_dataframe, read_table_insert_temp_view, upsert_dataset,extract_dataset_spark, _create_spark_dataframe
 from profuturo.reporters import HtmlReporter
 from profuturo.extraction import extract_terms
 import sys
+import os
 from datetime import datetime
 
 html_reporter = HtmlReporter()
@@ -12,6 +13,12 @@ bigquery_pool = get_bigquery_pool()
 phase = int(sys.argv[1])
 user = int(sys.argv[3])
 area = int(sys.argv[4])
+bucket_name = os.getenv("BUCKET_DEFINITIVO")
+print(bucket_name)
+prefix =f"{os.getenv('PREFIX_DEFINITIVO')}"
+print(prefix)
+url = os.getenv("URL_DEFINITIVO")
+print(url)
 
 
 with define_extraction(phase, area, postgres_pool, bigquery_pool) as (postgres, bigquery):
@@ -21,6 +28,8 @@ with define_extraction(phase, area, postgres_pool, bigquery_pool) as (postgres, 
     end = term["end_month"]
     end_month_anterior = term["end_saldos_anterior"]
     valor_accion_anterior = term["valor_accion_anterior"]
+    start_month = term["start_month"]
+    end_month = term["end_month"]
     print(end_month_anterior, valor_accion_anterior)
     spark = _get_spark_session()
 
@@ -211,6 +220,75 @@ with define_extraction(phase, area, postgres_pool, bigquery_pool) as (postgres, 
             ],
             params={"term": term_id},
         )
+
+        movimientos_df = _create_spark_dataframe(spark, configure_postgres_spark, f"""
+        WITH periodos AS (
+        SELECT F."FCN_ID_FORMATO_ESTADO_CUENTA", min(T."FTN_ID_PERIODO") AS PERIODO_INICIAL, max(T."FTN_ID_PERIODO") AS PERIODO_FINAL
+        FROM "GESTOR"."TTGESPRO_CONFIGURACION_FORMATO_ESTADO_CUENTA" F
+        INNER JOIN "GESTOR"."TCGESPRO_CONFIGURACION_ANVERSO" A ON F."FCN_ID_GENERACION" = A."FCN_GENERACION"
+        INNER JOIN "GESTOR"."TCGESPRO_PERIODICIDAD" P ON F."FCN_ID_PERIODICIDAD_GENERACION" = P."FTN_ID_PERIODICIDAD" AND mod(extract(MONTH FROM :end), P."FTN_MESES") = 0
+        INNER JOIN "GESTOR"."TCGESPRO_PERIODICIDAD" PA ON F."FCN_ID_PERIODICIDAD_REVERSO" = PA."FTN_ID_PERIODICIDAD"
+        INNER JOIN "GESTOR"."TCGESPRO_PERIODO" T ON to_date(T."FTC_PERIODO", 'MM/YYYY') BETWEEN :end - INTERVAL '1 month' * PA."FTN_MESES" AND :end
+        GROUP BY "FTN_ID_CONFIGURACION_FORMATO_ESTADO_CUENTA"
+        )
+        SELECT
+        R."FCN_CUENTA", R."FCN_ID_PERIODO", R."FTF_MONTO_PESOS",
+        R."FTN_SUA_DIAS_COTZDOS_BIMESTRE",R."FTN_SUA_ULTIMO_SALARIO_INT_PER",
+        R."FTD_FEH_LIQUIDACION", R."FCN_ID_CONCEPTO_MOVIMIENTO",R."FTC_SUA_RFC_PATRON",
+        SB."FTC_TIPO_CLIENTE" AS "TIPO_SUBCUENA", 0 AS "FTN_MONPES"
+        FROM "HECHOS"."TTHECHOS_MOVIMIENTO" R
+        INNER JOIN "MAESTROS"."TCDATMAE_TIPO_SUBCUENTA" SB
+        ON SB."FTN_ID_TIPO_SUBCTA" = R."FCN_ID_TIPO_SUBCTA"
+        INNER JOIN periodos ON R."FCN_ID_PERIODO" BETWEEN periodos.PERIODO_INICIAL AND periodos.PERIODO_FINAL
+        UNION ALL
+        SELECT
+        R."CSIE1_NUMCUE",R."FCN_ID_PERIODO",R."MONTO" AS "FTF_MONTO_PESOS",
+        NULL AS "FTN_SUA_DIAS_COTZDOS_BIMESTRE",NULL AS "FTN_SUA_ULTIMO_SALARIO_INT_PER",
+        to_date(cast(R."CSIE1_FECCON" as varchar),'YYYYMMDD') AS "FTD_FEH_LIQUIDACION",
+        CAST(R."CSIE1_CODMOV"AS INT) AS "FCN_ID_CONCEPTO_MOVIMIENTO",
+        NULL AS "FTC_SUA_RFC_PATRON",SB."FTC_TIPO_CLIENTE" AS "TIPO_SUBCUENA",
+        MP."FTN_MONPES"
+        FROM "HECHOS"."TTHECHOS_MOVIMIENTOS_INTEGRITY" R
+        INNER JOIN "GESTOR"."TCGESPRO_MOVIMIENTO_PROFUTURO" MP
+        ON R."SUBCUENTA" = MP."FCN_ID_TIPO_SUBCUENTA" AND CAST(R."CSIE1_CODMOV" AS INT) = MP."FTN_ID_MOVIMIENTO_PROFUTURO"
+        INNER JOIN "MAESTROS"."TCDATMAE_TIPO_SUBCUENTA" SB
+        ON SB."FTN_ID_TIPO_SUBCTA" = R."SUBCUENTA"
+        INNER JOIN periodos ON R."FCN_ID_PERIODO" BETWEEN periodos.PERIODO_INICIAL AND periodos.PERIODO_FINAL
+        """, {"term": term_id, "start": start_month, "end": end_month, "user": str(user)})
+
+        spark.sql("DROP TABLE IF EXISTS TTHECHOS_MOVIMIENTO")
+
+        movimientos_df.write.partitionBy("FCN_ID_PERIODO", "FCN_ID_CONCEPTO_MOVIMIENTO") \
+            .option("path", f"gs://{bucket_name}/datawarehouse/movimientos/TTHECHOS_MOVIMIENTO") \
+            .option("mode", "append") \
+            .option("compression", "snappy") \
+            .saveAsTable("TTHECHOS_MOVIMIENTO")
+
+        rendimiento_df = _create_spark_dataframe(spark, configure_postgres_spark, f"""
+        WITH periodos AS (
+        SELECT 
+        min(T."FTN_ID_PERIODO") AS PERIODO_INICIAL, max(T."FTN_ID_PERIODO") AS PERIODO_FINAL
+        FROM "GESTOR"."TTGESPRO_CONFIGURACION_FORMATO_ESTADO_CUENTA" F
+        INNER JOIN "GESTOR"."TCGESPRO_CONFIGURACION_ANVERSO" A ON F."FCN_ID_GENERACION" = A."FCN_GENERACION"
+        INNER JOIN "GESTOR"."TCGESPRO_PERIODICIDAD" P ON F."FCN_ID_PERIODICIDAD_GENERACION" = P."FTN_ID_PERIODICIDAD" AND mod(extract(MONTH FROM :end), P."FTN_MESES") = 0
+        INNER JOIN "GESTOR"."TCGESPRO_PERIODICIDAD" PA ON F."FCN_ID_PERIODICIDAD_ANVERSO" = PA."FTN_ID_PERIODICIDAD"
+        INNER JOIN "GESTOR"."TCGESPRO_PERIODO" T ON to_date(T."FTC_PERIODO", 'MM/YYYY') BETWEEN :end - INTERVAL '1 month' * PA."FTN_MESES" AND :end
+        GROUP BY "FTN_ID_CONFIGURACION_FORMATO_ESTADO_CUENTA"
+        )
+        SELECT
+        DISTINCT
+        "FCN_CUENTA", "FCN_ID_PERIODO", "FTF_SALDO_FINAL", "FTF_ABONO", "FTF_SALDO_INICIAL",
+        "FTF_COMISION", "FTF_CARGO", "FTF_RENDIMIENTO_CALCULADO", "FTD_FECHAHORA_ALTA", "FCN_ID_TIPO_SUBCTA"
+        FROM "HECHOS"."TTCALCUL_RENDIMIENTO" R
+        INNER JOIN periodos ON R."FCN_ID_PERIODO" BETWEEN periodos.PERIODO_INICIAL AND periodos.PERIODO_FINAL
+        """, {"term": term_id, "start": start_month, "end": end_month, "user": str(user)})
+        spark.sql("DROP TABLE IF EXISTS TTCALCUL_RENDIMIENTO")
+
+        rendimiento_df.write.partitionBy("FCN_ID_PERIODO", "FCN_ID_TIPO_SUBCTA") \
+            .option("path", f"gs://{bucket_name}/datawarehouse/rendimientos/TTCALCUL_RENDIMIENTO") \
+            .option("mode", "append") \
+            .option("compression", "snappy") \
+            .saveAsTable("TTCALCUL_RENDIMIENTO")
 
         notify(
             postgres,

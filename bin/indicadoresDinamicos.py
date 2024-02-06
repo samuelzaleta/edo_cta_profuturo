@@ -85,9 +85,9 @@ with define_extraction(phase, area, postgres_pool, bigquery_pool) as (postgres,b
         ARRAY[I."FTB_DISPONIBLE", I."FTB_ENVIO", I."FTB_IMPRESION", I."FTB_GENERACION"]  <> '{true,true,true,true}'
         """, '"HECHOS"."TCHECHOS_CLIENTE_INDICADOR"', term=term_id, params={'term': term_id, 'area':area})
 
-        truncate_table(bigquery, "ESTADO_CUENTA.TTEDOCTA_CLIENTE_INDICADOR", term=term_id)
+        truncate_table(postgres, 'TTEDOCTA_CLIENTE_INDICADOR', term=term_id)
 
-        extract_dataset_spark(configure_postgres_spark, configure_bigquery_spark, """
+        extract_dataset_spark(configure_postgres_spark, configure_postgres_spark, """
         SELECT
         "FCN_CUENTA",
         "FCN_ID_PERIODO",
@@ -108,7 +108,8 @@ with define_extraction(phase, area, postgres_pool, bigquery_pool) as (postgres,b
         GROUP BY
         "FCN_CUENTA",
         "FCN_ID_PERIODO"
-        """, "ESTADO_CUENTA.TTEDOCTA_CLIENTE_INDICADOR",params={'term': term_id,'area':area})
+        """, '"ESTADO_CUENTA"."TTEDOCTA_CLIENTE_INDICADOR"',params={'term': term_id,'area':area})
+
 
         query = """
         SELECT FTC_ENTIDAD_FEDERATIVA, INDICADOR, COUNT(1) NUM_REGISTROS
