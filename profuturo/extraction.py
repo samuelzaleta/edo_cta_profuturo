@@ -384,11 +384,11 @@ def _get_spark_session() -> SparkSession:
     return SparkSession.builder \
         .master('local[*]') \
         .appName("profuturo") \
-        .config("spark.executor.memory", "32g") \
-        .config("spark.executor.memoryOverhead", "8g") \
-        .config("spark.driver.memory", "32g") \
-        .config("spark.executor.instances", "5") \
-        .config("spark.default.parallelism", "900") \
+        .config("spark.executor.memory", "28g") \
+        .config("spark.executor.memoryOverhead", "2g") \
+        .config("spark.driver.memory", "28g") \
+        .config("spark.executor.instances", "3") \
+        .config("spark.default.parallelism", "6000") \
         .getOrCreate()
 
 
@@ -410,7 +410,7 @@ def _write_spark_dataframe(
 ) -> None:
     connection_configurator(df.write, table, False) \
         .mode(mode) \
-        .option("numRowsPerSparkPartition", 20000) \
+        .option("numRowsPerSparkPartition", 40_000) \
         .option("compression", "snappy") \
         .save()
 
