@@ -2,19 +2,21 @@ from profuturo.common import define_extraction, register_time, truncate_table, n
 from profuturo.database import get_postgres_pool, configure_postgres_spark, configure_bigquery_spark, get_bigquery_pool
 from profuturo.extraction import _write_spark_dataframe, extract_terms,  _get_spark_session, read_table_insert_temp_view
 from pyspark.sql.functions import udf, concat, col, current_date , row_number,lit, current_timestamp
+from profuturo.env import load_env
 import sys
 import requests
 import time
+import os
 
 
-
-url = "https://procesos-api-service-qa-2ky75pylsa-uk.a.run.app/procesos/generarEstadosCuentaRetiros/muestras"
-
+load_env()
 postgres_pool = get_postgres_pool()
 bigquery_pool = get_bigquery_pool()
 phase = int(sys.argv[1])
 user = int(sys.argv[3])
 area = int(sys.argv[4])
+url = os.getenv("URL_MUESTRAS_RET")
+
 
 with define_extraction(phase, area, postgres_pool,bigquery_pool) as (postgres, bigquery):
     term = extract_terms(postgres, phase)

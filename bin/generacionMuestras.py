@@ -30,7 +30,7 @@ bucket_name = os.getenv("BUCKET_ID")
 print(bucket_name)
 prefix =f"{os.getenv('PREFIX_BLOB')}"
 print(prefix)
-url = os.getenv("URL")
+url = os.getenv("URL_MUESTRAS_RECA")
 print(url)
 
 
