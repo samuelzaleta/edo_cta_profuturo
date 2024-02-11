@@ -992,8 +992,7 @@ with define_extraction(phase, area, postgres_pool, bigquery_pool) as (postgres, 
         R.FTC_PERIODO_REFERENCIA,
         R.FTN_MONTO,
         R.FTD_FECHAHORA_ALTA,
-        R.FTC_USUARIO_ALTA, 
-        R.FTN_ID_FORMATO
+        R.FTC_USUARIO_ALTA
         FROM reverso R
         """)
 
