@@ -380,15 +380,22 @@ def read_table_insert_temp_view(
     print(df.count())
 
 
-def _get_spark_session() -> SparkSession:
+def _get_spark_session(
+    excuetor_memory: str = '4g',
+    memory_overhead: str ='1g',
+    memory_offhead: str ='1g',
+    driver_memory: str ='1g',
+    intances: int = 2,
+    parallelims :int = 6000
+) -> SparkSession:
     return SparkSession.builder \
-        .master('local[*]') \
         .appName("profuturo") \
-        .config("spark.executor.memory", "28g") \
-        .config("spark.executor.memoryOverhead", "2g") \
-        .config("spark.driver.memory", "28g") \
-        .config("spark.executor.instances", "3") \
-        .config("spark.default.parallelism", "6000") \
+        .config("spark.executor.memory", f"{excuetor_memory}") \
+        .config("spark.executor.memoryOverhead", f"{memory_overhead}") \
+        .config("spark.executor.memoryOffHeap", f"{memory_offhead}") \
+        .config("spark.driver.memory", f"{driver_memory}") \
+        .config("spark.executor.instances", f"{intances}") \
+        .config("spark.default.parallelism", f"{parallelims}") \
         .getOrCreate()
 
 
