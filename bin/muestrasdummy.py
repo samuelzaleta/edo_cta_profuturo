@@ -28,7 +28,7 @@ phase = int(sys.argv[1])
 user = int(sys.argv[3])
 area = int(sys.argv[4])
 term =int(sys.argv[2])
-print(phase,term, area,user )
+print(phase,term, user,area )
 bucket_name = os.getenv("BUCKET_ID")
 print(bucket_name)
 prefix =f"imagenesDummy"
@@ -125,81 +125,82 @@ def get_blob_info(bucket_name, prefix):
 
     return blob_info_list
 
-with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, _):
+with define_extraction(phase, area, postgres_pool, bigquery_pool) as (postgres, bigquery):
     term = extract_terms(postgres, phase)
     term_id = term["id"]
-    time_period = term["time_period"]
     start_month = term["start_month"]
     end_month = term["end_month"]
     spark = _get_spark_session()
-    spark.conf.set("spark.sql.shuffle.partitions", 100)
-    spark.conf.set("spark.default.parallelism", 100)
+    spark.conf.set("spark.sql.files.maxPartitionBytes", "256m")
+    spark.conf.set("spark.sql.legacy.allowNonEmptyLocationInCTAS", "true")
+    spark.conf.set("spark.sql.shuffle.partitions", 20)
 
-    ###########################  IMAGENES   #################################################
-    truncate_table(postgres, 'TTEDOCTA_IMAGEN_DUMMY')
+    with register_time(postgres_pool, phase, term_id, user, area):
+        ###########################  IMAGENES   #################################################
+        truncate_table(postgres, 'TTEDOCTA_IMAGEN_DUMMY')
 
-    delete_all_objects(bucket_name, prefix)
-    delete_all_objects(bucket_name, 'profuturo-archivos-dummy')
+        delete_all_objects(bucket_name, prefix)
+        delete_all_objects(bucket_name, 'profuturo-archivos-dummy')
 
-    query = """
-            SELECT
-            DISTINCT
-            concat("FTC_CODIGO_POSICION_PDF",'-',tcie."FCN_ID_FORMATO_ESTADO_CUENTA",'-', ra."FCN_ID_AREA",'-',COALESCE(tcie."FTC_DESCRIPCION_SIEFORE",'sinsiefore')) AS ID,"FTO_IMAGEN" AS FTO_IMAGEN
-            FROM "GESTOR"."TTGESPRO_CONFIG_IMAGEN_EDOCTA" tcie
-            INNER JOIN "GESTOR"."TTGESPRO_ROL_USUARIO" ru ON CAST(tcie."FTC_USUARIO" AS INT) = ru."FCN_ID_USUARIO"
-            INNER JOIN "GESTOR"."TCGESPRO_ROL_AREA" ra ON ru."FCN_ID_ROL" =  ra."FCN_ID_ROL"
-            """
+        query = """
+                SELECT
+                DISTINCT
+                concat("FTC_CODIGO_POSICION_PDF",'-',tcie."FCN_ID_FORMATO_ESTADO_CUENTA",'-', ra."FCN_ID_AREA",'-',COALESCE(tcie."FTC_DESCRIPCION_SIEFORE",'sinsiefore')) AS ID,"FTO_IMAGEN" AS FTO_IMAGEN
+                FROM "GESTOR"."TTGESPRO_CONFIG_IMAGEN_EDOCTA" tcie
+                INNER JOIN "GESTOR"."TTGESPRO_ROL_USUARIO" ru ON CAST(tcie."FTC_USUARIO" AS INT) = ru."FCN_ID_USUARIO"
+                INNER JOIN "GESTOR"."TCGESPRO_ROL_AREA" ra ON ru."FCN_ID_ROL" =  ra."FCN_ID_ROL"
+                """
 
-    imagenes_df = _create_spark_dataframe(spark, configure_postgres_spark, query,params={"term": term_id, "start": start_month, "end": end_month, "user": str(user)})
+        imagenes_df = _create_spark_dataframe(spark, configure_postgres_spark, query,params={"term": term_id, "start": start_month, "end": end_month, "user": str(user)})
 
-    imagenes_df.show()
+        imagenes_df.show()
 
-    imagenes_df.foreach(upload_to_gcs)
+        imagenes_df.foreach(upload_to_gcs)
 
-    # Obtiene la información del blob
-    blob_info_list = get_blob_info(bucket_name, prefix)
+        # Obtiene la información del blob
+        blob_info_list = get_blob_info(bucket_name, prefix)
 
-    schema = StructType([
-        StructField("FTC_POSICION_PDF", StringType(), True),
-        StructField("FCN_ID_FORMATO_EDOCTA", IntegerType(), True),
-        StructField("FCN_ID_AREA", IntegerType(), True),
-        StructField("FTC_URL_IMAGEN", StringType(), True),
-        StructField("FTC_IMAGEN", StringType(), True),
-        StructField("FTC_SIEFORE", StringType(), True)
-    ])
+        schema = StructType([
+            StructField("FTC_POSICION_PDF", StringType(), True),
+            StructField("FCN_ID_FORMATO_EDOCTA", IntegerType(), True),
+            StructField("FCN_ID_AREA", IntegerType(), True),
+            StructField("FTC_URL_IMAGEN", StringType(), True),
+            StructField("FTC_IMAGEN", StringType(), True),
+            StructField("FTC_SIEFORE", StringType(), True)
+        ])
 
-    df = spark.createDataFrame(blob_info_list, schema=schema)
+        df = spark.createDataFrame(blob_info_list, schema=schema)
 
-    _write_spark_dataframe(df, configure_postgres_spark, '"ESTADO_CUENTA"."TTEDOCTA_IMAGEN_DUMMY"')
+        _write_spark_dataframe(df, configure_postgres_spark, '"ESTADO_CUENTA"."TTEDOCTA_IMAGEN_DUMMY"')
 
-    for i in range(10):
-        response = requests.get(url_reca)
-        print(response)
-        # Verifica si la petición fue exitosa
-        if response.status_code == 200:
-            # Si la petición fue exitosa, puedes acceder al contenido de la respuesta de la siguiente manera:
-            content = response.content.decode('utf-8')
-            data = json.loads(content)
-            if data['data']['statusText'] == 'finalizado':
+        for i in range(10):
+            response = requests.get(url_reca)
+            print(response)
+            # Verifica si la petición fue exitosa
+            if response.status_code == 200:
+                # Si la petición fue exitosa, puedes acceder al contenido de la respuesta de la siguiente manera:
+                content = response.content.decode('utf-8')
+                data = json.loads(content)
+                if data['data']['statusText'] == 'finalizado':
+                    break
+                time.sleep(8)
+            else:
+                # Si la petición no fue exitosa, puedes imprimir el código de estado para obtener más información
+                print(f"La solicitud no fue exitosa. Código de estado: {response.status_code}")
                 break
-            time.sleep(8)
-        else:
-            # Si la petición no fue exitosa, puedes imprimir el código de estado para obtener más información
-            print(f"La solicitud no fue exitosa. Código de estado: {response.status_code}")
-            break
 
-    for i in range(10):
-        response = requests.get(url_ret)
-        print(response)
-        # Verifica si la petición fue exitosa
-        if response.status_code == 200:
-            # Si la petición fue exitosa, puedes acceder al contenido de la respuesta de la siguiente manera:
-            content = response.content.decode('utf-8')
-            data = json.loads(content)
-            if data['data']['statusText'] == 'finalizado':
+        for i in range(10):
+            response = requests.get(url_ret)
+            print(response)
+            # Verifica si la petición fue exitosa
+            if response.status_code == 200:
+                # Si la petición fue exitosa, puedes acceder al contenido de la respuesta de la siguiente manera:
+                content = response.content.decode('utf-8')
+                data = json.loads(content)
+                if data['data']['statusText'] == 'finalizado':
+                    break
+                time.sleep(8)
+            else:
+                # Si la petición no fue exitosa, puedes imprimir el código de estado para obtener más información
+                print(f"La solicitud no fue exitosa. Código de estado: {response.status_code}")
                 break
-            time.sleep(8)
-        else:
-            # Si la petición no fue exitosa, puedes imprimir el código de estado para obtener más información
-            print(f"La solicitud no fue exitosa. Código de estado: {response.status_code}")
-            break

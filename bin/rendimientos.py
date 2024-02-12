@@ -27,8 +27,8 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
 
     with register_time(postgres_pool, phase, term_id, user, area):
         all_user = """
-        SELECT C."FTN_CUENTA" AS "FCN_CUENTA", TS."FTN_ID_TIPO_SUBCTA" AS "FCN_ID_TIPO_SUBCTA"
-        FROM "MAESTROS"."TCDATMAE_CLIENTE" C,
+        SELECT C."FCN_CUENTA" AS "FCN_CUENTA", TS."FTN_ID_TIPO_SUBCTA" AS "FCN_ID_TIPO_SUBCTA"
+        FROM "HECHOS"."TCHECHOS_CLIENTE" C,
         "MAESTROS"."TCDATMAE_TIPO_SUBCUENTA" TS
         --WHERE C."FTN_CUENTA" = 3300576485
         """

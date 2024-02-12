@@ -979,7 +979,7 @@ with define_extraction(phase, area, postgres_pool, bigquery_pool) as (postgres, 
                      WHEN R.FTC_DESC_CONCEPTO LIKE 'Rendimiento%' THEN 4
                      ELSE 5
                 END,
-                R.FTD_FECHA_MOVIMIENTO DESC
+                R.FTD_FECHA_MOVIMIENTO ASC
         ) AS FTN_ORDEN,
         R.FCN_ID_EDOCTA,
         R.FCN_NUMERO_CUENTA,
@@ -992,8 +992,7 @@ with define_extraction(phase, area, postgres_pool, bigquery_pool) as (postgres, 
         R.FTC_PERIODO_REFERENCIA,
         R.FTN_MONTO,
         R.FTD_FECHAHORA_ALTA,
-        R.FTC_USUARIO_ALTA, 
-        R.FTN_ID_FORMATO
+        R.FTC_USUARIO_ALTA
         FROM reverso R
         """)
 

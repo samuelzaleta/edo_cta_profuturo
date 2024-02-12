@@ -221,6 +221,7 @@ with define_extraction(phase, area, postgres_pool, bigquery_pool) as (postgres, 
             params={"term": term_id},
         )
 
+
         movimientos_df = _create_spark_dataframe(spark, configure_postgres_spark, f"""
         WITH periodos AS (
         SELECT F."FCN_ID_FORMATO_ESTADO_CUENTA", min(T."FTN_ID_PERIODO") AS PERIODO_INICIAL, max(T."FTN_ID_PERIODO") AS PERIODO_FINAL
@@ -272,7 +273,7 @@ with define_extraction(phase, area, postgres_pool, bigquery_pool) as (postgres, 
         INNER JOIN "GESTOR"."TCGESPRO_CONFIGURACION_ANVERSO" A ON F."FCN_ID_GENERACION" = A."FCN_GENERACION"
         INNER JOIN "GESTOR"."TCGESPRO_PERIODICIDAD" P ON F."FCN_ID_PERIODICIDAD_GENERACION" = P."FTN_ID_PERIODICIDAD" AND mod(extract(MONTH FROM :end), P."FTN_MESES") = 0
         INNER JOIN "GESTOR"."TCGESPRO_PERIODICIDAD" PA ON F."FCN_ID_PERIODICIDAD_ANVERSO" = PA."FTN_ID_PERIODICIDAD"
-        INNER JOIN "GESTOR"."TCGESPRO_PERIODO" T ON to_date(T."FTC_PERIODO", 'MM/YYYY') BETWEEN :end - INTERVAL '1 month' * PA."FTN_MESES" AND :end
+        INNER JOIN "GESTOR"."TCGESPRO_PERIODO" T ON to_date(T."FTC_PERIODO", 'MM/YYYY') BETWEEN :start - INTERVAL '1 month' * PA."FTN_MESES" AND :end
         GROUP BY "FTN_ID_CONFIGURACION_FORMATO_ESTADO_CUENTA"
         )
         SELECT
@@ -289,6 +290,7 @@ with define_extraction(phase, area, postgres_pool, bigquery_pool) as (postgres, 
             .option("mode", "append") \
             .option("compression", "snappy") \
             .saveAsTable("TTCALCUL_RENDIMIENTO")
+
 
         notify(
             postgres,
