@@ -145,20 +145,20 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
 
         read_table_insert_temp_view(
             configure_buc_spark,
-            queryCorreo,
-            'correoTelefono',
+            query=queryCorreo,
+            view='correoTelefono',
         )
 
         read_table_insert_temp_view(
             configure_postgres_spark,
-            queryCliente,
-            'clientePostgres',
+            query=queryCliente,
+            view='clientePostgres',
         )
 
         read_table_insert_temp_view(
             configure_buc_spark,
-            query,
-            'cliente',
+            query=query,
+            view='cliente',
         )
 
         df = spark.sql("""
@@ -202,7 +202,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
         truncate_table(postgres, "TCHECHOS_CLIENTE_INDICADOR", term=term_id)
         truncate_table(postgres, "TCGESPRO_MUESTRA", term=term_id, area=area)
         truncate_table(postgres, "TCHECHOS_CLIENTE", term=term_id)
-        read_table_insert_temp_view(configure_mit_spark, f"""
+        read_table_insert_temp_view(configure_mit_spark, query=f"""
         SELECT
         PG.FTN_NUM_CTA_INVDUAL AS FCN_CUENTA,
         'TRUE' AS FCC_VALOR
@@ -216,10 +216,10 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                 AND PGS.FCN_ID_TIPO_SUBCTA NOT IN (15,16,17,18)
                 AND TRUNC(PG.FTD_FEH_LIQUIDACION) <= :end
                 --AND PG.FTN_NUM_CTA_INVDUAL IN {user}
-        """, "indicador_pension", params={'end': end_month})
+        """, view="indicador_pension", params={'end': end_month})
         spark.sql("select count(*) as count_indicador_pension from indicador_pension").show()
 
-        read_table_insert_temp_view(configure_mit_spark, f"""
+        read_table_insert_temp_view(configure_mit_spark, query=f"""
         SELECT DISTINCT IND.FTN_NUM_CTA_INVDUAL AS FCN_CUENTA,
                CASE IND.FCC_VALOR_IND
                    WHEN '66' THEN 'IMSS'
@@ -232,11 +232,11 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
         WHERE CONF.FFN_ID_CONFIG_INDI = 1
           AND FTC_VIGENCIA= 1
          -- AND IND.FTN_NUM_CTA_INVDUAL in {users}
-        """, "indicador_origen")
+        """,view= "indicador_origen")
         spark.sql("select count(*) as count_indicador_origen from indicador_origen").show()
         spark.sql("select * from indicador_origen").show(20)
 
-        read_table_insert_temp_view(configure_mit_spark, f"""
+        read_table_insert_temp_view(configure_mit_spark, query=f"""
         SELECT DISTINCT IND.FTN_NUM_CTA_INVDUAL AS FCN_CUENTA,
                CASE IND.FCC_VALOR_IND
                    WHEN '713' THEN 'Asignado'
@@ -247,11 +247,11 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
         WHERE CONF.FFN_ID_CONFIG_INDI = 12
           AND FTC_VIGENCIA= 1
          -- AND  IND.FTN_NUM_CTA_INVDUAL IN {users}
-        """, "indicador_tipo_cliente")
+        """, view="indicador_tipo_cliente")
         spark.sql("select count(*) as count_indicador_tipo_cliente from indicador_tipo_cliente").show()
         spark.sql("select * from indicador_tipo_cliente").show(20)
 
-        read_table_insert_temp_view(configure_mit_spark, f"""
+        read_table_insert_temp_view(configure_mit_spark, query=f"""
         SELECT DISTINCT IND.FTN_NUM_CTA_INVDUAL AS FCN_CUENTA,
                CASE IND.FCC_VALOR_IND 
                    WHEN '1' THEN 'V'
@@ -262,18 +262,18 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
         WHERE CONF.FFN_ID_CONFIG_INDI = 2
           AND FTC_VIGENCIA= 1
           AND IND.FTN_NUM_CTA_INVDUAL IN {users}
-        """, "indicador_vigencia")
+        """, view="indicador_vigencia")
         spark.sql("select count(*) as count_indicador_vigencia from indicador_vigencia").show()
 
-        read_table_insert_temp_view(configure_mit_spark, f"""
+        read_table_insert_temp_view(configure_mit_spark, query=f"""
         SELECT DISTINCT FTN_NUM_CTA_INVDUAL AS FCN_CUENTA, 'TRUE' /* TRUE */ AS FCC_VALOR
         FROM CIERREN.THAFOGRAL_SALDO_HISTORICO_V2
         WHERE FCN_ID_SIEFORE = 81
         --AND FTN_NUM_CTA_INVDUAL IN {users}
-        """, "indicador_bono")
+        """,view= "indicador_bono")
         spark.sql("select count(*) as count_indicador_bono from indicador_bono").show()
 
-        read_table_insert_temp_view(configure_mit_spark, f"""
+        read_table_insert_temp_view(configure_mit_spark, query=f"""
         SELECT
             PG.FTN_NUM_CTA_INVDUAL AS FCN_CUENTA,
             CASE
@@ -292,11 +292,11 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                 AND PGS.FCN_ID_TIPO_SUBCTA NOT IN (15,16,17,18)
                 AND TRUNC(PG.FTD_FEH_LIQUIDACION) <= :end
                 --AND PG.FTN_NUM_CTA_INVDUAL IN {users}
-        """, "indicador_tipo_pension", {'start': start_month, 'end': end_month})
+        """,view= "indicador_tipo_pension", params={'start': start_month, 'end': end_month})
 
         spark.sql("select count(*) as count_tipo_pension from indicador_tipo_pension").show()
 
-        read_table_insert_temp_view(configure_mit_spark, f"""
+        read_table_insert_temp_view(configure_mit_spark, query=f"""
         SELECT
         P.FTN_NUM_CTA_INVDUAL AS FCN_CUENTA,
         CASE WHEN SUBSTR(C.FCC_VALOR,6,7) = 'BI' then 'Inicial'
@@ -307,11 +307,11 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
         INNER JOIN CIERREN.TCCRXGRAL_CAT_CATALOGO C ON P.FCN_ID_SIEFORE= C.FCN_ID_CAT_CATALOGO
         WHERE P.FTC_ESTATUS = 1 AND FTN_PRIORIDAD = 1 and P.FCN_ID_GRUPO = 141
         --AND P.FTN_NUM_CTA_INVDUAL IN {users}
-        """, "indicador_perfil_inversion")
+        """, view="indicador_perfil_inversion")
 
         spark.sql("select count(*) as count_perfil_inversion from indicador_perfil_inversion").show()
 
-        read_table_insert_temp_view(configure_mit_spark, f"""
+        read_table_insert_temp_view(configure_mit_spark, query=f"""
         SELECT DISTINCT IND.FTN_NUM_CTA_INVDUAL AS FCN_CUENTA,
            CASE IND.FCC_VALOR_IND
                WHEN '10785' THEN 'AFORE'
@@ -323,7 +323,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
             WHERE CONF.FFN_ID_CONFIG_INDI = 34
             AND FTC_VIGENCIA= 1 
            -- AND FTN_NUM_CTA_INVDUAL IN {users}       
-        """, "indicador_generacion")
+        """, view="indicador_generacion")
 
         df = spark.sql(f"""
         SELECT DISTINCT o.FCN_CUENTA,

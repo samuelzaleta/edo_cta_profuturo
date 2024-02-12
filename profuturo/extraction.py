@@ -81,14 +81,13 @@ def update_indicator_spark(
         ))
 
     try:
-        extract_dataset_spark(
+        read_table_insert_temp_view(
             origin_configurator,
             destination_configurator,
-            query,
-            '"HECHOS"."TCHECHOS_CLIENTE_INDICADOR"',
+            query=query,
+            view="CLIENTE_INDICADOR",
             term=term,
             params=params,
-            limit=limit,
             transform=transform,
         )
     except Exception as e:
@@ -365,7 +364,9 @@ def read_table_insert_temp_view(
     origin_configurator: SparkConnectionConfigurator,
     query: str,
     view: str,
-    params: Dict[str, Any] = None
+    params: Dict[str, Any] = None,
+    term: int = None,
+    transform: Callable[[SparkDataFrame], SparkDataFrame] = None,
 ):
     if params is None:
         params = {}
@@ -374,6 +375,17 @@ def read_table_insert_temp_view(
     print("EXTRACCIÓN")
     df = _create_spark_dataframe(spark, origin_configurator, query, params)
     print("DONE")
+
+    if term:
+        print("Adding period...")
+        df_sp = df.withColumn("FCN_ID_PERIODO", lit(term))
+        print("Done adding period!")
+
+    if transform is not None:
+        print("Transforming dataframe...")
+        df = transform(df)
+        print("Done transforming dataframe!")
+
     df.createOrReplaceTempView(view)
     print("DONE VIEW:",view)
     df.show(2)
