@@ -57,7 +57,7 @@ def process_dataframe(df, identifier):
 
 def str_to_gcs(data, name):
     blob = bucket.blob(f"correspondencia/{name}")
-    blob.upload_from_string(data.encode("iso_8859_1"), content_type="text/plain")
+    blob.upload_from_string(data.encode("ansi"), content_type="text/plain")
     print(F"SE CREO EL ARCHIVO DE correspondencia/{name}")
 
 

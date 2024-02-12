@@ -49,7 +49,7 @@ else:
 
 def str_to_gcs(data, name):
     blob = bucket.blob(f"correspondencia/{name}")
-    blob.upload_from_string(data.encode("iso_8859_1"), content_type="text/plain")
+    blob.upload_from_string(data.encode("ansi"), content_type="text/plain")
 
 
 def upload_file_to_smb(remote_file_path, filename, data):
