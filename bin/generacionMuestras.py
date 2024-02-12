@@ -935,6 +935,7 @@ with define_extraction(phase, area, postgres_pool, bigquery_pool) as (postgres, 
                 G.FCN_NUMERO_CUENTA,
                 A.FTC_TIPO_AHORRO,
                 A.FTC_USUARIO_ALTA
+                HAVING SUM(cast(A.FTN_COMISION as numeric(16,2))) > 0
                 UNION ALL
                 SELECT 
                 cast(G.FCN_ID_EDOCTA as bigint) as FCN_ID_EDOCTA,
@@ -959,6 +960,7 @@ with define_extraction(phase, area, postgres_pool, bigquery_pool) as (postgres, 
                 G.FCN_NUMERO_CUENTA,
                 A.FTC_TIPO_AHORRO,
                 A.FTC_USUARIO_ALTA
+                HAVING SUM(cast(A.FTN_RENDIMIENTO as numeric(16,2))) > 0
                 """)
 
         reverso_df = reverso_df.union(anverso_cuatrimestral_df)
