@@ -1,6 +1,6 @@
 import sys
-import smtplib
-import paramiko
+import requests
+#from smbprotocol import open_file, register_session
 import math
 from profuturo.common import register_time, define_extraction, notify
 from profuturo.database import get_postgres_pool, configure_postgres_spark
@@ -21,16 +21,15 @@ area = int(sys.argv[4])
 
 storage_client = storage.Client()
 
-client = secretmanager.SecretManagerServiceClient()
-"""smtp_host = client.access_secret_version(name="SMTP_HOST").payload.data.decode("UTF-8")
-smtp_port = client.access_secret_version(name="SMTP_PORT").payload.data.decode("UTF-8")
-smtp_user = client.access_secret_version(name="SMTP_ADDRESS_SENDER").payload.data.decode("UTF-8")
-smtp_pass = client.access_secret_version(name="SMTP_PASSWORD_SENDER").payload.data.decode("UTF-8")
-sftp_host = client.access_secret_version(name="SFTP_HOST").payload.data.decode("UTF-8")
-sftp_port = client.access_secret_version(name="SFTP_PORT").payload.data.decode("UTF-8")
-sftp_user = client.access_secret_version(name="SFTP_USERNAME").payload.data.decode("UTF-8")
-sftp_pass = client.access_secret_version(name="SFTP_PASSWORD").payload.data.decode("UTF-8")
-sftp_remote_file_path = client.access_secret_version(name="SFTP_CARPETA_DESTINO").payload.data.decode("UTF-8")"""
+"""client = secretmanager.SecretManagerServiceClient()
+smb_host = client.access_secret_version(name="SFTP_HOST").payload.data.decode("UTF-8")
+smb_port = client.access_secret_version(name="SFTP_PORT").payload.data.decode("UTF-8")
+smb_user = client.access_secret_version(name="SFTP_USERNAME").payload.data.decode("UTF-8")
+smb_pass = client.access_secret_version(name="SFTP_PASSWORD").payload.data.decode("UTF-8")
+smb_remote_file_path = client.access_secret_version(name="SFTP_CARPETA_DESTINO").payload.data.decode("UTF-8")
+"""
+
+#register_session(smb_host, username=smb_user, password=smb_pass)
 
 
 def get_buckets():
@@ -41,7 +40,15 @@ def get_buckets():
             return bucket.name
 
 
-bucket = storage_client.get_bucket(get_buckets())
+bucket_name = get_buckets()
+bucket = storage_client.get_bucket(bucket_name)
+
+if "dev" in bucket_name:
+    email_url = "https://procesos-api-service-dev-e46ynxyutq-uk.a.run.app/procesos/email/send"
+elif "qa" in bucket_name:
+    email_url = "https://procesos-api-service-qa-2ky75pylsa-uk.a.run.app/procesos/email/send"
+else:
+    email_url = "https://procesos-api-service-h3uy3grcoq-uk.a.run.app/procesos/email/send"
 
 
 def process_dataframe(df, identifier):
@@ -63,34 +70,26 @@ def get_months(cuatrimestre):
     return months
 
 
-def upload_file_to_sftp(hostname, username, password, local_file_path, remote_file_path, data):
-    with open(f"{local_file_path}", "w") as file:
-        file.write(data)
-
-    try:
-        transport = paramiko.Transport((hostname, 22))
-        transport.connect(username=username, password=password)
-
-        sftp = paramiko.SFTPClient.from_transport(transport)
-
-        sftp.put(local_file_path, remote_file_path)
-
-        print(f"File uploaded successfully to {remote_file_path} on SFTP server {hostname}")
-
-    except Exception as e:
-        print(f"An error occurred during SFTP upload: {e}")
-
-    finally:
-        sftp.close()
-        transport.close()
+"""def upload_file_to_smb(remote_file_path, filename, data):
+    with open_file(f"{remote_file_path}/{filename}", "w") as fd:
+        fd.write(data)"""
 
 
-def send_email(host, port, username, password, from_address, to_address, subject, body):
-    server = smtplib.SMTP(host, port)
-    server.login(username, password)
-    message = "Subject: {}\n\n{}".format(subject, body)
-    server.sendmail(from_address, to_address, message)
-    server.quit()
+def send_email(url, receiver, subject, text):
+    data = {
+        "to": f"{receiver};",
+        "subject": subject,
+        "text": text
+    }
+    headers = {
+        "Content-Type": "application/json"
+    }
+    response = requests.request("POST", url, data=data, headers=headers)
+
+    if response.status_code == 200:
+        print("Correo enviado con éxito!")
+    else:
+        print(f"Error al enviar correo: {response.status_code}")
 
 
 with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, _):
@@ -184,7 +183,6 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                 )
                 unique_clients = df_anverso_general.select("FCN_ID_EDOCTA").distinct()
                 df_general = df_general.join(unique_clients, on="FCN_ID_EDOCTA", how="inner")
-                print("DF_GENERAL", df_general.count())
 
                 df_general = (
                     df_general.select("FCN_NUMERO_CUENTA", "FCN_FOLIO", "FTC_NOMBRE_COMPLETO", "FTC_CALLE_NUMERO",
@@ -263,7 +261,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                     name_anverso = f"recaudacion_anverso_mensual_{str(month)[:4]}_{str(month)[-2:]}_{part}-{num_parts_anverso}.txt" if type(
                         month) == int else f"recaudacion_anverso_cuatrimestral_{str(cuatrimestre)[:4]}_{str(cuatrimestre)[-2:]}_{part}-{num_parts_anverso}.txt"
                     str_to_gcs(res, name_anverso)
-                    # upload_file_to_sftp(sftp_host, sftp_user, sftp_pass, name_anverso, sftp_remote_file_path, res)
+                    # upload_file_to_smb(smb_remote_file_path, name_anverso, res)
                     body_message += f"Se generó el archivo de {name_anverso} con un total de {len(processed_data_part)} registros\n"
 
                 query_reverso = """
@@ -277,10 +275,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
 
                 df_edo_reverso = spark.sql("SELECT * FROM reverso")
 
-                print("SE EXTRAJO EXITOSAMENTE REVERSO", df_edo_reverso.count())
-
                 df_reverso_general = df_edo_reverso.join(df_general, "FCN_NUMERO_CUENTA")
-                print("SE REALIZO EL JOIN DE REVERSO", df_reverso_general.count())
                 df_reverso_general = (
                     df_reverso_general.select("FCN_NUMERO_CUENTA", "FTN_ID_CONCEPTO", "FTC_SECCION",
                                               f.date_format("FTD_FECHA_MOVIMIENTO", "ddMMyyyy").alias(
@@ -289,13 +284,9 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                                               f.col("FTN_SALARIO_BASE").cast("decimal(16, 2)"),
                                               f.col("FTN_MONTO").cast("decimal(16, 2)"))
                 )
-                print("DF_REVERSO_GENERAL", df_reverso_general.count())
                 ret = df_reverso_general.filter(f.col("FTC_SECCION") == "RET").count()
-                print("RET", ret)
                 vol = df_reverso_general.filter(f.col("FTC_SECCION") == "VOL").count()
-                print("VOL", vol)
                 viv = df_reverso_general.filter(f.col("FTC_SECCION") == "VIV").count()
-                print("VIV", viv)
                 total = df_reverso_general.count()
 
                 num_parts_reverso = math.ceil(total / limit)
@@ -317,21 +308,12 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                     name_reverso = f"recaudacion_reverso_mensual_{str(month)[:4]}_{str(month)[-2:]}_{part}-{num_parts_reverso}.txt" if type(
                         month) == int else f"recaudacion_reverso_cuatrimestral_{str(cuatrimestre)[:4]}_{str(cuatrimestre)[-2:]}_{part}-{num_parts_reverso}.txt"
                     str_to_gcs(res, name_reverso)
-                    # upload_file_to_sftp(sftp_host, sftp_user, sftp_pass, name_reverso, "", res)
+                    # upload_file_to_smb(smb_remote_file_path, name_reverso, res)
                     body_message += f"Se generó el archivo de {name_reverso} con un total de {len(reverso_data_part)} registros\n"
 
-            """send_email(
-                host=smtp_host,
-                port=smtp_port,
-                username=smtp_user,
-                password=smtp_pass,
-                from_address=smtp_user,
-                to_address="alfredo.guerra@profuturo.com.mx",
-                subject="Generacion de los archivos de recaudacion",
-                body=body_message
-            )
+            send_email(email_url, "", "Generacion de los archivos de recaudacion", body_message)
 
-        notify(
+        """notify(
             postgres,
             f"Generacion de archivos Recaudaciones",
             phase,
