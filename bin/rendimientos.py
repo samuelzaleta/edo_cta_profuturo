@@ -170,21 +170,21 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
 
         read_table_insert_temp_view(
             configure_postgres_spark,
-            all_user,
-            "clientes",
+            query=all_user,
+            view="clientes",
             params={"date": end_month_anterior, "type": "F", "accion": valor_accion_anterior}
         )
 
         read_table_insert_temp_view(
             configure_postgres_spark,
-            saldo_inicial_query,
-            "saldoinicial",
+            query=saldo_inicial_query,
+            view="saldoinicial",
             params={"date": end_month_anterior, "type": "F", "accion": valor_accion_anterior}
         )
         read_table_insert_temp_view(
             configure_postgres_spark,
-            saldo_final_query,
-            "saldofinal",
+            query=saldo_final_query,
+            view="saldofinal",
             params={
                     "end_month": end_month,
                     "term_id": term_id}
@@ -192,8 +192,8 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
 
         read_table_insert_temp_view(
             configure_postgres_spark,
-            cargo_query,
-            "cargo",
+            query=cargo_query,
+            view="cargo",
             params={"term_id": term_id}
         )
         read_table_insert_temp_view(
@@ -204,8 +204,8 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
         )
         read_table_insert_temp_view(
             configure_postgres_spark,
-            comision_query,
-            "comision",
+            query=comision_query,
+            view="comision",
             params={"term_id": term_id}
         )
 
