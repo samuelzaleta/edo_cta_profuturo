@@ -165,7 +165,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
         SELECT FCN_CUENTA FROM (SELECT 
         CT.FCN_CUENTA,
         CASE
-            WHEN INDICADOR = 'correo' THEN CT.FTC_CORREO = CP.FTC_CORREO
+            WHEN INDICADOR = 'correo' THEN cast(CT.FTC_CORREO as varchar) = cast(CP.FTC_CORREO as varchar)
             ELSE CT.FTC_TELEFONO = CP.FTC_TELEFONO
         END AS FTB_EVALUACION
         FROM 
