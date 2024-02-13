@@ -60,12 +60,10 @@ def extract_terms(conn: Connection, phase: int, term_id: int = None) -> Dict[str
 
 def update_indicator_spark(
     origin_configurator: SparkConnectionConfigurator,
-    destination_configurator: SparkConnectionConfigurator,
     query: str,
     indicator: RowMapping,
     term: int = None,
     params: Dict[str, Any] = None,
-    limit: int = None,
     area: int = None
 ):
     def transform(df: SparkDataFrame) -> SparkDataFrame:
@@ -83,7 +81,6 @@ def update_indicator_spark(
     try:
         read_table_insert_temp_view(
             origin_configurator,
-            destination_configurator,
             query=query,
             view="CLIENTE_INDICADOR",
             term=term,
@@ -378,7 +375,7 @@ def read_table_insert_temp_view(
 
     if term:
         print("Adding period...")
-        df_sp = df.withColumn("FCN_ID_PERIODO", lit(term))
+        df = df.withColumn("FCN_ID_PERIODO", lit(term))
         print("Done adding period!")
 
     if transform is not None:

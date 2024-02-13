@@ -1,7 +1,7 @@
 from sqlalchemy import text
 from profuturo.common import define_extraction, truncate_table, notify,register_time
 from profuturo.database import SparkConnectionConfigurator, get_postgres_pool, configure_mit_spark, configure_postgres_spark, configure_buc_spark, configure_integrity_spark, configure_bigquery_spark, get_bigquery_pool
-from profuturo.extraction import update_indicator_spark, extract_dataset_spark, _get_spark_session
+from profuturo.extraction import update_indicator_spark, extract_dataset_spark, _get_spark_session, _write_spark_dataframe
 from profuturo.reporters import HtmlReporter
 from profuturo.extraction import extract_terms, read_table_insert_temp_view
 import sys
@@ -25,6 +25,17 @@ with define_extraction(phase, area, postgres_pool, bigquery_pool) as (postgres,b
     with register_time(postgres_pool, phase, term_id, user, area):
         # Indicadores dinámicos
         truncate_table(postgres, "TCHECHOS_CLIENTE_INDICADOR", term=term_id, area=area)
+
+        all_user = """
+        SELECT DISTINCT C."FTN_CUENTA" AS "FCN_CUENTA"
+        FROM "MAESTROS"."TCDATMAE_CLIENTE" C
+        """
+        read_table_insert_temp_view(
+            configure_postgres_spark,
+            query=all_user,
+            view="clientes"
+        )
+
         postgres.execute(text("""
         UPDATE "HECHOS"."TCHECHOS_CLIENTE"
         SET "FTC_GENERACION" = 'DECIMO TRANSITORIO'
@@ -50,6 +61,7 @@ with define_extraction(phase, area, postgres_pool, bigquery_pool) as (postgres,b
 
             for indicator_query in indicators_queries.fetchall():
                 query = indicator_query[0]
+                print(query)
 
                 origin = indicator_query[1]
 
@@ -63,9 +75,18 @@ with define_extraction(phase, area, postgres_pool, bigquery_pool) as (postgres,b
                 else:
                     origin_configurator = configure_postgres_spark
 
-                update_indicator_spark(origin_configurator, configure_postgres_spark, query, indicator._mapping,
-                                       term=term_id,area= area,
-                                       params={'term': term_id, 'end': end_month, 'start': start_month})
+                update_indicator_spark(origin_configurator=origin_configurator, query=query,
+                                       indicator= indicator._mapping,term=term_id,area= area,
+                                       params={'term': term_id, 'end': end_month, 'start': start_month}
+                                       )
+                df =spark.sql("""SELECT 
+                             CI.* FROM CLIENTE_INDICADOR CI 
+                             INNER JOIN clientes C 
+                             on CI.FCN_CUENTA = C.FCN_CUENTA
+                             """)
+                print(df.count())
+                _write_spark_dataframe(df, configure_postgres_spark, '"HECHOS"."TCHECHOS_CLIENTE_INDICADOR"')
+                spark.catalog.dropTempView("CLIENTE_INDICADOR")
 
             print(f"Done extracting {indicator[1]}!")
 
@@ -88,7 +109,7 @@ with define_extraction(phase, area, postgres_pool, bigquery_pool) as (postgres,b
         truncate_table(postgres, 'TTEDOCTA_CLIENTE_INDICADOR', term=term_id)
 
         extract_dataset_spark(configure_postgres_spark, configure_postgres_spark, """
-        SELECT
+        SELECT 
         "FCN_CUENTA",
         "FCN_ID_PERIODO",
         :area AS "FCN_ID_AREA",
@@ -97,11 +118,13 @@ with define_extraction(phase, area, postgres_pool, bigquery_pool) as (postgres,b
         MIN("FTB_DISPONIBLE")::bool AS "FTB_DISPONIBLE",
         MIN("FTB_GENERACION")::bool AS "FTB_GENERACION"
         FROM (
-        SELECT "FCN_CUENTA", "FCN_ID_PERIODO", "FCN_ID_INDICADOR",
-                ("FTA_EVALUA_INDICADOR"[1])::int AS "FTB_DISPONIBLE",
-                ("FTA_EVALUA_INDICADOR"[2])::int AS "FTB_ENVIO",
-               ("FTA_EVALUA_INDICADOR"[3])::int AS "FTB_IMPRESION",
-               ("FTA_EVALUA_INDICADOR"[4])::int AS "FTB_GENERACION"
+        SELECT 
+        DISTINCT
+        "FCN_CUENTA", "FCN_ID_PERIODO", "FCN_ID_INDICADOR",
+        ("FTA_EVALUA_INDICADOR"[1])::int AS "FTB_DISPONIBLE",
+        ("FTA_EVALUA_INDICADOR"[2])::int AS "FTB_ENVIO",
+        ("FTA_EVALUA_INDICADOR"[3])::int AS "FTB_IMPRESION",
+        ("FTA_EVALUA_INDICADOR"[4])::int AS "FTB_GENERACION"
         FROM "HECHOS"."TCHECHOS_CLIENTE_INDICADOR"
         WHERE "FCN_ID_PERIODO" = :term
         ) X
