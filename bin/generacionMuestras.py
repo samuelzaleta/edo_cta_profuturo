@@ -789,12 +789,12 @@ with define_extraction(phase, area, postgres_pool, bigquery_pool) as (postgres, 
         END
         )
         , periodos AS (
-        SELECT F."FCN_ID_FORMATO_ESTADO_CUENTA", min(T."FTN_ID_PERIODO") AS PERIODO_INICIAL, max(T."FTN_ID_PERIODO") AS PERIODO_FINAL
+       SELECT F."FCN_ID_FORMATO_ESTADO_CUENTA", min(T."FTN_ID_PERIODO") AS PERIODO_INICIAL, max(T."FTN_ID_PERIODO") AS PERIODO_FINAL
         FROM "GESTOR"."TTGESPRO_CONFIGURACION_FORMATO_ESTADO_CUENTA" F
         INNER JOIN "GESTOR"."TCGESPRO_CONFIGURACION_ANVERSO" A ON F."FCN_ID_GENERACION" = A."FCN_GENERACION"
         INNER JOIN "GESTOR"."TCGESPRO_PERIODICIDAD" P ON F."FCN_ID_PERIODICIDAD_GENERACION" = P."FTN_ID_PERIODICIDAD" AND mod(extract(MONTH FROM :end), P."FTN_MESES") = 0
         INNER JOIN "GESTOR"."TCGESPRO_PERIODICIDAD" PA ON F."FCN_ID_PERIODICIDAD_REVERSO" = PA."FTN_ID_PERIODICIDAD"
-        INNER JOIN "GESTOR"."TCGESPRO_PERIODO" T ON to_date(T."FTC_PERIODO", 'MM/YYYY') BETWEEN :start - INTERVAL '1 month' * PA."FTN_MESES" AND :end
+        INNER JOIN "GESTOR"."TCGESPRO_PERIODO" T ON to_date(T."FTC_PERIODO", 'MM/YYYY') BETWEEN :end - INTERVAL '1 month' * PA."FTN_MESES" AND :end
         GROUP BY "FTN_ID_CONFIGURACION_FORMATO_ESTADO_CUENTA"
         )
         SELECT
@@ -807,10 +807,6 @@ with define_extraction(phase, area, postgres_pool, bigquery_pool) as (postgres, 
         SUM("FTN_SALDO_ANTERIOR") AS "FTN_SALDO_ANTERIOR",
         SUM("FTN_SALDO_FINAL") AS "FTN_SALDO_FINAL",
         "FTC_SECCION",
-        NULL ::numeric(16, 2) AS  "FTN_VALOR_ACTUAL_PESO",
-        NULL ::numeric(16, 6) AS "FTN_VALOR_ACTUAL_UDI",
-        NULL ::numeric(16, 2) AS "FTN_VALOR_NOMINAL_PESO",
-        NULL ::numeric(16, 6) AS "FTN_VALOR_NOMINAL_UDI",
         "FTC_TIPO_AHORRO",
         "FTN_ORDEN_SDO",
         :user AS "FTC_USUARIO_ALTA"
@@ -844,10 +840,6 @@ with define_extraction(phase, area, postgres_pool, bigquery_pool) as (postgres, 
         "FTN_ID_FORMATO",
         "FTC_CONCEPTO_NEGOCIO",
         "FTC_SECCION",
-        "FTN_VALOR_ACTUAL_PESO",
-        "FTN_VALOR_ACTUAL_UDI",
-        "FTN_VALOR_NOMINAL_PESO",
-        "FTN_VALOR_NOMINAL_UDI",
         "FTC_TIPO_AHORRO",
         "FTN_ORDEN_SDO",
         "FTC_USUARIO_ALTA"
