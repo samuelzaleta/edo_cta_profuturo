@@ -499,29 +499,29 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
 
         read_table_insert_temp_view(
             configure_mit_spark,
-            query_retiros,
-            "RETIROS",
+            query=query_retiros,
+            view="RETIROS",
             params={"end": end_month, 'start': start_month, 'term': term_id}
         )
 
         read_table_insert_temp_view(
             configure_mit_spark,
-            query_saldo_liquidaciones_sin_transferencias,
-            "SALDOS_LIQUIDACIONES",
+            query=query_saldo_liquidaciones_sin_transferencias,
+            view="SALDOS_LIQUIDACIONES",
             params={"end": end_month, 'start': start_month, 'term': term_id}
         )
 
         read_table_insert_temp_view(
             configure_mit_spark,
-            query_saldo_liquidaciones_transferencias,
-            "SALDOS_LIQUIDACIONES_TRANSFERENCIAS",
+            query=query_saldo_liquidaciones_transferencias,
+            view="SALDOS_LIQUIDACIONES_TRANSFERENCIAS",
             params={"end": end_month, 'start': start_month, 'term': term_id}
         )
 
         read_table_insert_temp_view(
             configure_mit_spark,
-            query_saldos,
-            "SALDOS_INICIALES",
+            query=query_saldos,
+            view="SALDOS_INICIALES",
             params={"end": end_month,'start': start_month, 'term': term_id}
         )
 
@@ -637,7 +637,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                 where R."FCN_ID_PERIODO" = :term
                 """
 
-        read_table_insert_temp_view(configure_postgres_spark, query, "retiros",
+        read_table_insert_temp_view(configure_postgres_spark, query=query, view="retiros",
                                     params={"term": term_id, "user": str(user), "area": area})
         df = spark.sql(""" select * from retiros""")
         # Convert PySpark DataFrame to pandas DataFrame
