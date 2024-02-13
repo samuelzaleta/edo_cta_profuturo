@@ -20,7 +20,12 @@ with define_extraction(phase, area, postgres_pool, bigquery_pool) as (postgres,b
     time_period = term["time_period"]
     start_month = term["start_month"]
     end_month = term["end_month"]
-    spark = _get_spark_session()
+    spark = _get_spark_session(excuetor_memory = '8g',
+    memory_overhead ='1g',
+    memory_offhead ='1g',
+    driver_memory ='1g',
+    intances = 4,
+    parallelims = 8000)
 
     with register_time(postgres_pool, phase, term_id, user, area):
         # Indicadores dinámicos
@@ -61,9 +66,11 @@ with define_extraction(phase, area, postgres_pool, bigquery_pool) as (postgres,b
 
             for indicator_query in indicators_queries.fetchall():
                 query = indicator_query[0]
-                print(query)
+
+                view = indicator[0]
 
                 origin = indicator_query[1]
+                print(origin)
 
                 origin_configurator: SparkConnectionConfigurator
                 if origin == "BUC":
@@ -75,18 +82,20 @@ with define_extraction(phase, area, postgres_pool, bigquery_pool) as (postgres,b
                 else:
                     origin_configurator = configure_postgres_spark
 
-                update_indicator_spark(origin_configurator=origin_configurator, query=query,
+                update_indicator_spark(origin_configurator=origin_configurator, query=query, view=view,
                                        indicator= indicator._mapping,term=term_id,area= area,
                                        params={'term': term_id, 'end': end_month, 'start': start_month}
                                        )
-                df =spark.sql("""SELECT 
-                             CI.* FROM CLIENTE_INDICADOR CI 
-                             INNER JOIN clientes C 
-                             on CI.FCN_CUENTA = C.FCN_CUENTA
-                             """)
+                df =spark.sql(f"""
+                SELECT
+                DISTINCT 
+                 CI.* FROM {view} CI 
+                 INNER JOIN clientes C 
+                 on CI.FCN_CUENTA = C.FCN_CUENTA
+                 """)
                 print(df.count())
                 _write_spark_dataframe(df, configure_postgres_spark, '"HECHOS"."TCHECHOS_CLIENTE_INDICADOR"')
-                spark.catalog.dropTempView("CLIENTE_INDICADOR")
+                spark.catalog.dropTempView(view)
 
             print(f"Done extracting {indicator[1]}!")
 

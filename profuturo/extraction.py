@@ -61,6 +61,7 @@ def extract_terms(conn: Connection, phase: int, term_id: int = None) -> Dict[str
 def update_indicator_spark(
     origin_configurator: SparkConnectionConfigurator,
     query: str,
+    view : str,
     indicator: RowMapping,
     term: int = None,
     params: Dict[str, Any] = None,
@@ -82,7 +83,7 @@ def update_indicator_spark(
         read_table_insert_temp_view(
             origin_configurator,
             query=query,
-            view="CLIENTE_INDICADOR",
+            view=view,
             term=term,
             params=params,
             transform=transform,
