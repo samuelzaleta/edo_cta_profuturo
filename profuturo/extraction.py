@@ -60,11 +60,12 @@ def extract_terms(conn: Connection, phase: int, term_id: int = None) -> Dict[str
 
 def update_indicator_spark(
     origin_configurator: SparkConnectionConfigurator,
+    destination_configurator: SparkConnectionConfigurator,
     query: str,
-    view : str,
     indicator: RowMapping,
     term: int = None,
     params: Dict[str, Any] = None,
+    limit: int = None,
     area: int = None
 ):
     def transform(df: SparkDataFrame) -> SparkDataFrame:
@@ -80,16 +81,19 @@ def update_indicator_spark(
         ))
 
     try:
-        read_table_insert_temp_view(
+        extract_dataset_spark(
             origin_configurator,
-            query=query,
-            view=view,
+            destination_configurator,
+            query,
+            '"HECHOS"."TCHECHOS_CLIENTE_INDICADOR"',
             term=term,
             params=params,
+            limit=limit,
             transform=transform,
         )
     except Exception as e:
         raise ProfuturoException("TABLE_SWITCH_ERROR", term) from e
+
 
 
 def extract_dataset(
@@ -209,6 +213,47 @@ def extract_dataset_write_view_spark(
 
         print("DONE VIEW")
 
+    except Exception as e:
+        raise ProfuturoException.from_exception(e, term) from e
+
+def extract_dataset_spark_return_df(
+        origin_configurator: SparkConnectionConfigurator,
+        query: Union[str, Compiled],
+        table: str,
+        term: int = None,
+        params: Dict[str, Any] = None,
+        limit: int = None,
+        transform: Callable[[SparkDataFrame], SparkDataFrame] = None,
+) -> object:
+    spark = _get_spark_session()
+
+    if isinstance(query, Compiled):
+        params = query.params
+        query = str(query)
+    if params is None:
+        params = {}
+    if limit is not None:
+        query = f"SELECT * FROM ({query}) WHERE ROWNUM <= :limit"
+        params["limit"] = limit
+
+    print(f"Extracting {table}...")
+
+    try:
+        print("Creating dataframe...")
+        df_sp = _create_spark_dataframe(spark, origin_configurator, query, params)
+        print("Done dataframe!")
+
+        if term:
+            df_sp = df_sp.withColumn("FCN_ID_PERIODO", lit(term))
+            print("Done adding period!")
+
+        if transform is not None:
+
+            df_sp = transform(df_sp)
+            print("Done transforming dataframe!")
+
+        print("Count:", df_sp.count())
+        return df_sp
     except Exception as e:
         raise ProfuturoException.from_exception(e, term) from e
 
