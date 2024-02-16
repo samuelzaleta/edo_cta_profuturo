@@ -31,16 +31,6 @@ with define_extraction(phase, area, postgres_pool, bigquery_pool) as (postgres,b
         # Indicadores dinámicos
         truncate_table(postgres, "TCHECHOS_CLIENTE_INDICADOR", term=term_id, area=area)
 
-        all_user = """
-        SELECT DISTINCT C."FTN_CUENTA" AS "FCN_CUENTA"
-        FROM "MAESTROS"."TCDATMAE_CLIENTE" C
-        """
-        read_table_insert_temp_view(
-            configure_postgres_spark,
-            query=all_user,
-            view="clientes"
-        )
-
         postgres.execute(text("""
         UPDATE "HECHOS"."TCHECHOS_CLIENTE"
         SET "FTC_GENERACION" = 'DECIMO TRANSITORIO'
@@ -82,20 +72,10 @@ with define_extraction(phase, area, postgres_pool, bigquery_pool) as (postgres,b
                 else:
                     origin_configurator = configure_postgres_spark
 
-                update_indicator_spark(origin_configurator=origin_configurator, query=query, view=view,
+                update_indicator_spark(origin_configurator=origin_configurator, destination_configurator=configure_postgres_spark, query=query,
                                        indicator= indicator._mapping,term=term_id,area= area,
-                                       params={'term': term_id, 'end': end_month, 'start': start_month}
-                                       )
-                df =spark.sql(f"""
-                SELECT
-                DISTINCT 
-                 CI.* FROM {view} CI 
-                 INNER JOIN clientes C 
-                 on CI.FCN_CUENTA = C.FCN_CUENTA
-                 """)
-                print(df.count())
-                _write_spark_dataframe(df, configure_postgres_spark, '"HECHOS"."TCHECHOS_CLIENTE_INDICADOR"')
-                spark.catalog.dropTempView(view)
+                                       params={'term': term_id, 'end': end_month, 'start': start_month})
+
 
             print(f"Done extracting {indicator[1]}!")
 
@@ -118,7 +98,8 @@ with define_extraction(phase, area, postgres_pool, bigquery_pool) as (postgres,b
         truncate_table(postgres, 'TTEDOCTA_CLIENTE_INDICADOR', term=term_id)
 
         extract_dataset_spark(configure_postgres_spark, configure_postgres_spark, """
-        SELECT 
+        SELECT
+        DISTINCT
         "FCN_CUENTA",
         "FCN_ID_PERIODO",
         :area AS "FCN_ID_AREA",
