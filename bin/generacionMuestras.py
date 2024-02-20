@@ -988,6 +988,7 @@ with define_extraction(phase, area, postgres_pool, bigquery_pool) as (postgres, 
         R.FTD_FECHAHORA_ALTA,
         R.FTC_USUARIO_ALTA
         FROM reverso R
+        WHERE FTN_MONTO <> 0
         """)
 
         anverso_df = spark.sql("""
