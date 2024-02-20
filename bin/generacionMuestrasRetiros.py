@@ -99,6 +99,7 @@ with define_extraction(phase, area, postgres_pool,bigquery_pool) as (postgres, b
                 "FTN_AFO_ISR" AS "FTC_AFO_RETENCION_ISR",
                 CAST("FTN_FEH_INI_PEN" AS INT) AS "FTC_FECHA_INICIO_PENSION",
                 CAST("FTN_FEH_RES_PEN" as INT) AS "FTC_FECHA_EMISION",
+                'NO DISPONIBLE' as "FTN_PENSION_INSTITUTO_SEG",
                 "FTC_TIPO_TRAMITE" As "FTN_TIPO_TRAMITE",
                 "FTN_ARCHIVO" AS "FTC_ARCHIVO",
                 "FTD_FECHA_EMISION" AS "FTD_FECHA_LIQUIDACION",
