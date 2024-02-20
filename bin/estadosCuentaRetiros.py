@@ -26,7 +26,6 @@ with define_extraction(phase, area, postgres_pool,bigquery_pool) as (postgres, b
     spark = _get_spark_session()
 
     with register_time(postgres_pool, phase, term_id, user, area):
-        truncate_table(postgres, 'TCGESPRO_MUESTRA', term=term_id, area=area)
         truncate_table(postgres, 'TTEDOCTA_RETIRO_GENERAL')
         truncate_table(postgres, 'TTEDOCTA_RETIRO')
 
