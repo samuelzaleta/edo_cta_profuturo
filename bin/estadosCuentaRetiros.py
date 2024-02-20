@@ -76,6 +76,9 @@ with define_extraction(phase, area, postgres_pool,bigquery_pool) as (postgres, b
                 "FTC_TPSEGURO" AS "FTC_SEGURO",
                 "FTC_TPPENSION" AS "FTC_TIPO_PENSION",
                 "FTC_FON_ENTIDAD",
+                CASE 
+                WHEN "FTC_FON_ENTIDAD" is not null THEN "FTD_FECHA_EMISION"
+                END "FTD_FON_FECHA_TRANSF",
                 CASE
                 WHEN "FTC_FON_ENTIDAD" is not null then "FTN_SDO_TRA_VIVIENDA" + "FTN_SDO_TRA_AHORRORET"
                 ELSE 0
