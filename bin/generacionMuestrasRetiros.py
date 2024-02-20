@@ -91,7 +91,6 @@ with define_extraction(phase, area, postgres_pool,bigquery_pool) as (postgres, b
                 ELSE 0
                 END "FTN_FON_MONTO_TRANSF",
                 0.0 AS "TFN_FON_RETENCION_ISR",
-                "FTD_FECHA_EMISION" AS "FTD_FECHA_EMISION",
                 "FTC_ENT_REC_TRAN" AS "FTC_AFO_ENTIDAD",
                 "FCC_MEDIO_PAGO" AS "FTC_AFO_MEDIO_PAGO",
                 CASE
