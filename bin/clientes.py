@@ -20,7 +20,13 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
     time_period = term["time_period"]
     start_month = term["start_month"]
     end_month = term["end_month"]
-    spark = _get_spark_session()
+    spark = _get_spark_session(
+        excuetor_memory='6g',
+        memory_overhead='1g',
+        memory_offhead='1g',
+        driver_memory='1g',
+        intances=4,
+        parallelims=8000)
     users =(10000851,10000861,10000868,10000872,1330029515,1350011161,1530002222,1700004823,3070006370,3200089837,
            3200231348,3200534369,3201895226,3201900769,3202077144,3202135111,3300118473,3300576485,3300797221,3300809724,
            3400764001,3500053269,3500058618,6120000991,6442107959,6442128265,6449009395,6449015130,10000884,10000885,
