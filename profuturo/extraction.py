@@ -432,7 +432,6 @@ def read_table_insert_temp_view(
     df.createOrReplaceTempView(view)
     print("DONE VIEW:",view)
     df.show(2)
-    print(df.count())
 
 
 def _get_spark_session(
