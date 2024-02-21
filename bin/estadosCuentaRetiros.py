@@ -76,7 +76,7 @@ with define_extraction(phase, area, postgres_pool,bigquery_pool) as (postgres, b
                 "FTC_TPSEGURO" AS "FTC_SEGURO",
                 "FTC_TPPENSION" AS "FTC_TIPO_PENSION",
                 "FTC_FON_ENTIDAD",
-                CASE 
+                CASE
                 WHEN "FTC_FON_ENTIDAD" is not null THEN "FTD_FECHA_EMISION"
                 END "FTD_FON_FECHA_TRANSF",
                 CASE
@@ -90,7 +90,9 @@ with define_extraction(phase, area, postgres_pool,bigquery_pool) as (postgres, b
                 WHEN "FTC_FON_ENTIDAD" is null then "FTN_SDO_TRA_VIVIENDA" + "FTN_SDO_TRA_AHORRORET" - "FTN_AFO_ISR"
                 ELSE 0
                 END "FTC_AFO_RECURSOS_ENTREGA",
-                "FTD_FECHA_EMISION" AS "FTD_AFO_FECHA_ENTREGA",
+                CASE
+                WHEN "FCC_MEDIO_PAGO" is not null then "FTD_FECHA_EMISION"
+                END "FTD_AFO_FECHA_ENTREGA",
                 "FTN_AFO_ISR" AS "FTC_AFO_RETENCION_ISR",
                 CAST("FTN_FEH_INI_PEN" AS INT) AS "FTC_FECHA_INICIO_PENSION",
                 CAST("FTN_FEH_RES_PEN" as INT) AS "FTC_FECHA_EMISION",
