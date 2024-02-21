@@ -64,7 +64,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
             FTC_AP_PATERNO,
             FTC_AP_MATERNO,
             FTC_CALLE,
-            TRIM(CONCAT(NUMEROEXTERIOR,NUMEROINTERIOR)) AS FTC_NUMERO,
+            TRIM(CONCAT(CONCAT(NUMEROEXTERIOR,' '),NUMEROINTERIOR)) AS FTC_NUMERO,
             FTC_COLONIA,
             FTC_DELEGACION,
             FTC_MUNICIPIO,
@@ -82,11 +82,11 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                PF.APELIDOMATERNO AS FTC_AP_MATERNO,
                DI.CALLE AS FTC_CALLE,
                CASE 
-               WHEN DI.NUMEROEXTERIOR IS NOT NULL THEN CONCAT('EXT: ',DI.NUMEROEXTERIOR)
+               WHEN DI.NUMEROEXTERIOR IS NOT NULL THEN DI.NUMEROEXTERIOR
                ELSE DI.NUMEROEXTERIOR
                END NUMEROEXTERIOR,
                CASE 
-                WHEN DI.NUMEROINTERIOR IS NOT NULL THEN CONCAT(' INT: ', DI.NUMEROINTERIOR)
+                WHEN DI.NUMEROINTERIOR IS NOT NULL THEN DI.NUMEROINTERIOR
                 ELSE DI.NUMEROINTERIOR
                 END NUMEROINTERIOR,
                ASE.NOMBRE AS FTC_COLONIA,
