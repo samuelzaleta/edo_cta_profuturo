@@ -7,6 +7,7 @@ from pyspark.sql.types import StringType, StructType, StructField, IntegerType
 from pyspark.sql.window import Window
 from sqlalchemy import text
 from google.cloud import storage, bigquery
+from concurrent.futures import ThreadPoolExecutor
 from io import BytesIO
 from PIL import Image
 from profuturo.env import load_env
@@ -62,32 +63,34 @@ def find_samples(samples_cursor: CursorResult):
 
     result = tuple(list(configurations.keys()))
     print(result)
+    try:
+        descripcion_consar = postgres.execute(text("""
+            SELECT "FTC_DESCRIPCION" FROM "MAESTROS"."TCDATMAE_MOVIMIENTO_CONSAR"
+            WHERE "FTN_ID_MOVIMIENTO_CONSAR" IN :consar
+            """), {'consar': result}).fetchall()
 
-    descripcion_consar = postgres.execute(text("""
-        SELECT "FTC_DESCRIPCION" FROM "MAESTROS"."TCDATMAE_MOVIMIENTO_CONSAR"
-        WHERE "FTN_ID_MOVIMIENTO_CONSAR" IN :consar
-        """), {'consar': result}).fetchall()
+        print(descripcion_consar)
+        # Creating a DataFrame
+        df = pd.DataFrame(descripcion_consar, columns=['Concepto Consar'])  # Replace 'Column_Name' with an appropriate column name
+        html_table = df.to_html()
 
-    print(descripcion_consar)
+        notify(
+            postgres,
+            'No se encontraron suficientes registros para los Conceptos CONSAR',
+            phase,
+            area,
+            term_id,
+            message=f"No se encontraron suficientes muestras para los Conceptos CONSAR:",
+            details=html_table,
+            aprobar=False,
+            descarga=False,
+            reproceso=False,
+        )
 
-    # Creating a DataFrame
-    df = pd.DataFrame(descripcion_consar, columns=['Concepto Consar'])  # Replace 'Column_Name' with an appropriate column name
-    html_table = df.to_html()
+        return samples
+    except:
+        return 'sin muestras'
 
-    notify(
-        postgres,
-        'No se encontraron suficientes registros para los Conceptos CONSAR',
-        phase,
-        area,
-        term_id,
-        message=f"No se encontraron suficientes muestras para los Conceptos CONSAR:",
-        details=html_table,
-        aprobar=False,
-        descarga=False,
-        reproceso=False,
-    )
-
-    return samples
 
 def upload_to_gcs(row):
     id_value = row["id"]
@@ -175,6 +178,42 @@ def get_blob_info(bucket_name, prefix):
 
     return blob_info_list
 
+def move_blob(source_bucket, destination_bucket, source_blob_name, destination_blob_name):
+    source_blob = source_bucket.blob(source_blob_name)
+    destination_blob = destination_bucket.blob(destination_blob_name)
+
+    # Copiar el blob del bucket fuente al bucket de destino
+    destination_blob.rewrite(source_blob)
+
+def move_files_parallel(source_bucket_name, destination_bucket_name, source_prefix="", destination_prefix="", num_threads=10):
+    # Inicializa los clientes de almacenamiento
+    source_client = storage.Client()
+    destination_client = storage.Client()
+    print("\n",source_bucket_name)
+    print(destination_bucket_name)
+    # Obtén los buckets
+    source_bucket = source_client.get_bucket(source_bucket_name)
+    destination_bucket = destination_client.get_bucket(destination_bucket_name)
+
+    # Lista todos los archivos en el bucket fuente con el prefijo dado
+    blobs = source_bucket.list_blobs(prefix=source_prefix)
+
+    # Usa ThreadPoolExecutor para ejecutar la copia de blobs en paralelo
+    with ThreadPoolExecutor(max_workers=num_threads) as executor:
+        futures = []
+
+        for blob in blobs:
+            # Crear el nombre del blob de destino con el prefijo de destino
+            destination_blob_name = destination_prefix + blob.name[len(source_prefix):]
+            futures.append(executor.submit(move_blob, source_bucket, destination_bucket, blob.name, destination_blob_name))
+
+        # Espera a que todos los hilos hayan completado
+        for future in futures:
+            future.result()
+
+    print("Movimiento de archivos completado")
+
+
 
 with define_extraction(phase, area, postgres_pool, bigquery_pool) as (postgres, bigquery):
     term = extract_terms(postgres, phase)
@@ -248,6 +287,7 @@ with define_extraction(phase, area, postgres_pool, bigquery_pool) as (postgres, 
         truncate_table(postgres, 'TTEDOCTA_IMAGEN')
 
         delete_all_objects(bucket_name, prefix)
+
         delete_all_objects(bucket_name, 'profuturo-archivos')
 
         query = """
@@ -321,7 +361,7 @@ with define_extraction(phase, area, postgres_pool, bigquery_pool) as (postgres, 
             D."FTC_TIPOGENERACION",D."FTC_DESC_TIPOGENERACION",
             concat_ws(' ',C."FTC_AP_PATERNO", C."FTC_AP_MATERNO", C."FTC_NOMBRE") AS "FTC_NOMBRE_COMPLETO",
             concat_ws(' ',C."FTC_CALLE", C."FTC_NUMERO") AS "FTC_CALLE_NUMERO",
-            C."FTC_COLONIA",C."FTC_DELEGACION", C."FTN_CODIGO_POSTAL" AS "FTN_CP",
+            C."FTC_COLONIA",concat_ws(' ',"FTC_DELEGACION", "FTC_MUNICIPIO") as "FTC_DELEGACION", C."FTN_CODIGO_POSTAL" AS "FTN_CP",
             C."FTC_ENTIDAD_FEDERATIVA",C."FTC_NSS",C."FTC_RFC",C."FTC_CURP",I."FTC_TIPO_PENSION" AS "FTC_TIPO_PENSION",
             D."FTN_PENSION_MENSUAL",
             D."FTC_FORMATO",

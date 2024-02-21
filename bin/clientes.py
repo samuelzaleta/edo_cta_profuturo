@@ -360,8 +360,8 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                tp.FCC_VALOR AS FTC_TIPO_PENSION,
                i.FCC_VALOR AS FTC_PERFIL_INVERSION
                --JSON_OBJECT('Vigencia', v.FCC_VALOR, 'Generacion', g.FCC_VALOR) AS FTO_INDICADORES
-        FROM indicador_generacion o
-            LEFT JOIN indicador_origen g ON o.FCN_CUENTA = g.FCN_CUENTA
+        FROM indicador_generacion g
+            LEFT JOIN indicador_origen o ON g.FCN_CUENTA = o.FCN_CUENTA
             LEFT JOIN indicador_tipo_cliente t ON o.FCN_CUENTA = t.FCN_CUENTA
             LEFT JOIN indicador_pension p ON o.FCN_CUENTA = p.FCN_CUENTA
             LEFT JOIN indicador_vigencia v ON o.FCN_CUENTA = v.FCN_CUENTA
