@@ -2,19 +2,21 @@ from profuturo.common import define_extraction, register_time, truncate_table, n
 from profuturo.database import get_postgres_pool, configure_postgres_spark, configure_bigquery_spark, get_bigquery_pool
 from profuturo.extraction import _write_spark_dataframe, extract_terms,  _get_spark_session, read_table_insert_temp_view
 from pyspark.sql.functions import udf, concat, col, current_date , row_number,lit, current_timestamp
+from profuturo.env import load_env
 import sys
 import requests
 import time
+import os
 
 
-
-#url = "https://procesos-api-service-dev-e46ynxyutq-uk.a.run.app/procesos/generarEstadosCuentaRetiros/muestras"
-url = "https://procesos-api-service-qa-2ky75pylsa-uk.a.run.app/procesos/generarEstadosCuentaRecaudaciones/definitivos"
+load_env()
 postgres_pool = get_postgres_pool()
 bigquery_pool = get_bigquery_pool()
 phase = int(sys.argv[1])
 user = int(sys.argv[3])
 area = int(sys.argv[4])
+url = os.getenv("URL_DEFINITIVO_RET")
+print(url)
 
 with define_extraction(phase, area, postgres_pool,bigquery_pool) as (postgres, bigquery):
     term = extract_terms(postgres, phase)
@@ -24,9 +26,8 @@ with define_extraction(phase, area, postgres_pool,bigquery_pool) as (postgres, b
     spark = _get_spark_session()
 
     with register_time(postgres_pool, phase, term_id, user, area):
-        truncate_table(postgres, 'TCGESPRO_MUESTRA', term=term_id, area=area)
-        truncate_table(bigquery, 'ESTADO_CUENTA.TTEDOCTA_RETIRO_GENERAL')
-        truncate_table(bigquery, 'ESTADO_CUENTA.TTEDOCTA_RETIRO')
+        truncate_table(postgres, 'TTEDOCTA_RETIRO_GENERAL')
+        truncate_table(postgres, 'TTEDOCTA_RETIRO')
 
         read_table_insert_temp_view(configure_postgres_spark, """
         SELECT
@@ -76,21 +77,26 @@ with define_extraction(phase, area, postgres_pool,bigquery_pool) as (postgres, b
                 "FTC_TPPENSION" AS "FTC_TIPO_PENSION",
                 "FTC_FON_ENTIDAD",
                 CASE
+                WHEN "FTC_FON_ENTIDAD" is not null THEN "FTD_FECHA_EMISION"
+                END "FTD_FON_FECHA_TRANSF",
+                CASE
                 WHEN "FTC_FON_ENTIDAD" is not null then "FTN_SDO_TRA_VIVIENDA" + "FTN_SDO_TRA_AHORRORET"
                 ELSE 0
                 END "FTN_FON_MONTO_TRANSF",
                 0.0 AS "TFN_FON_RETENCION_ISR",
-                "FTD_FECHA_EMISION" AS "FTD_FECHA_EMISION",
                 "FTC_ENT_REC_TRAN" AS "FTC_AFO_ENTIDAD",
                 "FCC_MEDIO_PAGO" AS "FTC_AFO_MEDIO_PAGO",
                 CASE
                 WHEN "FTC_FON_ENTIDAD" is null then "FTN_SDO_TRA_VIVIENDA" + "FTN_SDO_TRA_AHORRORET" - "FTN_AFO_ISR"
                 ELSE 0
                 END "FTC_AFO_RECURSOS_ENTREGA",
-                "FTD_FECHA_EMISION" AS "FTD_AFO_FECHA_ENTREGA",
+                CASE
+                WHEN "FCC_MEDIO_PAGO" is not null then "FTD_FECHA_EMISION"
+                END "FTD_AFO_FECHA_ENTREGA",
                 "FTN_AFO_ISR" AS "FTC_AFO_RETENCION_ISR",
                 CAST("FTN_FEH_INI_PEN" AS INT) AS "FTC_FECHA_INICIO_PENSION",
                 CAST("FTN_FEH_RES_PEN" as INT) AS "FTC_FECHA_EMISION",
+                'NO DISPONIBLE' as "FTN_PENSION_INSTITUTO_SEG",
                 "FTC_TIPO_TRAMITE" As "FTN_TIPO_TRAMITE",
                 "FTN_ARCHIVO" AS "FTC_ARCHIVO",
                 "FTD_FECHA_EMISION" AS "FTD_FECHA_LIQUIDACION",
@@ -109,8 +115,8 @@ with define_extraction(phase, area, postgres_pool,bigquery_pool) as (postgres, b
         ).cast("bigint"))
 
 
-        _write_spark_dataframe(general_df, configure_bigquery_spark, 'ESTADO_CUENTA.TTEDOCTA_RETIRO_GENERAL')
-        _write_spark_dataframe(anverso_df, configure_bigquery_spark, 'ESTADO_CUENTA.TTEDOCTA_RETIRO')
+        _write_spark_dataframe(general_df, configure_postgres_spark, '"ESTADO_CUENTA"."TTEDOCTA_RETIRO_GENERAL"')
+        _write_spark_dataframe(anverso_df, configure_postgres_spark, '"ESTADO_CUENTA"."TTEDOCTA_RETIRO"')
 
         response = requests.get(url)
 

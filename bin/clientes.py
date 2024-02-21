@@ -1,6 +1,6 @@
 from profuturo.common import register_time, define_extraction, notify, truncate_table
 from profuturo.database import get_postgres_pool, configure_buc_spark, configure_mit_spark, configure_postgres_spark
-from profuturo.extraction import _get_spark_session, _write_spark_dataframe, read_table_insert_temp_view, extract_dataset_spark
+from profuturo.extraction import _get_spark_session, _write_spark_dataframe,_create_spark_dataframe, read_table_insert_temp_view, extract_dataset_spark
 from profuturo.reporters import HtmlReporter
 from profuturo.extraction import extract_terms
 from sqlalchemy import text
@@ -20,9 +20,40 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
     time_period = term["time_period"]
     start_month = term["start_month"]
     end_month = term["end_month"]
-    spark = _get_spark_session()
-    users =(3200089837,	3201423324,	3201693866,	3202486462,	3300118473,	3300780661,	3300809724,	3300835243,	3400764001,	6120000991,	6130000050,	6442107959,	6449015130,	6449061689,	6449083099,	8051533577,	8052970237,	1700004823,	3500058618,	3200231348,	3300576485,	3500053269,	1530002222,	3200840759,	3201292580,	3202135111,	8052710429,	3202077144,	3200474366,	3200767640,	3300797020,	3300797221,	3400958595,	3201900769,	3201895226,	3200534369,	1350011161,	3200996343,	1330029515,	3200976872,	3201368726,	3070006370,	6449009395,	6442128265,	3201096947
-)
+    spark = _get_spark_session(
+        excuetor_memory='6g',
+        memory_overhead='1g',
+        memory_offhead='1g',
+        driver_memory='1g',
+        intances=4,
+        parallelims=8000)
+    users =(10000851,10000861,10000868,10000872,1330029515,1350011161,1530002222,1700004823,3070006370,3200089837,
+           3200231348,3200534369,3201895226,3201900769,3202077144,3202135111,3300118473,3300576485,3300797221,3300809724,
+           3400764001,3500053269,3500058618,6120000991,6442107959,6442128265,6449009395,6449015130,10000884,10000885,
+           10000887,10000888,10000889,10000890,10000891,10000892,10000893,10000894,10000895,10000896,10001041,10001042,
+           10000898,10000899,10000900,10000901,10000902,10000903,10000904,10000905,10000906,10000907,10000908,10000909,
+           10000910,10000911,10000912,10000913,10000914,10000915,10000916,10000917,10000918,10000919,10000920,10000921,
+           10000922,10000923,10000924,10000925,10000927,10000928,10000929,10000930,10000931,10000932,10000933,10000934,
+           10000935,10000936,10001263,10001264,10001265,10001266,10001267,10001268,10001269,10001270,10001271,10001272,
+           10001274,10001275,10001277,10001278,10001279,10001280,10001281,10001282,10001283,10001284,10001285,10001286,
+           10001288,10001289,10001290,10001292,10001293,10001294,10001296,10001297,10001298,10001299,10001300,10001301,
+           10001305,10001306,10001307,10001308,10001309,10001311,10001312,10001314,10001315,10001316,10001317,10001318,
+           10001319,10001320,10001321,10001322,10000896,10000898,10000790,10000791,10000792,10000793,10000794,10000795,
+           10000797,10000798,10000799,10000800,10000801,10000802,10000803,10000804,10000805,10000806,10000807,10000808,
+           10000809,10000810,10000811,10000812,10000813,10000814,10000815,10000816,10000817,10000818,10000819,10000820,
+           10000821,10000822,10000823,10000824,10000825,10000826,10000827,10000828,10000830,10000832,10000833,10000834,
+           10000835,10000836,10000837,10000838,10000839,10000840,10001098,10001099,10001100,10001101,10001102,10001103,
+           10001104,10001105,10001106,10001107,10001108,10001109,10001110,10001111,10001112,10001113,10001114,10001115,
+           10001116,10001117,10001118,10001119,10001120,10001121,10001122,10001123,10001124,10001125,10001126,10001127,
+           10001128,10001129,10001130,10001131,10001132,10001133,10001134,10001135,10001136,10001137,10001138,10001139,
+           10001140,10001141,10001142,10001143,10001145,10001146,10001147,10001148,10000991,10000992,10000993,10000994,
+           10000995,10000996,10000997,10000998,10000999,10001000,10001001,10001002,10001003,10001004,10001005,10001006,
+           10001007,10001008,10001009,10001010,10001011,10001012,10001013,10001014,10001015,10001016,10001017,10001018,
+           10001019,10001020,10001021,10001023,10001024,10001025,10001026,10001027,10001029,10001030,10001031,10001032,
+           10001033,10001034,10001035,10001036,10001037,10001038,10001039,10001040, 1250002546,3300005489,3200653979,
+           3200442678,3300056170,3500058618, 1330029515,1350011161,1530002222,3070006370,3200089837,3200474366,3200534369,
+           3200767640,3200840759,3201096947,3201292580,3201900769, 1250002546,3300005489,3200653979,3200442678,
+3300056170)
 
     with register_time(postgres_pool, phase, term_id, user, area):
         # Extracción
@@ -33,7 +64,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
             FTC_AP_PATERNO,
             FTC_AP_MATERNO,
             FTC_CALLE,
-            FTC_NUMERO,
+            TRIM(CONCAT(CONCAT(NUMEROEXTERIOR,' '),NUMEROINTERIOR)) AS FTC_NUMERO,
             FTC_COLONIA,
             FTC_DELEGACION,
             FTC_MUNICIPIO,
@@ -50,7 +81,14 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                PF.APELLIDOPATERNO AS FTC_AP_PATERNO,
                PF.APELIDOMATERNO AS FTC_AP_MATERNO,
                DI.CALLE AS FTC_CALLE,
-               DI.NUMEROEXTERIOR AS FTC_NUMERO,
+               CASE 
+               WHEN DI.NUMEROEXTERIOR IS NOT NULL THEN DI.NUMEROEXTERIOR
+               ELSE DI.NUMEROEXTERIOR
+               END NUMEROEXTERIOR,
+               CASE 
+                WHEN DI.NUMEROINTERIOR IS NOT NULL THEN DI.NUMEROINTERIOR
+                ELSE DI.NUMEROINTERIOR
+                END NUMEROINTERIOR,
                ASE.NOMBRE AS FTC_COLONIA,
                CD.NOMBRE AS FTC_DELEGACION,
                M.NOMBRE AS FTC_MUNICIPIO,
@@ -80,7 +118,6 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
               AND D.IDTIPODOM = 818 -- Tipo de domicilio Particular
               AND D.IDSTATUSDOM = 761 -- ACTIVO
               -- AND D.PREFERENTE = 1 Domicilio preferente
-              --AND TO_NUMBER(REGEXP_REPLACE(TO_CHAR(C.NUMERO), '[^0-9]', '')) IN {users}
         ) where id = 1
         """
         queryCorreo = """
@@ -145,27 +182,27 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
 
         read_table_insert_temp_view(
             configure_buc_spark,
-            queryCorreo,
-            'correoTelefono',
+            query=queryCorreo,
+            view='correoTelefono',
         )
 
         read_table_insert_temp_view(
             configure_postgres_spark,
-            queryCliente,
-            'clientePostgres',
+            query=queryCliente,
+            view='clientePostgres',
         )
 
         read_table_insert_temp_view(
             configure_buc_spark,
-            query,
-            'cliente',
+            query=query,
+            view='cliente',
         )
 
         df = spark.sql("""
         SELECT FCN_CUENTA FROM (SELECT 
         CT.FCN_CUENTA,
         CASE
-            WHEN INDICADOR = 'correo' THEN CT.FTC_CORREO = CP.FTC_CORREO
+            WHEN INDICADOR = 'correo' THEN cast(CT.FTC_CORREO as varchar(30)) = cast(CP.FTC_CORREO as varchar(30))
             ELSE CT.FTC_TELEFONO = CP.FTC_TELEFONO
         END AS FTB_EVALUACION
         FROM 
@@ -182,7 +219,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
         if len(tuple_list) > 0:
             postgres.execute(text("""
                         DELETE FROM "HECHOS"."TTHECHOS_CARGA_ARCHIVO"
-                        WHERE "FCN_ID_INDICADOR" IN (25,27,26) AND "FCN_CUENTA" IN :user
+                        WHERE "FCN_ID_INDICADOR" IN (25,27,26)
                         """), {"term": term_id, "user": tuple(tuple_list)})
 
         df = spark.sql(""" 
@@ -190,8 +227,6 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
         ct.FTC_CORREO FROM cliente c
         LEFT JOIN  correoTelefono ct ON  c.FTN_CUENTA = ct.FCN_CUENTA 
          """).cache()
-
-        df.show(20)
 
         truncate_table(postgres, "TCDATMAE_CLIENTE")
         _write_spark_dataframe(df, configure_postgres_spark, '"MAESTROS"."TCDATMAE_CLIENTE"')
@@ -202,7 +237,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
         truncate_table(postgres, "TCHECHOS_CLIENTE_INDICADOR", term=term_id)
         truncate_table(postgres, "TCGESPRO_MUESTRA", term=term_id, area=area)
         truncate_table(postgres, "TCHECHOS_CLIENTE", term=term_id)
-        read_table_insert_temp_view(configure_mit_spark, f"""
+        read_table_insert_temp_view(configure_mit_spark, query=f"""
         SELECT
         PG.FTN_NUM_CTA_INVDUAL AS FCN_CUENTA,
         'TRUE' AS FCC_VALOR
@@ -215,11 +250,9 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                 AND PG.FCN_ID_SUBPROCESO IN (309, 310, 330,331)
                 AND PGS.FCN_ID_TIPO_SUBCTA NOT IN (15,16,17,18)
                 AND TRUNC(PG.FTD_FEH_LIQUIDACION) <= :end
-                --AND PG.FTN_NUM_CTA_INVDUAL IN {user}
-        """, "indicador_pension", params={'end': end_month})
-        spark.sql("select count(*) as count_indicador_pension from indicador_pension").show()
+        """, view="indicador_pension", params={'end': end_month})
 
-        read_table_insert_temp_view(configure_mit_spark, f"""
+        read_table_insert_temp_view(configure_mit_spark, query=f"""
         SELECT DISTINCT IND.FTN_NUM_CTA_INVDUAL AS FCN_CUENTA,
                CASE IND.FCC_VALOR_IND
                    WHEN '66' THEN 'IMSS'
@@ -231,12 +264,10 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
         INNER JOIN tfafogral_config_indi CONF ON IND.FFN_ID_CONFIG_INDI = CONF.FFN_ID_CONFIG_INDI
         WHERE CONF.FFN_ID_CONFIG_INDI = 1
           AND FTC_VIGENCIA= 1
-         -- AND IND.FTN_NUM_CTA_INVDUAL in {users}
-        """, "indicador_origen")
+        """,view= "indicador_origen")
         spark.sql("select count(*) as count_indicador_origen from indicador_origen").show()
-        spark.sql("select * from indicador_origen").show(20)
 
-        read_table_insert_temp_view(configure_mit_spark, f"""
+        read_table_insert_temp_view(configure_mit_spark, query=f"""
         SELECT DISTINCT IND.FTN_NUM_CTA_INVDUAL AS FCN_CUENTA,
                CASE IND.FCC_VALOR_IND
                    WHEN '713' THEN 'Asignado'
@@ -246,12 +277,9 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
         INNER JOIN tfafogral_config_indi CONF ON IND.FFN_ID_CONFIG_INDI = CONF.FFN_ID_CONFIG_INDI
         WHERE CONF.FFN_ID_CONFIG_INDI = 12
           AND FTC_VIGENCIA= 1
-         -- AND  IND.FTN_NUM_CTA_INVDUAL IN {users}
-        """, "indicador_tipo_cliente")
-        spark.sql("select count(*) as count_indicador_tipo_cliente from indicador_tipo_cliente").show()
-        spark.sql("select * from indicador_tipo_cliente").show(20)
+        """, view="indicador_tipo_cliente")
 
-        read_table_insert_temp_view(configure_mit_spark, f"""
+        read_table_insert_temp_view(configure_mit_spark, query=f"""
         SELECT DISTINCT IND.FTN_NUM_CTA_INVDUAL AS FCN_CUENTA,
                CASE IND.FCC_VALOR_IND 
                    WHEN '1' THEN 'V'
@@ -261,19 +289,16 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
         INNER JOIN tfafogral_config_indi CONF ON IND.FFN_ID_CONFIG_INDI = CONF.FFN_ID_CONFIG_INDI
         WHERE CONF.FFN_ID_CONFIG_INDI = 2
           AND FTC_VIGENCIA= 1
-          AND IND.FTN_NUM_CTA_INVDUAL IN {users}
-        """, "indicador_vigencia")
-        spark.sql("select count(*) as count_indicador_vigencia from indicador_vigencia").show()
 
-        read_table_insert_temp_view(configure_mit_spark, f"""
+        """, view="indicador_vigencia")
+
+        read_table_insert_temp_view(configure_mit_spark, query=f"""
         SELECT DISTINCT FTN_NUM_CTA_INVDUAL AS FCN_CUENTA, 'TRUE' /* TRUE */ AS FCC_VALOR
         FROM CIERREN.THAFOGRAL_SALDO_HISTORICO_V2
         WHERE FCN_ID_SIEFORE = 81
-        --AND FTN_NUM_CTA_INVDUAL IN {users}
-        """, "indicador_bono")
-        spark.sql("select count(*) as count_indicador_bono from indicador_bono").show()
+        """,view= "indicador_bono")
 
-        read_table_insert_temp_view(configure_mit_spark, f"""
+        read_table_insert_temp_view(configure_mit_spark, query=f"""
         SELECT
             PG.FTN_NUM_CTA_INVDUAL AS FCN_CUENTA,
             CASE
@@ -291,12 +316,10 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                 AND PG.FCN_ID_SUBPROCESO IN (309, 310, 330,331)
                 AND PGS.FCN_ID_TIPO_SUBCTA NOT IN (15,16,17,18)
                 AND TRUNC(PG.FTD_FEH_LIQUIDACION) <= :end
-                --AND PG.FTN_NUM_CTA_INVDUAL IN {users}
-        """, "indicador_tipo_pension", {'start': start_month, 'end': end_month})
+               
+        """,view= "indicador_tipo_pension", params={'start': start_month, 'end': end_month})
 
-        spark.sql("select count(*) as count_tipo_pension from indicador_tipo_pension").show()
-
-        read_table_insert_temp_view(configure_mit_spark, f"""
+        read_table_insert_temp_view(configure_mit_spark, query=f"""
         SELECT
         P.FTN_NUM_CTA_INVDUAL AS FCN_CUENTA,
         CASE WHEN SUBSTR(C.FCC_VALOR,6,7) = 'BI' then 'Inicial'
@@ -306,12 +329,10 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
         FROM TTAFOGRAL_OSS P
         INNER JOIN CIERREN.TCCRXGRAL_CAT_CATALOGO C ON P.FCN_ID_SIEFORE= C.FCN_ID_CAT_CATALOGO
         WHERE P.FTC_ESTATUS = 1 AND FTN_PRIORIDAD = 1 and P.FCN_ID_GRUPO = 141
-        --AND P.FTN_NUM_CTA_INVDUAL IN {users}
-        """, "indicador_perfil_inversion")
+       
+        """, view="indicador_perfil_inversion")
 
-        spark.sql("select count(*) as count_perfil_inversion from indicador_perfil_inversion").show()
-
-        read_table_insert_temp_view(configure_mit_spark, f"""
+        read_table_insert_temp_view(configure_mit_spark, query=f"""
         SELECT DISTINCT IND.FTN_NUM_CTA_INVDUAL AS FCN_CUENTA,
            CASE IND.FCC_VALOR_IND
                WHEN '10785' THEN 'AFORE'
@@ -322,11 +343,13 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
             INNER JOIN tfafogral_config_indi CONF ON IND.FFN_ID_CONFIG_INDI = CONF.FFN_ID_CONFIG_INDI
             WHERE CONF.FFN_ID_CONFIG_INDI = 34
             AND FTC_VIGENCIA= 1 
-           -- AND FTN_NUM_CTA_INVDUAL IN {users}       
-        """, "indicador_generacion")
+
+        """, view="indicador_generacion")
 
         df = spark.sql(f"""
-        SELECT DISTINCT o.FCN_CUENTA,
+        SELECT 
+               DISTINCT 
+               o.FCN_CUENTA,
                {term_id} AS FCN_ID_PERIODO,
                coalesce(cast(p.FCC_VALOR AS BOOLEAN), false) AS FTB_PENSION, 
                t.FCC_VALOR AS  FTC_TIPO_CLIENTE,
@@ -337,8 +360,8 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                tp.FCC_VALOR AS FTC_TIPO_PENSION,
                i.FCC_VALOR AS FTC_PERFIL_INVERSION
                --JSON_OBJECT('Vigencia', v.FCC_VALOR, 'Generacion', g.FCC_VALOR) AS FTO_INDICADORES
-        FROM indicador_origen o
-            LEFT JOIN indicador_generacion g ON o.FCN_CUENTA = g.FCN_CUENTA
+        FROM indicador_generacion g
+            LEFT JOIN indicador_origen o ON g.FCN_CUENTA = o.FCN_CUENTA
             LEFT JOIN indicador_tipo_cliente t ON o.FCN_CUENTA = t.FCN_CUENTA
             LEFT JOIN indicador_pension p ON o.FCN_CUENTA = p.FCN_CUENTA
             LEFT JOIN indicador_vigencia v ON o.FCN_CUENTA = v.FCN_CUENTA
@@ -348,7 +371,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
         WHERE o.FCN_CUENTA IN (SELECT DISTINCT FTN_CUENTA FROM cliente)
         """)
         #df = df.withColumn("FTO_INDICADORES", to_json(struct(lit('{}'))))
-        df.show(2)
+
         df = df.dropDuplicates(["FCN_CUENTA"])
 
         df = df.repartition(60)
@@ -374,7 +397,6 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                         AND PG.FCN_ID_SUBPROCESO IN (309, 310, 330,331)
                         AND PGS.FCN_ID_TIPO_SUBCTA NOT IN (15,16,17,18)
                         AND TRUNC(PG.FTD_FEH_LIQUIDACION) <= :end
-                       -- AND PG.FTN_NUM_CTA_INVDUAL IN {users}
                 GROUP BY
                 PG.FTN_NUM_CTA_INVDUAL,PG.FCN_ID_SUBPROCESO
                 """

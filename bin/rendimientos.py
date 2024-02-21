@@ -1,13 +1,15 @@
 from profuturo.common import register_time, define_extraction, notify, truncate_table
 from profuturo.database import get_postgres_pool, get_buc_pool, configure_postgres_spark, configure_mit_spark
-from profuturo.extraction import _get_spark_session, _write_spark_dataframe, read_table_insert_temp_view
+from profuturo.extraction import _get_spark_session, _write_spark_dataframe, read_table_insert_temp_view, _create_spark_dataframe
 from profuturo.reporters import HtmlReporter
 from profuturo.extraction import extract_terms
 import sys
 from datetime import datetime
+import os
 
 html_reporter = HtmlReporter()
 postgres_pool = get_postgres_pool()
+bucket_name = os.getenv("BUCKET_DEFINITIVO")
 
 phase = int(sys.argv[1])
 user = int(sys.argv[3])
@@ -25,8 +27,10 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
 
     with register_time(postgres_pool, phase, term_id, user, area):
         all_user = """
-        SELECT C."FTN_CUENTA" AS "FCN_CUENTA", TS."FTN_ID_TIPO_SUBCTA" AS "FCN_ID_TIPO_SUBCTA"  FROM "MAESTROS"."TCDATMAE_CLIENTE" C,
-            "MAESTROS"."TCDATMAE_TIPO_SUBCUENTA" TS
+        SELECT C."FCN_CUENTA" AS "FCN_CUENTA", TS."FTN_ID_TIPO_SUBCTA" AS "FCN_ID_TIPO_SUBCTA"
+        FROM "HECHOS"."TCHECHOS_CLIENTE" C,
+        "MAESTROS"."TCDATMAE_TIPO_SUBCUENTA" TS
+        --WHERE C."FTN_CUENTA" = 3300576485
         """
         saldo_inicial_query = f"""
                 SELECT
@@ -41,6 +45,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                     --AND tsh."FTC_TIPO_SALDO" = 'F'
                     --AND tsh."FTD_FEH_LIQUIDACION" BETWEEN DATE '' AND :end_month_anterior
                     AND tsh."FCN_ID_PERIODO" = CAST(to_char(:date, 'YYYYMM') AS INT)
+                    --AND tsh."FCN_CUENTA" = 3300576485
                 GROUP BY
                     1=1
                     , tsh."FCN_CUENTA"
@@ -91,6 +96,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
             1=1
             AND tsh."FTC_TIPO_SALDO" = 'F'
             AND tsh."FCN_ID_PERIODO" = :term_id
+            --AND tsh."FCN_CUENTA" = 3300576485
         GROUP BY
             1=1
             , tsh."FCN_CUENTA"
@@ -98,44 +104,56 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
         """
         cargo_query = """
         SELECT DISTINCT "FCN_CUENTA", "FCN_ID_TIPO_SUBCTA", SUM(round("FTF_MONTO_PESOS",2)) AS "FTF_CARGO"
-        FROM (
-            SELECT DISTINCT "FCN_CUENTA",
-                   "FCN_ID_TIPO_SUBCTA",
-                   "FTF_MONTO_PESOS"
-            FROM "HECHOS"."TTHECHOS_MOVIMIENTO"
-            WHERE "FCN_ID_TIPO_MOVIMIENTO" = '180'
-              AND "FCN_ID_PERIODO" = :term_id
-            UNION ALL
-            SELECT DISTINCT "CSIE1_NUMCUE",
-                   "SUBCUENTA",
-                   "MONTO"
-            FROM "HECHOS"."TTHECHOS_MOVIMIENTOS_INTEGRITY"
-            WHERE CAST("CSIE1_CODMOV" AS INT) <= 500
-              AND "FCN_ID_PERIODO" = :term_id
-
-        ) AS mov
-        GROUP BY "FCN_CUENTA", "FCN_ID_TIPO_SUBCTA"
+            FROM (
+                SELECT DISTINCT "FCN_CUENTA",
+                       "FCN_ID_TIPO_SUBCTA",
+                       SUM("FTF_MONTO_PESOS") AS "FTF_MONTO_PESOS"
+                FROM "HECHOS"."TTHECHOS_MOVIMIENTO"
+                WHERE "FCN_ID_TIPO_MOVIMIENTO" = '180'
+                  AND "FCN_ID_PERIODO" = :term_id
+                  GROUP BY
+                  "FCN_CUENTA",
+                  "FCN_ID_TIPO_SUBCTA"
+                UNION ALL
+                SELECT DISTINCT "CSIE1_NUMCUE" AS "FCN_CUENTA",
+                       "SUBCUENTA" AS "FCN_ID_TIPO_SUBCTA",
+                        SUM("MONTO") AS "FTF_MONTO_PESOS"
+                FROM "HECHOS"."TTHECHOS_MOVIMIENTOS_INTEGRITY"
+                WHERE CAST("CSIE1_CODMOV" AS INT) <= 500
+                  AND "FCN_ID_PERIODO" = :term_id
+                  GROUP BY
+                  "CSIE1_NUMCUE",
+                  "SUBCUENTA"
+        
+            ) AS mov
+            --WHERE "FCN_CUENTA" = 3300576485
+            GROUP BY "FCN_CUENTA", "FCN_ID_TIPO_SUBCTA"
         """
         abono_query = """
-        SELECT DISTINCT  "FCN_CUENTA", "FCN_ID_TIPO_SUBCTA", SUM(round("FTF_MONTO_PESOS",2)) AS "FTF_ABONO"
+        SELECT DISTINCT "FCN_CUENTA", "FCN_ID_TIPO_SUBCTA", SUM(round("FTF_MONTO_PESOS",2)) AS "FTF_ABONO"
         FROM (
             SELECT DISTINCT "FCN_CUENTA",
                    "FCN_ID_TIPO_SUBCTA",
-                   "FTF_MONTO_PESOS"
+                   SUM("FTF_MONTO_PESOS") AS "FTF_MONTO_PESOS"
             FROM "HECHOS"."TTHECHOS_MOVIMIENTO"
             WHERE "FCN_ID_TIPO_MOVIMIENTO" = '181'
               AND "FCN_ID_PERIODO" = :term_id
-
+              GROUP BY
+              "FCN_CUENTA",
+              "FCN_ID_TIPO_SUBCTA"
             UNION ALL
-        
-            SELECT DISTINCT "CSIE1_NUMCUE",
-                   "SUBCUENTA",
-                   "MONTO"
+            SELECT DISTINCT "CSIE1_NUMCUE" AS "FCN_CUENTA",
+                   "SUBCUENTA" AS "FCN_ID_TIPO_SUBCTA",
+                    SUM("MONTO") AS "FTF_MONTO_PESOS"
             FROM "HECHOS"."TTHECHOS_MOVIMIENTOS_INTEGRITY"
             WHERE CAST("CSIE1_CODMOV" AS INT) > 500
               AND "FCN_ID_PERIODO" = :term_id
-
+              GROUP BY
+              "CSIE1_NUMCUE",
+              "SUBCUENTA"
+        
         ) AS mov
+        --WHERE "FCN_CUENTA" = 3300576485
         GROUP BY "FCN_CUENTA", "FCN_ID_TIPO_SUBCTA"
         """
         comision_query = """
@@ -145,28 +163,28 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
         C."FTN_TIPO_SUBCTA" as "FCN_ID_TIPO_SUBCTA",
         SUM(C."FTF_MONTO_PESOS"::double precision) AS "FTF_COMISION"
         FROM "HECHOS"."TTHECHOS_COMISION" C
-        WHERE "FCN_ID_PERIODO" = :term_id
+        WHERE "FCN_ID_PERIODO" = :term_id --AND "FCN_CUENTA" = 3300576485
         GROUP BY C."FCN_CUENTA", C."FTN_TIPO_SUBCTA"
         """
         truncate_table(postgres, "TTCALCUL_RENDIMIENTO", term=term_id)
 
         read_table_insert_temp_view(
             configure_postgres_spark,
-            all_user,
-            "clientes",
+            query=all_user,
+            view="clientes",
             params={"date": end_month_anterior, "type": "F", "accion": valor_accion_anterior}
         )
 
         read_table_insert_temp_view(
             configure_postgres_spark,
-            saldo_inicial_query,
-            "saldoinicial",
+            query=saldo_inicial_query,
+            view="saldoinicial",
             params={"date": end_month_anterior, "type": "F", "accion": valor_accion_anterior}
         )
         read_table_insert_temp_view(
             configure_postgres_spark,
-            saldo_final_query,
-            "saldofinal",
+            query=saldo_final_query,
+            view="saldofinal",
             params={
                     "end_month": end_month,
                     "term_id": term_id}
@@ -174,8 +192,8 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
 
         read_table_insert_temp_view(
             configure_postgres_spark,
-            cargo_query,
-            "cargo",
+            query=cargo_query,
+            view="cargo",
             params={"term_id": term_id}
         )
         read_table_insert_temp_view(
@@ -186,16 +204,30 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
         )
         read_table_insert_temp_view(
             configure_postgres_spark,
-            comision_query,
-            "comision",
+            query=comision_query,
+            view="comision",
             params={"term_id": term_id}
         )
+
+        spark.sql("""
+        SELECT 
+        COALESCE(si.FCN_CUENTA, sf.FCN_CUENTA, C.FCN_CUENTA) AS FCN_CUENTA,
+        COALESCE(si.FCN_ID_TIPO_SUBCTA, sf.FCN_ID_TIPO_SUBCTA,C.FCN_ID_TIPO_SUBCTA) AS FCN_ID_TIPO_SUBCTA,
+        COALESCE(si.FTF_SALDO_INICIAL, 0) AS FTF_SALDO_INICIAL, 
+        COALESCE(sf.FTF_SALDO_FINAL, 0) AS FTF_SALDO_FINAL
+        FROM clientes c
+        LEFT JOIN saldoinicial si
+        ON c.FCN_CUENTA = si.FCN_CUENTA AND c.FCN_ID_TIPO_SUBCTA = si.FCN_ID_TIPO_SUBCTA 
+        LEFT JOIN saldofinal sf
+        ON c.FCN_CUENTA = sf.FCN_CUENTA AND c.FCN_ID_TIPO_SUBCTA = sf.FCN_ID_TIPO_SUBCTA
+        ORDER BY si.FCN_CUENTA, si.FCN_ID_TIPO_SUBCTA
+        """).show()
 
         df = spark.sql(f"""
         WITH saldos as (
         SELECT 
-        COALESCE(si.FCN_CUENTA, sf.FCN_CUENTA) AS FCN_CUENTA,
-        COALESCE(si.FCN_ID_TIPO_SUBCTA, sf.FCN_ID_TIPO_SUBCTA) AS FCN_ID_TIPO_SUBCTA,
+        COALESCE(si.FCN_CUENTA, sf.FCN_CUENTA, C.FCN_CUENTA) AS FCN_CUENTA,
+        COALESCE(si.FCN_ID_TIPO_SUBCTA, sf.FCN_ID_TIPO_SUBCTA,C.FCN_ID_TIPO_SUBCTA) AS FCN_ID_TIPO_SUBCTA,
         COALESCE(si.FTF_SALDO_INICIAL, 0) AS FTF_SALDO_INICIAL, 
         COALESCE(sf.FTF_SALDO_FINAL, 0) AS FTF_SALDO_FINAL
         FROM clientes c
@@ -232,10 +264,11 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                ta.FTF_COMISION,
                (ta.FTF_SALDO_FINAL - (ta.FTF_ABONO + ta.FTF_SALDO_INICIAL - ta.FTF_COMISION - ta.FTF_CARGO)) AS FTF_RENDIMIENTO_CALCULADO
         FROM tablon AS ta
-        WHERE 1=1 and ta.FCN_CUENTA IN (SELECT DISTINCT FCN_CUENTA FROM saldos)
+        WHERE 1=1 and (ta.FTF_SALDO_FINAL +ta.FTF_ABONO + ta.FTF_SALDO_INICIAL + ta.FTF_COMISION + ta.FTF_CARGO) > 0
         """)
         df.show(30)
         _write_spark_dataframe(df, configure_postgres_spark, '"HECHOS"."TTCALCUL_RENDIMIENTO"')
+
 
         # Cifras de control
         report1 = html_reporter.generate(

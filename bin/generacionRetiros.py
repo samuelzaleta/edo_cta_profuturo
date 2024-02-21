@@ -1,11 +1,12 @@
-import paramiko
-import smtplib
+from smbprotocol import open_file, register_session
+import requests
 import sys
+import math
 from profuturo.common import register_time, define_extraction, notify
-from profuturo.database import get_postgres_pool
-from profuturo.extraction import extract_terms, _get_spark_session
+from profuturo.database import get_postgres_pool, configure_postgres_spark
+from profuturo.extraction import extract_terms, _get_spark_session, read_table_insert_temp_view
 from profuturo.reporters import HtmlReporter
-from google.cloud import storage, bigquery, secretmanager
+from google.cloud import storage, secretmanager
 import pyspark.sql.functions as f
 
 spark = _get_spark_session()
@@ -18,20 +19,13 @@ user = int(sys.argv[3])
 area = int(sys.argv[4])
 
 storage_client = storage.Client()
-bigquery_client = bigquery.Client()
-bigquery_project = bigquery_client.project
 
 client = secretmanager.SecretManagerServiceClient()
-
-"""smtp_host = client.access_secret_version(name="SMTP_HOST").payload.data.decode("UTF-8")
-smtp_port = client.access_secret_version(name="SMTP_PORT").payload.data.decode("UTF-8")
-smtp_user = client.access_secret_version(name="SMTP_ADDRESS_SENDER").payload.data.decode("UTF-8")
-smtp_pass = client.access_secret_version(name="SMTP_PASSWORD_SENDER").payload.data.decode("UTF-8")
-sftp_host = client.access_secret_version(name="SFTP_HOST").payload.data.decode("UTF-8")
-sftp_port = client.access_secret_version(name="SFTP_PORT").payload.data.decode("UTF-8")
-sftp_user = client.access_secret_version(name="SFTP_USERNAME").payload.data.decode("UTF-8")
-sftp_pass = client.access_secret_version(name="SFTP_PASSWORD").payload.data.decode("UTF-8")
-sftp_remote_file_path = client.access_secret_version(name="SFTP_CARPETA_DESTINO").payload.data.decode("UTF-8")"""
+smb_host = client.access_secret_version(name="SFTP_HOST").payload.data.decode("UTF-8")
+smb_port = client.access_secret_version(name="SFTP_PORT").payload.data.decode("UTF-8")
+smb_user = client.access_secret_version(name="SFTP_USERNAME").payload.data.decode("UTF-8")
+smb_pass = client.access_secret_version(name="SFTP_PASSWORD").payload.data.decode("UTF-8")
+smb_remote_file_path = client.access_secret_version(name="SFTP_CARPETA_DESTINO").payload.data.decode("UTF-8")
 
 
 def get_buckets():
@@ -42,50 +36,42 @@ def get_buckets():
             return bucket.name
 
 
-bucket = storage_client.get_bucket(get_buckets())
+bucket_name = get_buckets()
+bucket = storage_client.get_bucket(bucket_name)
 
-
-def extract_bigquery(table):
-    df = spark.read.format('bigquery') \
-        .option('table', f'{bigquery_project}:{table}') \
-        .load()
-    print(f"SE EXTRAIDO EXITOSAMENTE {table}")
-    return df
+if "dev" in bucket_name:
+    email_url = "https://procesos-api-service-dev-e46ynxyutq-uk.a.run.app/procesos/email/send"
+elif "qa" in bucket_name:
+    email_url = "https://procesos-api-service-qa-2ky75pylsa-uk.a.run.app/procesos/email/send"
+else:
+    email_url = "https://procesos-api-service-h3uy3grcoq-uk.a.run.app/procesos/email/send"
 
 
 def str_to_gcs(data, name):
     blob = bucket.blob(f"correspondencia/{name}")
-    blob.upload_from_string(data.encode("iso_8859_1"), content_type="text/plain")
+    blob.upload_from_string(data.encode("ansi"), content_type="text/plain")
 
 
-def upload_file_to_sftp(hostname, username, password, local_file_path, remote_file_path, data):
-    with open(f"{local_file_path}", "w") as file:
-        file.write(data)
-
-    try:
-        transport = paramiko.Transport((hostname, 22))
-        transport.connect(username=username, password=password)
-
-        sftp = paramiko.SFTPClient.from_transport(transport)
-
-        sftp.put(local_file_path, remote_file_path)
-
-        print("File uploaded successfully")
-
-    except Exception as e:
-        print(f"An error occurred during SFTP upload: {e}")
-
-    finally:
-        sftp.close()
-        transport.close()
+def upload_file_to_smb(remote_file_path, filename, data):
+    with open_file(f"{remote_file_path}/{filename}", "w") as fd:
+        fd.write(data)
 
 
-def send_email(host, port, username, password, from_address, to_address, subject, body):
-    server = smtplib.SMTP(host, port)
-    server.login(username, password)
-    message = "Subject: {}\n\n{}".format(subject, body)
-    server.sendmail(from_address, to_address, message)
-    server.quit()
+def send_email(url, receiver, subject, text):
+    data = {
+        "to": f"{receiver};",
+        "subject": subject,
+        "text": text
+    }
+    headers = {
+        "Content-Type": "application/json"
+    }
+    response = requests.request("POST", url, data=data, headers=headers)
+
+    if response.status_code == 200:
+        print("Correo enviado con éxito!")
+    else:
+        print(f"Error al enviar correo: {response.status_code}")
 
 
 with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, _):
@@ -98,12 +84,34 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
     with register_time(postgres_pool, phase, term_id, user, area):
         body_message = ""
 
+        query_retiro_general = """
+                            SELECT * FROM "ESTADO_CUENTA"."TTEDOCTA_RETIRO_GENERAL"
+                                            """
+        read_table_insert_temp_view(
+            configure_postgres_spark,
+            query_retiro_general,
+            "retiros_general"
+        )
+
+        retiros_general = spark.sql("SELECT * FROM retiros_general")
+
         retiros_general = (
-            extract_bigquery('ESTADO_CUENTA.TTEDOCTA_RETIRO_GENERAL').filter(
+            retiros_general.filter(
                 f.col("FCN_ID_PERIODO") == term_id)
         )
+
+        query_retiro = """
+                                    SELECT * FROM "ESTADO_CUENTA"."TTEDOCTA_RETIRO"
+                                                    """
+        read_table_insert_temp_view(
+            configure_postgres_spark,
+            query_retiro,
+            "retiros"
+        )
+
+        retiros = spark.sql("SELECT * FROM retiros")
         retiros = (
-            extract_bigquery('ESTADO_CUENTA.TTEDOCTA_RETIRO').filter(f.col("FCN_ID_PERIODO") == term_id).withColumn(
+            retiros.filter(f.col("FCN_ID_PERIODO") == term_id).withColumn(
                 "FTD_FECHA_EMISION_2", f.date_format("FTD_FECHA_EMISION", "yyyyMMdd"))
         )
 
@@ -130,7 +138,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                 f.col("FTC_INFNVT_RETENCION_ISR").cast("decimal(16, 2)"),
                 "FTD_FECHA_EMISION_2",
                 retiros.FTC_FECHA_INICIO_PENSION.alias("FTC_FECHA_INICIO_PENSION"),
-                f.col("FTN_PENSION_INSTITUTO_SEG").cast("decimal(16, 2)"),
+                f.col("FTN_PENSION_INSTITUTO_SEG"),
                 f.col("FTN_SALDO_FINAL").cast("decimal(16, 2)"))
         )
         df = df.fillna("").fillna(0)
@@ -194,31 +202,27 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
         for regimen in regimenes:
             df_regimen = df.filter(f.col("FTC_REGIMEN") == regimen)
             total = df_regimen.count()
-            total = df_regimen.count()
+            limit = 500000
+            num_parts = math.ceil(total / limit)
             processed_data = df_regimen.rdd.flatMap(lambda row: [([row[i] for i in range(len(row))])]).collect()
-            res = "\n".join("".join(str(item) for item in row) for row in processed_data)
 
-            name = f"retiros_mensual_{regimen}_{str(term_id)[:4]}_{str(term_id)[-2:]}_1-1.txt"
+            for part in range(1, num_parts + 1):
+                if len(processed_data) < limit:
+                    processed_data_part = processed_data[:len(processed_data)]
+                else:
+                    processed_data_part = processed_data[:limit - 1]
+                    del processed_data[:limit - 1]
 
-            str_to_gcs(res, name)
+                res = "\n".join("".join(str(item) for item in row) for row in processed_data_part)
+                name = f"retiros_mensual_{regimen}_{str(term_id)[:4]}_{str(term_id)[-2:]}_{part}-{num_parts}.txt"
+                str_to_gcs(res, name)
+                upload_file_to_smb(smb_remote_file_path, name, res)
+                body_message += f"Se generó el archivo de {name} con un total de {len(processed_data_part)} registros\n"
+                processed_data = [i for i in processed_data if i not in processed_data_part]
 
-            # upload_file_to_sftp(sftp_host, sftp_user, sftp_pass, name, sftp_remote_file_path, res)
+        send_email(email_url, "", "Generacion de los archivos de retiros", body_message)
 
-            body_message += f"Se generó el archivo de {name} con un total de {total} registros\n"
-            print(body_message)
-
-        """send_email(
-            host=smtp_host,
-            port=smtp_port,
-            username=smtp_user,
-            password=smtp_pass,
-            from_address=smtp_user,
-            to_address="alfredo.guerra@profuturo.com.mx",
-            subject="Generacion de los archivos de retiros",
-            body=body_message
-        )
-
-        notify(
+        """notify(
             postgres,
             f"Generacion de archivos Retiros",
             phase,

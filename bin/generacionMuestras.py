@@ -7,6 +7,7 @@ from pyspark.sql.types import StringType, StructType, StructField, IntegerType
 from pyspark.sql.window import Window
 from sqlalchemy import text
 from google.cloud import storage, bigquery
+from concurrent.futures import ThreadPoolExecutor
 from io import BytesIO
 from PIL import Image
 from profuturo.env import load_env
@@ -17,6 +18,7 @@ import random
 import string
 import time
 import os
+import json
 
 load_env()
 postgres_pool = get_postgres_pool()
@@ -29,7 +31,7 @@ bucket_name = os.getenv("BUCKET_ID")
 print(bucket_name)
 prefix =f"{os.getenv('PREFIX_BLOB')}"
 print(prefix)
-url = os.getenv("URL")
+url = os.getenv("URL_MUESTRAS_RECA")
 print(url)
 
 
@@ -61,32 +63,34 @@ def find_samples(samples_cursor: CursorResult):
 
     result = tuple(list(configurations.keys()))
     print(result)
+    try:
+        descripcion_consar = postgres.execute(text("""
+            SELECT "FTC_DESCRIPCION" FROM "MAESTROS"."TCDATMAE_MOVIMIENTO_CONSAR"
+            WHERE "FTN_ID_MOVIMIENTO_CONSAR" IN :consar
+            """), {'consar': result}).fetchall()
 
-    descripcion_consar = postgres.execute(text("""
-        SELECT "FTC_DESCRIPCION" FROM "MAESTROS"."TCDATMAE_MOVIMIENTO_CONSAR"
-        WHERE "FTN_ID_MOVIMIENTO_CONSAR" IN :consar
-        """), {'consar': result}).fetchall()
+        print(descripcion_consar)
+        # Creating a DataFrame
+        df = pd.DataFrame(descripcion_consar, columns=['Concepto Consar'])  # Replace 'Column_Name' with an appropriate column name
+        html_table = df.to_html()
 
-    print(descripcion_consar)
+        notify(
+            postgres,
+            'No se encontraron suficientes registros para los Conceptos CONSAR',
+            phase,
+            area,
+            term_id,
+            message=f"No se encontraron suficientes muestras para los Conceptos CONSAR:",
+            details=html_table,
+            aprobar=False,
+            descarga=False,
+            reproceso=False,
+        )
 
-    # Creating a DataFrame
-    df = pd.DataFrame(descripcion_consar, columns=['Concepto Consar'])  # Replace 'Column_Name' with an appropriate column name
-    html_table = df.to_html()
+        return samples
+    except:
+        return 'sin muestras'
 
-    notify(
-        postgres,
-        'No se encontraron suficientes registros para los Conceptos CONSAR',
-        phase,
-        area,
-        term_id,
-        message=f"No se encontraron suficientes muestras para los Conceptos CONSAR:",
-        details=html_table,
-        aprobar=False,
-        descarga=False,
-        reproceso=False,
-    )
-
-    return samples
 
 def upload_to_gcs(row):
     id_value = row["id"]
@@ -174,6 +178,42 @@ def get_blob_info(bucket_name, prefix):
 
     return blob_info_list
 
+def move_blob(source_bucket, destination_bucket, source_blob_name, destination_blob_name):
+    source_blob = source_bucket.blob(source_blob_name)
+    destination_blob = destination_bucket.blob(destination_blob_name)
+
+    # Copiar el blob del bucket fuente al bucket de destino
+    destination_blob.rewrite(source_blob)
+
+def move_files_parallel(source_bucket_name, destination_bucket_name, source_prefix="", destination_prefix="", num_threads=10):
+    # Inicializa los clientes de almacenamiento
+    source_client = storage.Client()
+    destination_client = storage.Client()
+    print("\n",source_bucket_name)
+    print(destination_bucket_name)
+    # Obtén los buckets
+    source_bucket = source_client.get_bucket(source_bucket_name)
+    destination_bucket = destination_client.get_bucket(destination_bucket_name)
+
+    # Lista todos los archivos en el bucket fuente con el prefijo dado
+    blobs = source_bucket.list_blobs(prefix=source_prefix)
+
+    # Usa ThreadPoolExecutor para ejecutar la copia de blobs en paralelo
+    with ThreadPoolExecutor(max_workers=num_threads) as executor:
+        futures = []
+
+        for blob in blobs:
+            # Crear el nombre del blob de destino con el prefijo de destino
+            destination_blob_name = destination_prefix + blob.name[len(source_prefix):]
+            futures.append(executor.submit(move_blob, source_bucket, destination_bucket, blob.name, destination_blob_name))
+
+        # Espera a que todos los hilos hayan completado
+        for future in futures:
+            future.result()
+
+    print("Movimiento de archivos completado")
+
+
 
 with define_extraction(phase, area, postgres_pool, bigquery_pool) as (postgres, bigquery):
     term = extract_terms(postgres, phase)
@@ -235,17 +275,19 @@ with define_extraction(phase, area, postgres_pool, bigquery_pool) as (postgres, 
             WHERE "FCN_ID_INDICADOR" = 32 AND "FCN_ID_AREA" = :area
               AND CA."FCN_ID_PERIODO" = :term
             """), {"term": term_id, "area": area})
+            print("muestra manuales")
         else:
             filter_reprocessed_samples = 'INNER JOIN "GESTOR"."TCGESPRO_MUESTRA_SOL_RE_CONSAR" MR ON M."FTN_ID_MUESTRA" = MR."FCN_ID_MUESTRA"'
 
-        truncate_table(bigquery, 'ESTADO_CUENTA.TTMUESTR_REVERSO')
-        truncate_table(bigquery, 'ESTADO_CUENTA.TTMUESTR_ANVERSO')
-        truncate_table(bigquery, 'ESTADO_CUENTA.TTMUESTR_GENERAL')
+        truncate_table(postgres, 'TTMUESTR_REVERSO')
+        truncate_table(postgres, 'TTMUESTR_ANVERSO')
+        truncate_table(postgres, 'TTMUESTR_GENERAL')
 
         ###########################  IMAGENES   #################################################
-        truncate_table(bigquery, 'ESTADO_CUENTA.TTEDOCTA_IMAGEN')
+        truncate_table(postgres, 'TTEDOCTA_IMAGEN')
 
         delete_all_objects(bucket_name, prefix)
+
         delete_all_objects(bucket_name, 'profuturo-archivos')
 
         query = """
@@ -277,7 +319,7 @@ with define_extraction(phase, area, postgres_pool, bigquery_pool) as (postgres, 
 
         df = spark.createDataFrame(blob_info_list, schema=schema)
 
-        _write_spark_dataframe(df, configure_bigquery_spark, 'ESTADO_CUENTA.TTEDOCTA_IMAGEN')
+        _write_spark_dataframe(df, configure_postgres_spark, '"ESTADO_CUENTA"."TTEDOCTA_IMAGEN"')
 
         ########################## GENERACIÓN DE MUESTRAS #################################################
         char1 = random.choice(string.ascii_letters).upper()
@@ -319,7 +361,7 @@ with define_extraction(phase, area, postgres_pool, bigquery_pool) as (postgres, 
             D."FTC_TIPOGENERACION",D."FTC_DESC_TIPOGENERACION",
             concat_ws(' ',C."FTC_AP_PATERNO", C."FTC_AP_MATERNO", C."FTC_NOMBRE") AS "FTC_NOMBRE_COMPLETO",
             concat_ws(' ',C."FTC_CALLE", C."FTC_NUMERO") AS "FTC_CALLE_NUMERO",
-            C."FTC_COLONIA",C."FTC_DELEGACION", C."FTN_CODIGO_POSTAL" AS "FTN_CP",
+            C."FTC_COLONIA",concat_ws(' ',"FTC_DELEGACION", "FTC_MUNICIPIO") as "FTC_DELEGACION", C."FTN_CODIGO_POSTAL" AS "FTN_CP",
             C."FTC_ENTIDAD_FEDERATIVA",C."FTC_NSS",C."FTC_RFC",C."FTC_CURP",I."FTC_TIPO_PENSION" AS "FTC_TIPO_PENSION",
             D."FTN_PENSION_MENSUAL",
             D."FTC_FORMATO",
@@ -386,6 +428,7 @@ with define_extraction(phase, area, postgres_pool, bigquery_pool) as (postgres, 
             col("FCN_ID_PERIODO"),
             col("FTN_ID_FORMATO"),
         ).cast("bigint"))
+
         general_df = general_df.withColumn("consecutivo", row_number().over(Window.orderBy(lit(0))).cast("string"))
         # Fill the "consecutivo" column with 9-digit values
         general_df = general_df.withColumn("consecutivo", lpad("consecutivo", 9, '0'))
@@ -398,13 +441,13 @@ with define_extraction(phase, area, postgres_pool, bigquery_pool) as (postgres, 
         general_df = general_df.drop(col("consecutivo"))
         general_df.write.format("parquet").mode("overwrite").save(f"gs://{bucket_name}/{prefix}/general.parquet")
         general_df = spark.read.format("parquet").load(f"gs://{bucket_name}/{prefix}/general.parquet").repartition(10)
-        general_df.show()
         general_df.createOrReplaceTempView("general")
+        spark.sql("select FCN_FOLIO from general").show()
 
         reverso_df = _create_spark_dataframe(spark, configure_postgres_spark, f"""
         WITH data as (
         SELECT
-        DISTINCT F."FCN_ID_FORMATO_ESTADO_CUENTA" AS "FTN_ID_FORMATO", M."FCN_CUENTA" AS "FCN_NUMERO_CUENTA",
+        F."FCN_ID_FORMATO_ESTADO_CUENTA" AS "FTN_ID_FORMATO", M."FCN_CUENTA" AS "FCN_NUMERO_CUENTA",
         M."FCN_ID_PERIODO",M."FCN_CUENTA", F."FCN_ID_GENERACION", F."FCN_ID_INDICADOR_CLIENTE",F."FCN_ID_INDICADOR_AFILIACION",
         F."FCN_ID_INDICADOR_BONO"
         FROM "GESTOR"."TTGESPRO_CONFIGURACION_FORMATO_ESTADO_CUENTA" F
@@ -467,10 +510,11 @@ with define_extraction(phase, area, postgres_pool, bigquery_pool) as (postgres, 
         INNER JOIN "GESTOR"."TCGESPRO_CONFIGURACION_ANVERSO" A ON F."FCN_ID_GENERACION" = A."FCN_GENERACION"
         INNER JOIN "GESTOR"."TCGESPRO_PERIODICIDAD" P ON F."FCN_ID_PERIODICIDAD_GENERACION" = P."FTN_ID_PERIODICIDAD" AND mod(extract(MONTH FROM :end), P."FTN_MESES") = 0
         INNER JOIN "GESTOR"."TCGESPRO_PERIODICIDAD" PA ON F."FCN_ID_PERIODICIDAD_REVERSO" = PA."FTN_ID_PERIODICIDAD"
-        INNER JOIN "GESTOR"."TCGESPRO_PERIODO" T ON to_date(T."FTC_PERIODO", 'MM/YYYY') BETWEEN :end - INTERVAL '1 month' * PA."FTN_MESES" AND :end
+        INNER JOIN "GESTOR"."TCGESPRO_PERIODO" T ON to_date(T."FTC_PERIODO", 'MM/YYYY') BETWEEN :start - INTERVAL '1 month' * PA."FTN_MESES" AND :end
         GROUP BY "FTN_ID_CONFIGURACION_FORMATO_ESTADO_CUENTA"
         ), movimientos as (
         SELECT
+        DISTINCT
         R."FCN_CUENTA",
         R."FCN_ID_PERIODO",
         R."FTF_MONTO_PESOS",
@@ -482,9 +526,9 @@ with define_extraction(phase, area, postgres_pool, bigquery_pool) as (postgres, 
         SB."FTC_TIPO_CLIENTE" AS "TIPO_SUBCUENA",
         0 AS "FTN_MONPES"
         FROM "HECHOS"."TTHECHOS_MOVIMIENTO" R
-        INNER JOIN periodos ON R."FCN_ID_PERIODO" BETWEEN periodos.PERIODO_INICIAL AND periodos.PERIODO_FINAL
-        INNER JOIN "GESTOR"."TCGESPRO_MUESTRA" M
-        ON M."FCN_CUENTA" = R."FCN_CUENTA"
+        INNER JOIN dataset M
+        ON M."FCN_NUMERO_CUENTA" = R."FCN_CUENTA"
+        INNER JOIN periodos ON R."FCN_ID_PERIODO" BETWEEN periodos.PERIODO_INICIAL AND periodos.PERIODO_FINAL AND M."FTN_ID_FORMATO" = periodos."FCN_ID_FORMATO_ESTADO_CUENTA"
         INNER JOIN "MAESTROS"."TCDATMAE_TIPO_SUBCUENTA" SB
         ON SB."FTN_ID_TIPO_SUBCTA" = R."FCN_ID_TIPO_SUBCTA"
         UNION ALL
@@ -494,7 +538,7 @@ with define_extraction(phase, area, postgres_pool, bigquery_pool) as (postgres, 
         R."MONTO" AS "FTF_MONTO_PESOS",
         NULL AS "FTN_SUA_DIAS_COTZDOS_BIMESTRE",
         NULL AS "FTN_SUA_ULTIMO_SALARIO_INT_PER",
-        NULL AS "FTD_FEH_LIQUIDACION",
+        to_date(cast(R."CSIE1_FECCON" as varchar),'YYYYMMDD') AS "FTD_FEH_LIQUIDACION",
         CAST(R."CSIE1_CODMOV"AS INT) AS "FCN_ID_CONCEPTO_MOVIMIENTO",
         NULL AS "FTC_SUA_RFC_PATRON",
         SB."FTC_TIPO_CLIENTE" AS "TIPO_SUBCUENA",
@@ -502,9 +546,9 @@ with define_extraction(phase, area, postgres_pool, bigquery_pool) as (postgres, 
         FROM "HECHOS"."TTHECHOS_MOVIMIENTOS_INTEGRITY" R
         INNER JOIN "GESTOR"."TCGESPRO_MOVIMIENTO_PROFUTURO" MP
         ON R."SUBCUENTA" = MP."FCN_ID_TIPO_SUBCUENTA" AND CAST(R."CSIE1_CODMOV" AS INT) = MP."FTN_ID_MOVIMIENTO_PROFUTURO"
-        INNER JOIN periodos ON R."FCN_ID_PERIODO" BETWEEN periodos.PERIODO_INICIAL AND periodos.PERIODO_FINAL
-        INNER JOIN "GESTOR"."TCGESPRO_MUESTRA" M
-        ON M."FCN_CUENTA" = R."CSIE1_NUMCUE"
+        INNER JOIN dataset M
+        ON M."FCN_NUMERO_CUENTA" = R."CSIE1_NUMCUE"
+        INNER JOIN periodos ON R."FCN_ID_PERIODO" BETWEEN periodos.PERIODO_INICIAL AND periodos.PERIODO_FINAL AND M."FTN_ID_FORMATO" = periodos."FCN_ID_FORMATO_ESTADO_CUENTA"
         INNER JOIN "MAESTROS"."TCDATMAE_TIPO_SUBCUENTA" SB
         ON SB."FTN_ID_TIPO_SUBCTA" = R."SUBCUENTA"
         )
@@ -535,19 +579,44 @@ with define_extraction(phase, area, postgres_pool, bigquery_pool) as (postgres, 
         INNER JOIN "GESTOR"."TCGESPRO_PERIODICIDAD" PG ON F."FCN_ID_PERIODICIDAD_REVERSO" = PG."FTN_ID_PERIODICIDAD"
         INNER JOIN dataset D ON D."FTN_ID_FORMATO" = F."FCN_ID_FORMATO_ESTADO_CUENTA"
         INNER JOIN movimientos R ON D."FCN_NUMERO_CUENTA" = R."FCN_CUENTA"
-        INNER JOIN periodos ON R."FCN_ID_PERIODO" BETWEEN periodos.PERIODO_INICIAL AND periodos.PERIODO_FINAL
         INNER JOIN "GESTOR"."TCGESPRO_PERIODO" T ON R."FCN_ID_PERIODO" = T."FTN_ID_PERIODO"
         INNER JOIN "GESTOR"."TTGESPRO_MOV_PROFUTURO_CONSAR" PC ON R."FCN_ID_CONCEPTO_MOVIMIENTO" = PC."FCN_ID_MOVIMIENTO_PROFUTURO"
-        AND PC."FCN_MONPES" = R."FTN_MONPES"
+        AND PC."FCN_MONPES" = R."FTN_MONPES" AND PC."FCN_ID_MOVIMIENTO_CONSAR" NOT IN (2,6,5,29,11,3)
         INNER JOIN "MAESTROS"."TCDATMAE_MOVIMIENTO_CONSAR" MC ON PC."FCN_ID_MOVIMIENTO_CONSAR" = MC."FTN_ID_MOVIMIENTO_CONSAR"
         LEFT JOIN "GESTOR"."TCGESPRO_REFER_MOV_CONSAR"  TRMC ON MC."FCN_ID_REFERENCIA" = TRMC."FTN_ID_REFERENCIA"
+        UNION ALL
+        SELECT
+        F."FCN_ID_FORMATO_ESTADO_CUENTA" AS "FTN_ID_FORMATO",
+        MC."FTC_MOV_TIPO_AHORRO" AS "FTC_SECCION",
+        R."FCN_CUENTA" AS "FCN_NUMERO_CUENTA",
+        NULL AS "FTD_FECHA_MOVIMIENTO",
+        MC."FTN_ID_MOVIMIENTO_CONSAR" AS "FTN_ID_CONCEPTO",
+        MC."FTC_DESCRIPCION" AS "FTC_DESC_CONCEPTO",
+        CAST(NULL AS varchar) AS "FTC_PERIODO_REFERENCIA",
+        sum(CAST(R."FTF_MONTO_PESOS" AS numeric(16,2))) AS "FTN_MONTO",
+        NULL AS "FTN_DIA_COTIZADO",
+        NULL AS "FTN_SALARIO_BASE",
+        now() AS "FTD_FECHAHORA_ALTA",
+        :user AS "FTC_USUARIO_ALTA"
+        FROM "GESTOR"."TTGESPRO_CONFIGURACION_FORMATO_ESTADO_CUENTA" F
+        INNER JOIN "GESTOR"."TCGESPRO_PERIODICIDAD" PG ON F."FCN_ID_PERIODICIDAD_REVERSO" = PG."FTN_ID_PERIODICIDAD"
+        INNER JOIN dataset D ON D."FTN_ID_FORMATO" = F."FCN_ID_FORMATO_ESTADO_CUENTA"
+        INNER JOIN movimientos R ON D."FCN_NUMERO_CUENTA" = R."FCN_CUENTA"
+        INNER JOIN "GESTOR"."TCGESPRO_PERIODO" T ON R."FCN_ID_PERIODO" = T."FTN_ID_PERIODO"
+        INNER JOIN "GESTOR"."TTGESPRO_MOV_PROFUTURO_CONSAR" PC ON R."FCN_ID_CONCEPTO_MOVIMIENTO" = PC."FCN_ID_MOVIMIENTO_PROFUTURO"
+        AND PC."FCN_MONPES" = R."FTN_MONPES" AND PC."FCN_ID_MOVIMIENTO_CONSAR" IN (2,6,5,29,11,3)
+        INNER JOIN "MAESTROS"."TCDATMAE_MOVIMIENTO_CONSAR" MC ON PC."FCN_ID_MOVIMIENTO_CONSAR" = MC."FTN_ID_MOVIMIENTO_CONSAR" AND PC."FCN_MONPES" = R."FTN_MONPES"
+        LEFT JOIN "GESTOR"."TCGESPRO_REFER_MOV_CONSAR"  TRMC ON MC."FCN_ID_REFERENCIA" = TRMC."FTN_ID_REFERENCIA"
+        GROUP BY
+        F."FCN_ID_FORMATO_ESTADO_CUENTA",
+        MC."FTC_MOV_TIPO_AHORRO",
+        R."FCN_CUENTA",
+        MC."FTN_ID_MOVIMIENTO_CONSAR",
+        MC."FTC_DESCRIPCION"
         """, {"term": term_id, "start": start_month, "end": end_month, "user": str(user)})
         reverso_df.write.format("parquet").mode("overwrite").save(f"gs://{bucket_name}/{prefix}/reverso.parquet")
         reverso_df = spark.read.format("parquet").load(f"gs://{bucket_name}/{prefix}/reverso.parquet").repartition(10)
-
-        reverso_df.show()
         reverso_df.createOrReplaceTempView("reverso")
-
 
         anverso_df = _create_spark_dataframe(spark, configure_postgres_spark, f"""
         WITH data as (
@@ -636,7 +705,6 @@ with define_extraction(phase, area, postgres_pool, bigquery_pool) as (postgres, 
         :user AS "FTC_USUARIO_ALTA"
         FROM (
         SELECT
-        DISTINCT
         D."FCN_NUMERO_CUENTA",
         D."FTN_ID_FORMATO",
         C."FTC_DES_CONCEPTO" AS "FTC_CONCEPTO_NEGOCIO",
@@ -655,7 +723,7 @@ with define_extraction(phase, area, postgres_pool, bigquery_pool) as (postgres, 
         INNER JOIN dataset D ON D."FTN_ID_FORMATO" = F."FCN_ID_FORMATO_ESTADO_CUENTA"
         LEFT JOIN "HECHOS"."TTCALCUL_BONO" TCB ON TCB."FCN_CUENTA" = D."FCN_NUMERO_CUENTA"
         INNER JOIN "HECHOS"."TTCALCUL_RENDIMIENTO" R ON D."FCN_NUMERO_CUENTA" = R."FCN_CUENTA"
-        INNER JOIN periodos ON R."FCN_ID_PERIODO" BETWEEN periodos.PERIODO_INICIAL AND periodos.PERIODO_FINAL
+        INNER JOIN periodos ON R."FCN_ID_PERIODO" BETWEEN periodos.PERIODO_INICIAL AND periodos.PERIODO_FINAL and periodos."FCN_ID_FORMATO_ESTADO_CUENTA" = D."FTN_ID_FORMATO"
         INNER JOIN "GESTOR"."TCGESPRO_PERIODO" T ON R."FCN_ID_PERIODO" = T."FTN_ID_PERIODO"
         INNER JOIN "GESTOR"."TCGESPRO_PERIODO" PR ON PR."FTN_ID_PERIODO" = :term
         --where "FTC_SECCION" <> 'SDO' and C."FTC_DES_CONCEPTO" = 'Ahorro para el retiro 92 y 97<sup>1</sup>'
@@ -702,250 +770,289 @@ with define_extraction(phase, area, postgres_pool, bigquery_pool) as (postgres, 
 
 
         anverso_cuatrimestral_df = _create_spark_dataframe(spark, configure_postgres_spark, f"""
-                WITH data as (
-                SELECT
-                DISTINCT F."FCN_ID_FORMATO_ESTADO_CUENTA" AS "FTN_ID_FORMATO", M."FCN_CUENTA" AS "FCN_NUMERO_CUENTA",
-                M."FCN_ID_PERIODO",M."FCN_CUENTA", F."FCN_ID_GENERACION", F."FCN_ID_INDICADOR_CLIENTE",F."FCN_ID_INDICADOR_AFILIACION",
-                F."FCN_ID_INDICADOR_BONO"
-                FROM "GESTOR"."TTGESPRO_CONFIGURACION_FORMATO_ESTADO_CUENTA" F
-                INNER JOIN "GESTOR"."TCGESPRO_FORMATO_ESTADO_CUENTA" FE ON F."FCN_ID_FORMATO_ESTADO_CUENTA" = FE."FTN_ID_FORMATO_ESTADO_CUENTA"
-                INNER JOIN "GESTOR"."TCGESPRO_PERIODICIDAD" PG ON F."FCN_ID_PERIODICIDAD_GENERACION" = PG."FTN_ID_PERIODICIDAD"
-                INNER JOIN "GESTOR"."TCGESPRO_PERIODICIDAD" PA ON F."FCN_ID_PERIODICIDAD_ANVERSO" = PA."FTN_ID_PERIODICIDAD"
-                INNER JOIN "GESTOR"."TCGESPRO_PERIODICIDAD" PR ON F."FCN_ID_PERIODICIDAD_REVERSO" = PR."FTN_ID_PERIODICIDAD"
-                INNER JOIN "GESTOR"."TCGESPRO_PERIODO" P ON P."FTN_ID_PERIODO" = :term
-                INNER JOIN "GESTOR"."TCGESPRO_MUESTRA" M ON P."FTN_ID_PERIODO" = M."FCN_ID_PERIODO"
-                {filter_reprocessed_samples}
-                -- QUITAR COMENT  CONDICION VALIDA PERO NO ES PERIODO CUATRIMESTRAL
-                WHERE mod(extract(MONTH FROM to_date(P."FTC_PERIODO", 'MM/YYYY')), PG."FTN_MESES") = 0
-                AND F."FTB_ESTATUS" = true
-                ), dataset as (
-                SELECT
-                D."FTN_ID_FORMATO", D."FCN_NUMERO_CUENTA"
-                FROM data D
-                INNER JOIN "HECHOS"."TCHECHOS_CLIENTE" I
-                ON D."FCN_ID_PERIODO" = I."FCN_ID_PERIODO"
-                AND D."FCN_CUENTA" = I."FCN_CUENTA"
-                AND D."FCN_ID_GENERACION" = CASE I."FTC_GENERACION"
-                   WHEN 'AFORE' THEN 2
-                   WHEN 'TRANSICION' THEN 3
-                   WHEN 'MIXTO' THEN 4 END
-                INNER JOIN "MAESTROS"."TCDATMAE_CLIENTE" C ON I."FCN_CUENTA" = C."FTN_CUENTA"
-                INNER JOIN "GESTOR"."TCGESPRO_INDICADOR_ESTADO_CUENTA" IE
-                ON IE."FTN_ID_INDICADOR_ESTADO_CUENTA" = D."FCN_ID_INDICADOR_CLIENTE"
-                AND IE."FTN_VALOR" = CASE I."FTC_ORIGEN"
-                   WHEN 'ISSSTE' THEN 67
-                   WHEN 'IMSS' THEN 66
-                   WHEN 'MIXTO' THEN 69
-                   WHEN 'INDEPENDIENTE' THEN 68 END
-                INNER JOIN "GESTOR"."TCGESPRO_INDICADOR_ESTADO_CUENTA" IEC
-                ON IEC."FTN_ID_INDICADOR_ESTADO_CUENTA" = D."FCN_ID_INDICADOR_AFILIACION"
-                AND IEC."FTN_VALOR" = CASE
-                   WHEN I."FTB_PENSION" THEN 1
-                   WHEN I."FTC_TIPO_CLIENTE" = 'Afiliado' THEN 714
-                   WHEN I."FTC_TIPO_CLIENTE" = 'Asignado' THEN 713
-                END
-                INNER JOIN "GESTOR"."TCGESPRO_INDICADOR_ESTADO_CUENTA" TIEC
-                ON TIEC."FTN_ID_INDICADOR_ESTADO_CUENTA" = D."FCN_ID_INDICADOR_BONO"
-                AND TIEC."FTN_VALOR" = CASE I."FTB_BONO"
-                   WHEN false THEN  1
-                   WHEN true THEN 2 END
-                UNION ALL
-                SELECT
-                DISTINCT D."FTN_ID_FORMATO", D."FCN_NUMERO_CUENTA"
-                FROM data D
-                INNER JOIN "HECHOS"."TCHECHOS_CLIENTE" I
-                ON D."FCN_ID_PERIODO" = I."FCN_ID_PERIODO"
-                AND D."FCN_CUENTA" = I."FCN_CUENTA"
-                AND D."FCN_ID_GENERACION" = CASE I."FTC_GENERACION"
-                    WHEN 'DECIMO TRANSITORIO' THEN 1
-                END
-                INNER JOIN "MAESTROS"."TCDATMAE_CLIENTE" C ON I."FCN_CUENTA" = C."FTN_CUENTA"
-                )
-                , periodos AS (
-                SELECT F."FCN_ID_FORMATO_ESTADO_CUENTA", min(T."FTN_ID_PERIODO") AS PERIODO_INICIAL, max(T."FTN_ID_PERIODO") AS PERIODO_FINAL
-                FROM "GESTOR"."TTGESPRO_CONFIGURACION_FORMATO_ESTADO_CUENTA" F
-                    INNER JOIN "GESTOR"."TCGESPRO_CONFIGURACION_ANVERSO" A ON F."FCN_ID_GENERACION" = A."FCN_GENERACION"
-                    INNER JOIN "GESTOR"."TCGESPRO_PERIODICIDAD" P ON F."FCN_ID_PERIODICIDAD_GENERACION" = P."FTN_ID_PERIODICIDAD" AND mod(extract(MONTH FROM :end), P."FTN_MESES") = 0
-                    INNER JOIN "GESTOR"."TCGESPRO_PERIODICIDAD" PA ON F."FCN_ID_PERIODICIDAD_REVERSO" = PA."FTN_ID_PERIODICIDAD"
-                    INNER JOIN "GESTOR"."TCGESPRO_PERIODO" T ON to_date(T."FTC_PERIODO", 'MM/YYYY') BETWEEN :start - INTERVAL '1 month' * PA."FTN_MESES" AND :end
-                GROUP BY "FTN_ID_CONFIGURACION_FORMATO_ESTADO_CUENTA"
-                )
-                SELECT
-                "FCN_NUMERO_CUENTA",
-                "FTN_ID_FORMATO",
-                "FTC_CONCEPTO_NEGOCIO",
-                SUM("FTF_APORTACION") AS "FTF_APORTACION",
-                SUM("FTN_RETIRO") AS "FTN_RETIRO",
-                SUM("FTN_COMISION") AS "FTN_COMISION",
-                SUM("FTN_SALDO_ANTERIOR") AS "FTN_SALDO_ANTERIOR",
-                SUM("FTN_SALDO_FINAL") AS "FTN_SALDO_FINAL",
-                "FTC_SECCION",
-                NULL ::numeric(16, 2) AS  "FTN_VALOR_ACTUAL_PESO",
-                NULL ::numeric(16, 6) AS "FTN_VALOR_ACTUAL_UDI",
-                NULL ::numeric(16, 2) AS "FTN_VALOR_NOMINAL_PESO",
-                NULL ::numeric(16, 6) AS "FTN_VALOR_NOMINAL_UDI",
-                "FTC_TIPO_AHORRO",
-                "FTN_ORDEN_SDO",
-                :user AS "FTC_USUARIO_ALTA"
-                FROM (
-                SELECT
-                DISTINCT
-                D."FCN_NUMERO_CUENTA",
-                D."FTN_ID_FORMATO",
-                C."FTC_DES_CONCEPTO" AS "FTC_CONCEPTO_NEGOCIO",
-                CASE WHEN R."FCN_ID_TIPO_SUBCTA" = ANY(C."FTA_SUBCUENTAS") AND C."FTC_SECCION" <> 'SDO' THEN R."FTF_ABONO" ELSE 0 END ::numeric(16, 2) AS "FTF_APORTACION",
-                CASE WHEN R."FCN_ID_TIPO_SUBCTA" = ANY(C."FTA_SUBCUENTAS") AND C."FTC_SECCION" <> 'SDO' THEN R."FTF_CARGO" ELSE 0 END::numeric(16, 2) AS "FTN_RETIRO",
-                CASE WHEN R."FCN_ID_TIPO_SUBCTA" = ANY(C."FTA_SUBCUENTAS") AND C."FTC_SECCION" <> 'SDO' THEN R."FTF_COMISION" ELSE 0 END::numeric(16, 2) AS "FTN_COMISION",
-                CASE WHEN R."FCN_ID_TIPO_SUBCTA" = ANY(C."FTA_SUBCUENTAS") AND C."FTC_SECCION" <> 'SDO' AND R."FCN_ID_PERIODO" = periodos.PERIODO_INICIAL THEN R."FTF_SALDO_FINAL" ELSE 0 END::numeric(16, 2) AS "FTN_SALDO_ANTERIOR",
-                CASE WHEN R."FCN_ID_TIPO_SUBCTA" = ANY(C."FTA_SUBCUENTAS") AND R."FCN_ID_PERIODO" = periodos.PERIODO_FINAL THEN R."FTF_SALDO_FINAL" ELSE 0 END::numeric(16, 2) AS "FTN_SALDO_FINAL",
-                C."FTC_SECCION",
-                C."FTC_AHORRO" AS "FTC_TIPO_AHORRO",
-                C."FTN_ORDEN_SDO" AS "FTN_ORDEN_SDO"
-                FROM "GESTOR"."TTGESPRO_CONFIGURACION_FORMATO_ESTADO_CUENTA" F
-                INNER JOIN "GESTOR"."TCGESPRO_CONFIGURACION_ANVERSO" C ON F."FCN_ID_GENERACION" = C."FCN_GENERACION"
-                INNER JOIN "GESTOR"."TCGESPRO_PERIODICIDAD" P ON F."FCN_ID_PERIODICIDAD_GENERACION" = P."FTN_ID_PERIODICIDAD"
-                INNER JOIN "GESTOR"."TCGESPRO_PERIODICIDAD" PG ON F."FCN_ID_PERIODICIDAD_REVERSO" = PG."FTN_ID_PERIODICIDAD"
-                INNER JOIN dataset D ON D."FTN_ID_FORMATO" = F."FCN_ID_FORMATO_ESTADO_CUENTA"
-                LEFT JOIN "HECHOS"."TTCALCUL_BONO" TCB ON TCB."FCN_CUENTA" = D."FCN_NUMERO_CUENTA"
-                INNER JOIN "HECHOS"."TTCALCUL_RENDIMIENTO" R ON D."FCN_NUMERO_CUENTA" = R."FCN_CUENTA"
-                INNER JOIN periodos ON R."FCN_ID_PERIODO" BETWEEN periodos.PERIODO_INICIAL AND periodos.PERIODO_FINAL
-                INNER JOIN "GESTOR"."TCGESPRO_PERIODO" T ON R."FCN_ID_PERIODO" = T."FTN_ID_PERIODO"
-                INNER JOIN "GESTOR"."TCGESPRO_PERIODO" PR ON PR."FTN_ID_PERIODO" = :term
-                --where "FTC_SECCION" <> 'SDO' and C."FTC_DES_CONCEPTO" = 'Ahorro para el retiro 92 y 97<sup>1</sup>'
-                ) X
-                GROUP BY
-                "FCN_NUMERO_CUENTA",
-                "FTN_ID_FORMATO",
-                "FTC_CONCEPTO_NEGOCIO",
-                "FTC_SECCION",
-                "FTN_VALOR_ACTUAL_PESO",
-                "FTN_VALOR_ACTUAL_UDI",
-                "FTN_VALOR_NOMINAL_PESO",
-                "FTN_VALOR_NOMINAL_UDI",
-                "FTC_TIPO_AHORRO",
-                "FTN_ORDEN_SDO",
-                "FTC_USUARIO_ALTA"
-                UNION ALL
-                SELECT
-                TCB."FCN_CUENTA" AS FCN_NUMERO_CUENTA,
-                D."FTN_ID_FORMATO",
-                NULL AS "FTC_CONCEPTO_NEGOCIO",
-                NULL AS "FTF_APORTACION",
-                NULL AS "FTN_RETIRO",
-                NULL AS "FTN_COMISION",
-                NULL AS "FTN_SALDO_ANTERIOR",
-                NULL AS "FTN_SALDO_FINAL",
-                'BON' AS "FTC_SECCION",
-                TCB."FTF_BON_ACT_PES"::numeric(16, 2) AS "FTN_VALOR_ACTUAL_PESO",
-                TCB."FTF_BON_ACT_ACC"::numeric(16, 6) AS "FTN_VALOR_ACTUAL_UDI",
-                TCB."FTF_BON_NOM_PES"::numeric(16, 2) AS "FTN_VALOR_NOMINAL_PESO",
-                TCB."FTF_BON_NOM_ACC"::numeric(16, 6) AS "FTN_VALOR_NOMINAL_UDI",
-                NULL AS "FTC_TIPO_AHORRO",
-                NULL AS "FTN_ORDEN_SDO",
-                :user AS "FTC_USUARIO_ALTA"
-                FROM "HECHOS"."TTCALCUL_BONO" TCB
-                INNER JOIN dataset D ON D."FCN_NUMERO_CUENTA" = TCB."FCN_CUENTA"
-                WHERE TCB."FCN_ID_PERIODO" = :term
-                """, {"term": term_id, "start": start_month, "end": end_month, "user": str(user)})
+        WITH data as (
+        SELECT
+        DISTINCT F."FCN_ID_FORMATO_ESTADO_CUENTA" AS "FTN_ID_FORMATO", M."FCN_CUENTA" AS "FCN_NUMERO_CUENTA",
+        M."FCN_ID_PERIODO",M."FCN_CUENTA", F."FCN_ID_GENERACION", F."FCN_ID_INDICADOR_CLIENTE",F."FCN_ID_INDICADOR_AFILIACION",
+        F."FCN_ID_INDICADOR_BONO"
+        FROM "GESTOR"."TTGESPRO_CONFIGURACION_FORMATO_ESTADO_CUENTA" F
+        INNER JOIN "GESTOR"."TCGESPRO_FORMATO_ESTADO_CUENTA" FE ON F."FCN_ID_FORMATO_ESTADO_CUENTA" = FE."FTN_ID_FORMATO_ESTADO_CUENTA"
+        INNER JOIN "GESTOR"."TCGESPRO_PERIODICIDAD" PG ON F."FCN_ID_PERIODICIDAD_GENERACION" = PG."FTN_ID_PERIODICIDAD"
+        INNER JOIN "GESTOR"."TCGESPRO_PERIODICIDAD" PA ON F."FCN_ID_PERIODICIDAD_ANVERSO" = PA."FTN_ID_PERIODICIDAD"
+        INNER JOIN "GESTOR"."TCGESPRO_PERIODICIDAD" PR ON F."FCN_ID_PERIODICIDAD_REVERSO" = PR."FTN_ID_PERIODICIDAD"
+        INNER JOIN "GESTOR"."TCGESPRO_PERIODO" P ON P."FTN_ID_PERIODO" = :term
+        INNER JOIN "GESTOR"."TCGESPRO_MUESTRA" M ON P."FTN_ID_PERIODO" = M."FCN_ID_PERIODO"
+        {filter_reprocessed_samples}
+        -- QUITAR COMENT  CONDICION VALIDA PERO NO ES PERIODO CUATRIMESTRAL
+        WHERE mod(extract(MONTH FROM to_date(P."FTC_PERIODO", 'MM/YYYY')), PG."FTN_MESES") = 0
+        AND F."FTB_ESTATUS" = true
+        ), dataset as (
+        SELECT
+        D."FTN_ID_FORMATO", D."FCN_NUMERO_CUENTA"
+        FROM data D
+        INNER JOIN "HECHOS"."TCHECHOS_CLIENTE" I
+        ON D."FCN_ID_PERIODO" = I."FCN_ID_PERIODO"
+        AND D."FCN_CUENTA" = I."FCN_CUENTA"
+        AND D."FCN_ID_GENERACION" = CASE I."FTC_GENERACION"
+        WHEN 'AFORE' THEN 2
+        WHEN 'TRANSICION' THEN 3
+        WHEN 'MIXTO' THEN 4 END
+        INNER JOIN "MAESTROS"."TCDATMAE_CLIENTE" C ON I."FCN_CUENTA" = C."FTN_CUENTA"
+        INNER JOIN "GESTOR"."TCGESPRO_INDICADOR_ESTADO_CUENTA" IE
+        ON IE."FTN_ID_INDICADOR_ESTADO_CUENTA" = D."FCN_ID_INDICADOR_CLIENTE"
+        AND IE."FTN_VALOR" = CASE I."FTC_ORIGEN"
+        WHEN 'ISSSTE' THEN 67
+        WHEN 'IMSS' THEN 66
+        WHEN 'MIXTO' THEN 69
+        WHEN 'INDEPENDIENTE' THEN 68 END
+        INNER JOIN "GESTOR"."TCGESPRO_INDICADOR_ESTADO_CUENTA" IEC
+        ON IEC."FTN_ID_INDICADOR_ESTADO_CUENTA" = D."FCN_ID_INDICADOR_AFILIACION"
+        AND IEC."FTN_VALOR" = CASE
+        WHEN I."FTB_PENSION" THEN 1
+        WHEN I."FTC_TIPO_CLIENTE" = 'Afiliado' THEN 714
+        WHEN I."FTC_TIPO_CLIENTE" = 'Asignado' THEN 713
+        END
+        INNER JOIN "GESTOR"."TCGESPRO_INDICADOR_ESTADO_CUENTA" TIEC
+        ON TIEC."FTN_ID_INDICADOR_ESTADO_CUENTA" = D."FCN_ID_INDICADOR_BONO"
+        AND TIEC."FTN_VALOR" = CASE I."FTB_BONO"
+        WHEN false THEN  1
+        WHEN true THEN 2 END
+        UNION ALL
+        SELECT
+        DISTINCT D."FTN_ID_FORMATO", D."FCN_NUMERO_CUENTA"
+        FROM data D
+        INNER JOIN "HECHOS"."TCHECHOS_CLIENTE" I
+        ON D."FCN_ID_PERIODO" = I."FCN_ID_PERIODO"
+        AND D."FCN_CUENTA" = I."FCN_CUENTA"
+        AND D."FCN_ID_GENERACION" = CASE I."FTC_GENERACION"
+        WHEN 'DECIMO TRANSITORIO' THEN 1
+        END
+        )
+        , periodos AS (
+       SELECT F."FCN_ID_FORMATO_ESTADO_CUENTA", min(T."FTN_ID_PERIODO") AS PERIODO_INICIAL, max(T."FTN_ID_PERIODO") AS PERIODO_FINAL
+        FROM "GESTOR"."TTGESPRO_CONFIGURACION_FORMATO_ESTADO_CUENTA" F
+        INNER JOIN "GESTOR"."TCGESPRO_CONFIGURACION_ANVERSO" A ON F."FCN_ID_GENERACION" = A."FCN_GENERACION"
+        INNER JOIN "GESTOR"."TCGESPRO_PERIODICIDAD" P ON F."FCN_ID_PERIODICIDAD_GENERACION" = P."FTN_ID_PERIODICIDAD" AND mod(extract(MONTH FROM :end), P."FTN_MESES") = 0
+        INNER JOIN "GESTOR"."TCGESPRO_PERIODICIDAD" PA ON F."FCN_ID_PERIODICIDAD_REVERSO" = PA."FTN_ID_PERIODICIDAD"
+        INNER JOIN "GESTOR"."TCGESPRO_PERIODO" T ON to_date(T."FTC_PERIODO", 'MM/YYYY') BETWEEN :end - INTERVAL '1 month' * PA."FTN_MESES" AND :end
+        GROUP BY "FTN_ID_CONFIGURACION_FORMATO_ESTADO_CUENTA"
+        )
+        SELECT
+        "FCN_NUMERO_CUENTA",
+        "FTN_ID_FORMATO",
+        "FTC_CONCEPTO_NEGOCIO",
+        SUM("FTF_APORTACION") AS "FTF_APORTACION",
+        SUM("FTN_RETIRO") AS "FTN_RETIRO",
+        SUM("FTN_COMISION") AS "FTN_COMISION",
+        SUM("FTN_SALDO_ANTERIOR") AS "FTN_SALDO_ANTERIOR",
+        SUM("FTN_SALDO_FINAL") AS "FTN_SALDO_FINAL",
+        "FTC_SECCION",
+        "FTC_TIPO_AHORRO",
+        "FTN_ORDEN_SDO",
+        :user AS "FTC_USUARIO_ALTA"
+        FROM (
+        SELECT
+        D."FCN_NUMERO_CUENTA",
+        D."FTN_ID_FORMATO",
+        C."FTC_DES_CONCEPTO" AS "FTC_CONCEPTO_NEGOCIO",
+        CASE WHEN R."FCN_ID_TIPO_SUBCTA" = ANY(C."FTA_SUBCUENTAS") AND C."FTC_SECCION" <> 'SDO' THEN R."FTF_ABONO" ELSE 0 END ::numeric(16, 2) AS "FTF_APORTACION",
+        CASE WHEN R."FCN_ID_TIPO_SUBCTA" = ANY(C."FTA_SUBCUENTAS") AND C."FTC_SECCION" <> 'SDO' THEN R."FTF_CARGO" ELSE 0 END::numeric(16, 2) AS "FTN_RETIRO",
+        CASE WHEN R."FCN_ID_TIPO_SUBCTA" = ANY(C."FTA_SUBCUENTAS") AND C."FTC_SECCION" <> 'SDO' THEN R."FTF_COMISION" ELSE 0 END::numeric(16, 2) AS "FTN_COMISION",
+        CASE WHEN R."FCN_ID_TIPO_SUBCTA" = ANY(C."FTA_SUBCUENTAS") AND C."FTC_SECCION" <> 'SDO' AND R."FCN_ID_PERIODO" = periodos.PERIODO_INICIAL THEN R."FTF_SALDO_FINAL" ELSE 0 END::numeric(16, 2) AS "FTN_SALDO_ANTERIOR",
+        CASE WHEN R."FCN_ID_TIPO_SUBCTA" = ANY(C."FTA_SUBCUENTAS") AND R."FCN_ID_PERIODO" = periodos.PERIODO_FINAL THEN R."FTF_SALDO_FINAL" ELSE 0 END::numeric(16, 2) AS "FTN_SALDO_FINAL",
+        C."FTC_SECCION",
+        C."FTC_AHORRO" AS "FTC_TIPO_AHORRO",
+        C."FTN_ORDEN_SDO" AS "FTN_ORDEN_SDO"
+        FROM "GESTOR"."TTGESPRO_CONFIGURACION_FORMATO_ESTADO_CUENTA" F
+        INNER JOIN "GESTOR"."TCGESPRO_CONFIGURACION_ANVERSO" C ON F."FCN_ID_GENERACION" = C."FCN_GENERACION"
+        INNER JOIN "GESTOR"."TCGESPRO_PERIODICIDAD" P ON F."FCN_ID_PERIODICIDAD_GENERACION" = P."FTN_ID_PERIODICIDAD"
+        INNER JOIN "GESTOR"."TCGESPRO_PERIODICIDAD" PG ON F."FCN_ID_PERIODICIDAD_ANVERSO" = PG."FTN_ID_PERIODICIDAD"
+        INNER JOIN dataset D ON D."FTN_ID_FORMATO" = F."FCN_ID_FORMATO_ESTADO_CUENTA"
+        LEFT JOIN "HECHOS"."TTCALCUL_BONO" TCB ON TCB."FCN_CUENTA" = D."FCN_NUMERO_CUENTA"
+        INNER JOIN "HECHOS"."TTCALCUL_RENDIMIENTO" R ON D."FCN_NUMERO_CUENTA" = R."FCN_CUENTA"
+        INNER JOIN periodos ON R."FCN_ID_PERIODO" BETWEEN periodos.PERIODO_INICIAL AND periodos.PERIODO_FINAL and periodos."FCN_ID_FORMATO_ESTADO_CUENTA" = D."FTN_ID_FORMATO"
+        INNER JOIN "GESTOR"."TCGESPRO_PERIODO" T ON R."FCN_ID_PERIODO" = T."FTN_ID_PERIODO"
+        INNER JOIN "GESTOR"."TCGESPRO_PERIODO" PR ON PR."FTN_ID_PERIODO" = :term
+        where "FTC_SECCION" NOT IN ('SDO') AND "FTC_AHORRO" NOT IN ('VIV')
+        ) X
+        GROUP BY
+        "FCN_NUMERO_CUENTA",
+        "FTN_ID_FORMATO",
+        "FTC_CONCEPTO_NEGOCIO",
+        "FTC_SECCION",
+        "FTC_TIPO_AHORRO",
+        "FTN_ORDEN_SDO",
+        "FTC_USUARIO_ALTA"
+        """, {"term": term_id, "start": start_month, "end": end_month, "user": str(user)})
 
         anverso_cuatrimestral_df.write.format("parquet").mode("overwrite").save(f"gs://{bucket_name}/{prefix}/anverso_cuatri.parquet")
         anverso_cuatrimestral_df = spark.read.format("parquet").load(f"gs://{bucket_name}/{prefix}/anverso_cuatri.parquet").repartition(10)
         anverso_cuatrimestral_df = anverso_cuatrimestral_df.withColumn("FTN_RENDIMIENTO", col("FTN_SALDO_FINAL") - (
                     col("FTF_APORTACION") + col("FTN_SALDO_ANTERIOR") - col("FTN_COMISION") - col("FTN_RETIRO")))
+
         anverso_cuatrimestral_df.show()
+        df = anverso_cuatrimestral_df.select("FCN_NUMERO_CUENTA").show()
         anverso_cuatrimestral_df.createOrReplaceTempView("anverso_cuatrimestral")
 
-
         general_df = spark.sql("""
-        SELECT C.*, ASS.FTN_MONTO AS FTN_SALDO_SUBTOTAL, AST.FTN_MONTO AS FTN_SALDO_TOTAL
+        SELECT
+        C.FTN_ID_GRUPO_SEGMENTACION,C.FTC_CANDADO_APERTURA,C.FTN_ID_FORMATO,C.FCN_ID_PERIODO,
+        cast(C.FCN_NUMERO_CUENTA as bigint) FCN_NUMERO_CUENTA,C.FTD_FECHA_CORTE,C.FTD_FECHA_GRAL_INICIO,C.FTD_FECHA_GRAL_FIN,C.FTD_FECHA_MOV_INICIO,
+        C.FTD_FECHA_MOV_FIN,C.FTN_ID_SIEFORE,C.FTC_DESC_SIEFORE,C.FTC_TIPOGENERACION,C.FTC_DESC_TIPOGENERACION,
+        C.FTC_NOMBRE_COMPLETO,C.FTC_CALLE_NUMERO,C.FTC_COLONIA,C.FTC_DELEGACION,C.FTN_CP,C.FTC_ENTIDAD_FEDERATIVA,
+        C.FTC_NSS,C.FTC_RFC,C.FTC_CURP,C.FTC_TIPO_PENSION,C.FTN_PENSION_MENSUAL,C.FTC_FORMATO,C.FTC_TIPO_TRABAJADOR,
+        C.FTC_USUARIO_ALTA,
+        C.FCN_ID_EDOCTA,
+        C.FCN_FOLIO,
+        cast(ASS.FTN_MONTO as numeric(16,2)) AS FTN_SALDO_SUBTOTAL, cast(AST.FTN_MONTO as numeric(16,2)) AS FTN_SALDO_TOTAL
         FROM general C
             INNER JOIN (
-                SELECT FCN_NUMERO_CUENTA, FTN_ID_FORMATO, SUM(FTN_SALDO_FINAL) AS FTN_MONTO
+                SELECT FCN_NUMERO_CUENTA, FTN_ID_FORMATO, SUM(cast(FTN_SALDO_FINAL as numeric(16,2))) AS FTN_MONTO
                 FROM anverso
                 WHERE FTC_SECCION = 'AHO'
                 GROUP BY FCN_NUMERO_CUENTA, FTN_ID_FORMATO
             ) ASS ON C.FCN_NUMERO_CUENTA = ASS.FCN_NUMERO_CUENTA
             INNER JOIN (
-                SELECT FCN_NUMERO_CUENTA,FTN_ID_FORMATO, SUM(FTN_SALDO_FINAL) AS FTN_MONTO
+                SELECT FCN_NUMERO_CUENTA,FTN_ID_FORMATO, SUM(cast(FTN_SALDO_FINAL as numeric(16,2))) AS FTN_MONTO
                 FROM anverso
                  WHERE FTC_SECCION NOT IN ('SDO')
                 GROUP BY FCN_NUMERO_CUENTA,FTN_ID_FORMATO
             ) AST ON C.FCN_NUMERO_CUENTA = AST.FCN_NUMERO_CUENTA
         -- WHERE C.FCN_ID_EDOCTA IS NOT NULL
         """).cache()
+        general_df.show()
 
         reverso_df = spark.sql("""
-        SELECT R.*, G.FCN_ID_EDOCTA
+        SELECT
+        DISTINCT
+        cast(G.FCN_ID_EDOCTA as bigint) as FCN_ID_EDOCTA,
+        cast(R.FCN_NUMERO_CUENTA as bigint) as FCN_NUMERO_CUENTA,
+        R.FTN_ID_CONCEPTO,
+        R.FTC_DESC_CONCEPTO,
+        R.FTC_SECCION,
+        R.FTD_FECHA_MOVIMIENTO,
+        R.FTN_SALARIO_BASE,
+        R.FTN_DIA_COTIZADO,
+        R.FTC_PERIODO_REFERENCIA,
+        R.FTN_MONTO,
+        R.FTD_FECHAHORA_ALTA,
+        R.FTC_USUARIO_ALTA, 
+        R.FTN_ID_FORMATO
         FROM reverso R
             INNER JOIN general G ON G.FCN_NUMERO_CUENTA = R.FCN_NUMERO_CUENTA AND G.FTN_ID_FORMATO = R.FTN_ID_FORMATO
         WHERE R.FCN_NUMERO_CUENTA IN (SELECT FCN_NUMERO_CUENTA FROM anverso_cuatrimestral)
-        /*UNION ALL
-        SELECT
-        A.FTN_ID_FORMATO, 
-        A.FTC_SECCION,
-        A.FCN_NUMERO_CUENTA,
-        null as FTD_FECHA_MOVIMIENTO,
-        null as FTN_ID_CONCEPTO,
-        "Comisión del Periodo" as FTC_DESC_CONCEPTO,
-        "Profuturo"  as FTC_PERIODO_REFERENCIA,
-        SUM(A.FTN_COMISION) as FTN_MONTO,
-        null as FTN_DIA_COTIZADO,
-        null as FTN_SALARIO_BASE,
-        now() AS FTD_FECHAHORA_ALTA,
-        A.FTC_USUARIO_ALTA,
-        G.FCN_ID_EDOCTA
-        FROM anverso_cuatrimestral A
-        INNER JOIN general G ON G.FCN_NUMERO_CUENTA = A.FCN_NUMERO_CUENTA AND G.FTN_ID_FORMATO = A.FTN_ID_FORMATO
-        WHERE A.FTC_SECCION IN ('RET', 'AHO')
-        GROUP BY 
-        G.FCN_ID_EDOCTA,
-        A.FTN_ID_FORMATO,
-        A.FCN_NUMERO_CUENTA,
-        A.FTC_SECCION,
-        A.FTC_USUARIO_ALTA
-        UNION ALL
-        SELECT 
-        A.FTN_ID_FORMATO, 
-        A.FTC_SECCION,
-        A.FCN_NUMERO_CUENTA,
-        null as FTD_FECHA_MOVIMIENTO,
-        null as FTN_ID_CONCEPTO,
-        "Rendimiento del Periodo" as FTC_DESC_CONCEPTO,
-        "Profuturo" as FTC_PERIODO_REFERENCIA,
-        SUM(A.FTN_COMISION) as FTN_MONTO,
-        null as FTN_DIA_COTIZADO,
-        null as FTN_SALARIO_BASE,
-        now() AS FTD_FECHAHORA_ALTA,
-        A.FTC_USUARIO_ALTA,
-        G.FCN_ID_EDOCTA
-        FROM anverso_cuatrimestral A
-        INNER JOIN general G ON G.FCN_NUMERO_CUENTA = A.FCN_NUMERO_CUENTA AND G.FTN_ID_FORMATO = A.FTN_ID_FORMATO
-        WHERE A.FTC_SECCION IN ('RET', 'AHO')
-        GROUP BY 
-        G.FCN_ID_EDOCTA,
-        A.FTN_ID_FORMATO,
-        A.FCN_NUMERO_CUENTA,
-        A.FTC_SECCION,
-        A.FTC_USUARIO_ALTA
-        */
         """).cache()
 
+        anverso_cuatrimestral_df = spark.sql("""
+                SELECT
+                cast(G.FCN_ID_EDOCTA as bigint) as FCN_ID_EDOCTA,
+                cast(G.FCN_NUMERO_CUENTA as bigint) as FCN_NUMERO_CUENTA,
+                null as FTN_ID_CONCEPTO,
+                "Comisión del Periodo" as FTC_DESC_CONCEPTO,
+                cast(A.FTC_TIPO_AHORRO as varchar(10)) as FTC_SECCION,
+                null as FTD_FECHA_MOVIMIENTO,
+                null as FTN_SALARIO_BASE,
+                null as FTN_DIA_COTIZADO,
+                "Profuturo"  as FTC_PERIODO_REFERENCIA,
+                SUM(cast(A.FTN_COMISION as numeric(16,2))) as FTN_MONTO,
+                now() AS FTD_FECHAHORA_ALTA,
+                cast(A.FTC_USUARIO_ALTA as varchar(10)) as FTC_USUARIO_ALTA,
+                A.FTN_ID_FORMATO    
+                FROM anverso_cuatrimestral A
+                INNER JOIN general G ON G.FCN_NUMERO_CUENTA = A.FCN_NUMERO_CUENTA AND G.FTN_ID_FORMATO = A.FTN_ID_FORMATO
+                WHERE A.FTC_TIPO_AHORRO IN ('RET', 'VOL')
+                GROUP BY 
+                G.FCN_ID_EDOCTA,
+                A.FTN_ID_FORMATO,
+                G.FCN_NUMERO_CUENTA,
+                A.FTC_TIPO_AHORRO,
+                A.FTC_USUARIO_ALTA
+                HAVING SUM(cast(A.FTN_COMISION as numeric(16,2))) <> 0
+                UNION ALL
+                SELECT 
+                cast(G.FCN_ID_EDOCTA as bigint) as FCN_ID_EDOCTA,
+                cast(G.FCN_NUMERO_CUENTA as bigint) as FCN_NUMERO_CUENTA,
+                null as FTN_ID_CONCEPTO,
+                "Rendimiento del Periodo" as FTC_DESC_CONCEPTO,
+                cast(A.FTC_TIPO_AHORRO as varchar(10)) as FTC_SECCION,
+                null as FTD_FECHA_MOVIMIENTO,
+                null as FTN_SALARIO_BASE,
+                null as FTN_DIA_COTIZADO,
+                "Profuturo"  as FTC_PERIODO_REFERENCIA,
+                SUM(cast(A.FTN_RENDIMIENTO as numeric(16,2))) as FTN_MONTO,
+                now() AS FTD_FECHAHORA_ALTA,
+                cast(A.FTC_USUARIO_ALTA as varchar(10)) as FTC_USUARIO_ALTA,
+                A.FTN_ID_FORMATO
+                FROM anverso_cuatrimestral A
+                INNER JOIN general G ON G.FCN_NUMERO_CUENTA = A.FCN_NUMERO_CUENTA AND G.FTN_ID_FORMATO = A.FTN_ID_FORMATO
+                WHERE A.FTC_TIPO_AHORRO IN ('RET', 'VIV','VOL')
+                GROUP BY 
+                G.FCN_ID_EDOCTA,
+                A.FTN_ID_FORMATO,
+                G.FCN_NUMERO_CUENTA,
+                A.FTC_TIPO_AHORRO,
+                A.FTC_USUARIO_ALTA
+                HAVING SUM(cast(A.FTN_RENDIMIENTO as numeric(16,2))) <> 0
+                """)
+
+        reverso_df = reverso_df.union(anverso_cuatrimestral_df)
+
+        reverso_df.createOrReplaceTempView("reverso")
+
+        reverso_df = spark.sql("""
+        SELECT
+        ROW_NUMBER() OVER (
+            partition by
+                R.FCN_NUMERO_CUENTA,
+                R.FTN_ID_FORMATO,
+                R.FTC_SECCION
+            ORDER BY
+                CASE WHEN R.FTC_DESC_CONCEPTO LIKE 'Interés%' THEN 1
+                     WHEN R.FTC_DESC_CONCEPTO LIKE 'Intereses%' THEN 2
+                     WHEN R.FTC_DESC_CONCEPTO LIKE 'Comisión%' THEN 3
+                     WHEN R.FTC_DESC_CONCEPTO LIKE 'Rendimiento%' THEN 4
+                     ELSE 5
+                END,
+                R.FTD_FECHA_MOVIMIENTO ASC
+        ) AS FTN_ORDEN,
+        R.FCN_ID_EDOCTA,
+        R.FCN_NUMERO_CUENTA,
+        R.FTN_ID_CONCEPTO,
+        R.FTC_DESC_CONCEPTO,
+        R.FTC_SECCION,
+        R.FTD_FECHA_MOVIMIENTO,
+        R.FTN_SALARIO_BASE,
+        R.FTN_DIA_COTIZADO,
+        R.FTC_PERIODO_REFERENCIA,
+        R.FTN_MONTO,
+        R.FTD_FECHAHORA_ALTA,
+        R.FTC_USUARIO_ALTA
+        FROM reverso R
+        WHERE FTN_MONTO <> 0
+        """)
+
         anverso_df = spark.sql("""
-        SELECT A.*, G.FCN_ID_EDOCTA 
+        SELECT
+        cast(A.FCN_NUMERO_CUENTA as bigint) FCN_NUMERO_CUENTA,A.FTC_CONCEPTO_NEGOCIO,
+        A.FTF_APORTACION, A.FTN_RETIRO,A.FTN_COMISION,A.FTN_SALDO_ANTERIOR,
+        A.FTN_SALDO_FINAL,A.FTC_SECCION,A.FTN_VALOR_ACTUAL_PESO,
+        A.FTN_VALOR_ACTUAL_UDI,A.FTN_VALOR_NOMINAL_PESO,
+        A.FTN_VALOR_NOMINAL_UDI,A.FTC_TIPO_AHORRO,A.FTN_ORDEN_SDO,
+        A.FTC_USUARIO_ALTA,A.FTN_RENDIMIENTO, cast(G.FCN_ID_EDOCTA as bigint) FCN_ID_EDOCTA
         FROM anverso A
             INNER JOIN general G ON G.FCN_NUMERO_CUENTA = A.FCN_NUMERO_CUENTA AND G.FTN_ID_FORMATO = A.FTN_ID_FORMATO
         """).cache()
 
+
         anverso_df = anverso_df.drop(col("FTN_ID_FORMATO"))
         reverso_df = reverso_df.drop(col("FTN_ID_FORMATO"))
 
-
         print("reverso")
-        _write_spark_dataframe(reverso_df, configure_bigquery_spark, 'ESTADO_CUENTA.TTMUESTR_REVERSO')
+        _write_spark_dataframe(reverso_df, configure_postgres_spark, '"ESTADO_CUENTA"."TTMUESTR_REVERSO"')
         print("anverso")
-        _write_spark_dataframe(anverso_df, configure_bigquery_spark, 'ESTADO_CUENTA.TTMUESTR_ANVERSO')
+        _write_spark_dataframe(anverso_df, configure_postgres_spark, '"ESTADO_CUENTA"."TTMUESTR_ANVERSO"')
         print("general")
-        _write_spark_dataframe(general_df, configure_bigquery_spark, 'ESTADO_CUENTA.TTMUESTR_GENERAL')
+        _write_spark_dataframe(general_df, configure_postgres_spark, '"ESTADO_CUENTA"."TTMUESTR_GENERAL"')
 
         reverso_df.unpersist()
         anverso_df.unpersist()
@@ -960,19 +1067,21 @@ with define_extraction(phase, area, postgres_pool, bigquery_pool) as (postgres, 
               AND "FCN_ID_AREA" = :area
             """), {"term": term_id, "area": area})
 
-
-        response = requests.get(url)
-
-        # Verifica si la petición fue exitosa
-        if response.status_code == 200:
-            # Si la petición fue exitosa, puedes acceder al contenido de la respuesta de la siguiente manera:
-            content = response.content
-            print(content)
-        else:
-            # Si la petición no fue exitosa, puedes imprimir el código de estado para obtener más información
-            print(f"La solicitud no fue exitosa. Código de estado: {response.status_code}")
-
-        time.sleep(80)
+        for i in range(1000):
+            response = requests.get(url)
+            print(response)
+            # Verifica si la petición fue exitosa
+            if response.status_code == 200:
+                # Si la petición fue exitosa, puedes acceder al contenido de la respuesta de la siguiente manera:
+                content = response.content.decode('utf-8')
+                data = json.loads(content)
+                if data['data']['statusText'] == 'finalizado':
+                    break
+                time.sleep(8)
+            else:
+                # Si la petición no fue exitosa, puedes imprimir el código de estado para obtener más información
+                print(f"La solicitud no fue exitosa. Código de estado: {response.status_code}")
+                break
 
         notify(
             postgres,
@@ -980,7 +1089,7 @@ with define_extraction(phase, area, postgres_pool, bigquery_pool) as (postgres, 
             phase,
             area,
             term=term_id,
-            message="Se terminaron de generar las muestras de los estados de cuenta con éxito: por favor espere unos minutos",
+            message="Se terminaron de generar las muestras de los estados de cuenta con éxito",
             aprobar=False,
             descarga=False,
         )

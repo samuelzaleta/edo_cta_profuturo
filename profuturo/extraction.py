@@ -95,6 +95,7 @@ def update_indicator_spark(
         raise ProfuturoException("TABLE_SWITCH_ERROR", term) from e
 
 
+
 def extract_dataset(
     origin: Connection,
     destination: Connection,
@@ -212,6 +213,47 @@ def extract_dataset_write_view_spark(
 
         print("DONE VIEW")
 
+    except Exception as e:
+        raise ProfuturoException.from_exception(e, term) from e
+
+def extract_dataset_spark_return_df(
+        origin_configurator: SparkConnectionConfigurator,
+        query: Union[str, Compiled],
+        table: str,
+        term: int = None,
+        params: Dict[str, Any] = None,
+        limit: int = None,
+        transform: Callable[[SparkDataFrame], SparkDataFrame] = None,
+) -> object:
+    spark = _get_spark_session()
+
+    if isinstance(query, Compiled):
+        params = query.params
+        query = str(query)
+    if params is None:
+        params = {}
+    if limit is not None:
+        query = f"SELECT * FROM ({query}) WHERE ROWNUM <= :limit"
+        params["limit"] = limit
+
+    print(f"Extracting {table}...")
+
+    try:
+        print("Creating dataframe...")
+        df_sp = _create_spark_dataframe(spark, origin_configurator, query, params)
+        print("Done dataframe!")
+
+        if term:
+            df_sp = df_sp.withColumn("FCN_ID_PERIODO", lit(term))
+            print("Done adding period!")
+
+        if transform is not None:
+
+            df_sp = transform(df_sp)
+            print("Done transforming dataframe!")
+
+        print("Count:", df_sp.count())
+        return df_sp
     except Exception as e:
         raise ProfuturoException.from_exception(e, term) from e
 
@@ -365,7 +407,9 @@ def read_table_insert_temp_view(
     origin_configurator: SparkConnectionConfigurator,
     query: str,
     view: str,
-    params: Dict[str, Any] = None
+    params: Dict[str, Any] = None,
+    term: int = None,
+    transform: Callable[[SparkDataFrame], SparkDataFrame] = None,
 ):
     if params is None:
         params = {}
@@ -374,21 +418,38 @@ def read_table_insert_temp_view(
     print("EXTRACCIÓN")
     df = _create_spark_dataframe(spark, origin_configurator, query, params)
     print("DONE")
+
+    if term:
+        print("Adding period...")
+        df = df.withColumn("FCN_ID_PERIODO", lit(term))
+        print("Done adding period!")
+
+    if transform is not None:
+        print("Transforming dataframe...")
+        df = transform(df)
+        print("Done transforming dataframe!")
+
     df.createOrReplaceTempView(view)
     print("DONE VIEW:",view)
     df.show(2)
-    print(df.count())
 
 
-def _get_spark_session() -> SparkSession:
+def _get_spark_session(
+    excuetor_memory: str = '4g',
+    memory_overhead: str ='1g',
+    memory_offhead: str ='1g',
+    driver_memory: str ='1g',
+    intances: int = 2,
+    parallelims :int = 6000
+) -> SparkSession:
     return SparkSession.builder \
-        .master('local[*]') \
         .appName("profuturo") \
-        .config("spark.executor.memory", "24g") \
-        .config("spark.executor.memoryOverhead", "8g") \
-        .config("spark.driver.memory", "24g") \
-        .config("spark.executor.instances", "5") \
-        .config("spark.default.parallelism", "900") \
+        .config("spark.executor.memory", f"{excuetor_memory}") \
+        .config("spark.executor.memoryOverhead", f"{memory_overhead}") \
+        .config("spark.executor.memoryOffHeap", f"{memory_offhead}") \
+        .config("spark.driver.memory", f"{driver_memory}") \
+        .config("spark.executor.instances", f"{intances}") \
+        .config("spark.default.parallelism", f"{parallelims}") \
         .getOrCreate()
 
 
@@ -410,7 +471,7 @@ def _write_spark_dataframe(
 ) -> None:
     connection_configurator(df.write, table, False) \
         .mode(mode) \
-        .option("numRowsPerSparkPartition", 20000) \
+        .option("numRowsPerSparkPartition", 40_000) \
         .option("compression", "snappy") \
         .save()
 
