@@ -27,7 +27,13 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
     term_id = term["id"]
     start_month = term["start_month"]
     end_month = term["end_month"]
-    spark = _get_spark_session()
+    spark = _get_spark_session(
+    excuetor_memory = '8g',
+    memory_overhead ='1g',
+    memory_offhead ='1g',
+    driver_memory ='1g',
+    intances = 4,
+    parallelims = 8000)
 
     with register_time(postgres_pool, phase, term_id, user, area):
         truncate_table(postgres, 'TTHECHOS_RETIRO', term=term_id)
