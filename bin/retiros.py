@@ -28,7 +28,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
     start_month = term["start_month"]
     end_month = term["end_month"]
     spark = _get_spark_session(
-    excuetor_memory = '8g',
+    excuetor_memory = '10g',
     memory_overhead ='1g',
     memory_offhead ='1g',
     driver_memory ='1g',
