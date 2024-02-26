@@ -21,7 +21,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
     start_month = term["start_month"]
     end_month = term["end_month"]
     spark = _get_spark_session(
-        excuetor_memory='8g',
+        excuetor_memory='12g',
         memory_overhead='1g',
         memory_offhead='1g',
         driver_memory='2g',
@@ -64,11 +64,12 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
             FTC_AP_PATERNO,
             FTC_AP_MATERNO,
             FTC_CALLE,
+            FTC_ASENTAMIENTO,
             TRIM(CONCAT(CONCAT(NUMEROEXTERIOR,' '),NUMEROINTERIOR)) AS FTC_NUMERO,
             FTC_COLONIA,
             FTC_DELEGACION,
             FTC_MUNICIPIO,
-            FTN_CODIGO_POSTAL,
+            FTC_CODIGO_POSTAL,
             FTC_ENTIDAD_FEDERATIVA,
             FTC_NSS,
             FTC_CURP,
@@ -80,6 +81,10 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                PF.NOMBRE AS FTC_NOMBRE,
                PF.APELLIDOPATERNO AS FTC_AP_PATERNO,
                PF.APELIDOMATERNO AS FTC_AP_MATERNO,
+               CASE 
+               WHEN DI.ASENTAMIENTO IS NULL THEN ASE.NOMBRE 
+               ELSE DI.ASENTAMIENTO
+               END FTC_ASENTAMIENTO, 
                DI.CALLE AS FTC_CALLE,
                CASE 
                WHEN DI.NUMEROEXTERIOR IS NOT NULL THEN DI.NUMEROEXTERIOR
@@ -92,7 +97,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                ASE.NOMBRE AS FTC_COLONIA,
                CD.NOMBRE AS FTC_DELEGACION,
                M.NOMBRE AS FTC_MUNICIPIO,
-               CAST(CP.CODIGOPOSTAL AS INTEGER) AS FTN_CODIGO_POSTAL,
+               CP.CODIGOPOSTAL AS FTC_CODIGO_POSTAL,
                E.NOMBRE AS FTC_ENTIDAD_FEDERATIVA,
                NSS.VALOR_IDENTIFICADOR AS FTC_NSS,
                CURP.VALOR_IDENTIFICADOR AS FTC_CURP,
@@ -323,7 +328,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
         SELECT
         P.FTN_NUM_CTA_INVDUAL AS FCN_CUENTA,
         CASE WHEN SUBSTR(C.FCC_VALOR,6,7) = 'BI' then 'Inicial'
-             WHEN SUBSTR(C.FCC_VALOR,6,7) = 'BP' then 'De Pension'
+             WHEN SUBSTR(C.FCC_VALOR,6,7) = 'BP' then 'De Pensiones'
              ELSE SUBSTR(C.FCC_VALOR, 6, 7) || '-' || TO_CHAR(CAST(SUBSTR(C.FCC_VALOR, 6, 7) AS INT) + 4)
              END FCC_VALOR
         FROM TTAFOGRAL_OSS P
@@ -349,7 +354,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
         df = spark.sql(f"""
         SELECT 
                DISTINCT 
-               o.FCN_CUENTA,
+               c.FTN_CUENTA as FCN_CUENTA,
                {term_id} AS FCN_ID_PERIODO,
                coalesce(cast(p.FCC_VALOR AS BOOLEAN), false) AS FTB_PENSION, 
                t.FCC_VALOR AS  FTC_TIPO_CLIENTE,
@@ -360,15 +365,15 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                tp.FCC_VALOR AS FTC_TIPO_PENSION,
                i.FCC_VALOR AS FTC_PERFIL_INVERSION
                --JSON_OBJECT('Vigencia', v.FCC_VALOR, 'Generacion', g.FCC_VALOR) AS FTO_INDICADORES
-        FROM indicador_generacion g
-            LEFT JOIN indicador_origen o ON g.FCN_CUENTA = o.FCN_CUENTA
-            LEFT JOIN indicador_tipo_cliente t ON o.FCN_CUENTA = t.FCN_CUENTA
-            LEFT JOIN indicador_pension p ON o.FCN_CUENTA = p.FCN_CUENTA
-            LEFT JOIN indicador_vigencia v ON o.FCN_CUENTA = v.FCN_CUENTA
-            LEFT JOIN indicador_bono b ON o.FCN_CUENTA = b.FCN_CUENTA
-            LEFT JOIN indicador_tipo_pension tp ON o.FCN_CUENTA = p.FCN_CUENTA
-            LEFT JOIN indicador_perfil_inversion i ON o.FCN_CUENTA = i.FCN_CUENTA
-        WHERE o.FCN_CUENTA IN (SELECT DISTINCT FTN_CUENTA FROM cliente)
+        FROM cliente c
+            LEFT JOIN indicador_generacion g ON c.FTN_CUENTA = g.FCN_CUENTA
+            LEFT JOIN indicador_origen o ON c.FTN_CUENTA = o.FCN_CUENTA
+            LEFT JOIN indicador_tipo_cliente t ON c.FTN_CUENTA = t.FCN_CUENTA
+            LEFT JOIN indicador_pension p ON c.FTN_CUENTA= p.FCN_CUENTA
+            LEFT JOIN indicador_vigencia v ON c.FTN_CUENTA= v.FCN_CUENTA
+            LEFT JOIN indicador_bono b ON c.FTN_CUENTA = b.FCN_CUENTA
+            LEFT JOIN indicador_tipo_pension tp ON c.FTN_CUENTA = p.FCN_CUENTA
+            LEFT JOIN indicador_perfil_inversion i ON c.FTN_CUENTA = i.FCN_CUENTA
         """)
         #df = df.withColumn("FTO_INDICADORES", to_json(struct(lit('{}'))))
 

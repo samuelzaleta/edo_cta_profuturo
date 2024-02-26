@@ -126,7 +126,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
         DISTINCT
         1 AS "NUMERO_SECCION",
         "FCN_NUMERO_CUENTA",
-        "FCN_FOLIO",
+        null as "FCN_FOLIO",
         "FTC_NOMBRE_COMPLETO",
         "FTC_CALLE_NUMERO",
         "FTC_COLONIA",
@@ -151,7 +151,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
         "FTN_PENSION_MENSUAL",
         "FTC_TIPO_TRABAJADOR",
         "FTC_FORMATO" --TO_DO CAMBIAR POR PERIODICIDAD DE FOMRATO
-        FROM "ESTADO_CUENTA"."TTEDOCTA_GENERAL_TEST" G
+        FROM "ESTADO_CUENTA"."TTMUESTR_GENERAL" G
         LEFT JOIN "ESTADO_CUENTA"."TTEDOCTA_CLIENTE_INDICADOR" I
         ON "FCN_NUMERO_CUENTA" = "FCN_CUENTA"
         WHERE -- "FTB_IMPRESION" = TRUE
@@ -171,12 +171,17 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
 
         query_anverso = f"""
         SELECT 
+        *
+        FROM (
+        SELECT 
         DISTINCT
         CASE
         WHEN "FTC_SECCION" = 'SDO' THEN 4
         WHEN "FTC_SECCION" IN( 'AHO', 'PEN') THEN 2
         WHEN "FTC_SECCION" = 'BON' THEN 3
         END  "NUMERO_SECCION",
+        "FTC_SECCION",
+        "FTN_ORDEN_SDO",
         "FCN_NUMERO_CUENTA",
         "FTC_CONCEPTO_NEGOCIO",
         "FTN_SALDO_ANTERIOR",
@@ -198,7 +203,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
         WHEN "FTC_SECCION" = 'SDO' AND "FTC_CONCEPTO_NEGOCIO" LIKE '%VEJEZ%' THEN 'IMSSCE'
         WHEN "FTC_SECCION" = 'SDO' AND "FTC_CONCEPTO_NEGOCIO" LIKE '%ISSSTE 2008%' THEN 'ISSSTE08'
         END "GRUPO_CONCEPTO"
-        FROM "ESTADO_CUENTA"."TTEDOCTA_ANVERSO_TEST" A
+        FROM "ESTADO_CUENTA"."TTMUESTR_ANVERSO" A
         LEFT JOIN "ESTADO_CUENTA"."TTEDOCTA_CLIENTE_INDICADOR" I
         ON "FCN_NUMERO_CUENTA" = "FCN_CUENTA"
         WHERE --"FTB_IMPRESION" = TRUE
@@ -207,6 +212,8 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
         --AND I."FCN_ID_PERIODO" = :term
         --AND 
         "FCN_NUMERO_CUENTA" IN {cuentas}
+        ) X
+        ORDER BY "FCN_NUMERO_CUENTA", "FTC_SECCION", "FTN_ORDEN_SDO"
         """
         anverso_df =_create_spark_dataframe(spark, configure_postgres_spark, query_anverso,params={"term": term_id, "start": start_month, "end": end_month, "user": str(user)})
 
@@ -345,7 +352,8 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
             part += 1
 
         query_reverso = f"""
-                        SELECT * FROM "ESTADO_CUENTA"."TTEDOCTA_REVERSO_TEST"  WHERE "FCN_NUMERO_CUENTA" IN {cuentas}
+                        SELECT * FROM (SELECT DISTINCT * FROM "ESTADO_CUENTA"."TTMUESTR_REVERSO"  WHERE "FCN_NUMERO_CUENTA" IN {cuentas}) X
+                        ORDER BY  "FCN_NUMERO_CUENTA", "FTC_SECCION", "FTN_ORDEN"
                                         """
         read_table_insert_temp_view(
             configure_postgres_spark,
@@ -380,13 +388,13 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
 
         num_parts_reverso = math.ceil(total / partition_size)
 
-        reverso_data = process_dataframe(df_reverso_general.fillna("").fillna(0), 1)
+        reverso_data = process_dataframe(df_reverso_general.fillna("").fillna(""), 1)
         print("DATOS PROCESADOS REVERSO")
 
         for part in range(1, num_parts_reverso + 1):
             if len(reverso_data) < partition_size:
                 reverso_data_part = reverso_data
-                res = "\n".join("|".join(str(item) for item in row) for row in reverso_data_part)
+                res = "\n".join("|".join(str(item) if item is not None else '' for item in row) for row in reverso_data_part)
                 reverso_final_row = f"\n2|{ret}|{vol}|{viv}|{total}"
                 res = res + reverso_final_row
             else:
