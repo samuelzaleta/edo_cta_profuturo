@@ -23,7 +23,13 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
     end_month_anterior = term["end_saldos_anterior"]
     valor_accion_anterior = term["valor_accion_anterior"]
     print(end_month_anterior, valor_accion_anterior)
-    spark = _get_spark_session()
+    spark = _get_spark_session(
+        excuetor_memory='8g',
+        memory_overhead='1g',
+        memory_offhead='1g',
+        driver_memory='2g',
+        intances=4,
+        parallelims=8000)
 
     with register_time(postgres_pool, phase, term_id, user, area):
         all_user = """

@@ -30,7 +30,7 @@ url = os.getenv("URL_MUESTRAS_RECA")
 print(url)
 
 decimal_pesos = DecimalType(16, 2)
-decimal_udi = DecimalType(16, 2)
+decimal_udi = DecimalType(16, 6)
 
 cuentas = (10000851,10000861,10000868,10000872,1330029515,1350011161,1530002222,1700004823,3070006370,3200089837,
            3200231348,3200534369,3201895226,3201900769,3202077144,3202135111,3300118473,3300576485,3300797221,3300809724,
@@ -57,9 +57,16 @@ cuentas = (10000851,10000861,10000868,10000872,1330029515,1350011161,1530002222,
            10001019,10001020,10001021,10001023,10001024,10001025,10001026,10001027,10001029,10001030,10001031,10001032,
            10001033,10001034,10001035,10001036,10001037,10001038,10001039,10001040
            )
-cuentas = (1330029515,1350011161,1530002222,3070006370,
-           3200089837,3200474366,3200534369,3200767640,
-           3200840759,3201096947,3201292580,3201900769)
+cuentas = (1530002222,1700004823,3070006370,3200089837,3200231348,3200474366,
+3200534369,3200767640,3200840759,3200976872,3200996343,
+3201096947,3201292580,3201368726,3201423324,3201693866,
+3201895226,3201900769,3202077144,8052970237,
+3202135111,3300118473,3300576485,3300780661,
+3300797020,3300797221,3300809724,3400764001,
+3400958595,3500053269,3500058618,6120000991,
+6130000050,6442107959,6442128265,6449009395,
+6449015130,8051533577,8052710429
+)
 def get_buckets():
     buckets = storage_client.list_buckets()
 
@@ -70,7 +77,7 @@ def get_buckets():
 bucket = storage_client.get_bucket(get_buckets())
 
 def str_to_gcs(data, name):
-    blob = bucket.blob(f"correspondencia/{name}")
+    blob = bucket.blob(f"correspondenciaReca/{name}")
     blob.upload_from_string(data.encode("iso_8859_1"), content_type="text/plain")
     print(F"SE CREO EL ARCHIVO DE correspondencia/{name}")
 
@@ -101,7 +108,14 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
     term_id = term["id"]
     start_month = term["start_month"]
     end_month = term["end_month"]
-    spark = _get_spark_session()
+    spark = _get_spark_session(
+    excuetor_memory = '8g',
+    memory_overhead ='1g',
+    memory_offhead ='1g',
+    driver_memory ='4g',
+    intances = 4,
+    parallelims = 9000)
+
     spark.conf.set("spark.sql.shuffle.partitions", 100)
     spark.conf.set("spark.default.parallelism", 100)
 
