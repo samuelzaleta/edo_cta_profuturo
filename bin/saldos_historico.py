@@ -66,7 +66,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
     print(inicio, hoy)
 
     #saldosDFfile = spark.read.text("gs://dataproc-spark-dev/SALDOSTDF_PESOS_file.TXT")
-    saldosDFfile = spark.read.text("gs://cargas_historico/SALDOSTDF_PESOS_file.TXT")
+    saldosDFfile = spark.read.text("gs://file_historico/SALDOSTDF_PESOS_file.TXT")
 
     #saldosDFfile.show(2)
 
