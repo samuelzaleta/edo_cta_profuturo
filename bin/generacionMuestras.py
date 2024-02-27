@@ -580,7 +580,8 @@ with define_extraction(phase, area, postgres_pool, bigquery_pool) as (postgres, 
         anverso_df = _create_spark_dataframe(spark, configure_postgres_spark, f"""
         WITH data as (
         SELECT
-        DISTINCT F."FCN_ID_FORMATO_ESTADO_CUENTA" AS "FTN_ID_FORMATO", M."FCN_CUENTA" AS "FCN_NUMERO_CUENTA",
+        DISTINCT 
+        F."FCN_ID_FORMATO_ESTADO_CUENTA" AS "FTN_ID_FORMATO", M."FCN_CUENTA" AS "FCN_NUMERO_CUENTA",
         M."FCN_ID_PERIODO",M."FCN_CUENTA", F."FCN_ID_GENERACION", F."FCN_ID_INDICADOR_CLIENTE",F."FCN_ID_INDICADOR_AFILIACION",
         F."FCN_ID_INDICADOR_BONO"
         FROM "GESTOR"."TTGESPRO_CONFIGURACION_FORMATO_ESTADO_CUENTA" F
@@ -664,6 +665,7 @@ with define_extraction(phase, area, postgres_pool, bigquery_pool) as (postgres, 
         :user AS "FTC_USUARIO_ALTA"
         FROM (
         SELECT
+        DISTINCT
         D."FCN_NUMERO_CUENTA",
         D."FTN_ID_FORMATO",
         C."FTC_DES_CONCEPTO" AS "FTC_CONCEPTO_NEGOCIO",
@@ -811,6 +813,7 @@ with define_extraction(phase, area, postgres_pool, bigquery_pool) as (postgres, 
         :user AS "FTC_USUARIO_ALTA"
         FROM (
         SELECT
+        DISTINCT
         D."FCN_NUMERO_CUENTA",
         D."FTN_ID_FORMATO",
         C."FTC_DES_CONCEPTO" AS "FTC_CONCEPTO_NEGOCIO",
