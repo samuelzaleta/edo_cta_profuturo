@@ -1,18 +1,26 @@
-from profuturo.common import define_extraction, register_time, notify
+from profuturo.common import define_extraction, register_time, notify, truncate_table
 from profuturo.database import get_postgres_pool, configure_postgres_spark
 from profuturo.extraction import _write_spark_dataframe, extract_terms, _get_spark_session, _create_spark_dataframe
 from pyspark.sql.functions import concat, col, row_number, lit, lpad
-import pyspark.sql.functions as F
+from pyspark.sql.types import StringType, StructType, StructField, IntegerType
+from concurrent.futures import ThreadPoolExecutor
+from google.cloud import storage, bigquery
 from pyspark.sql.window import Window
 from profuturo.env import load_env
 from sqlalchemy import text
-import sys
+from io import BytesIO
+from PIL import Image
+import pyspark.sql.functions as F
+import requests
 import random
 import string
+import json
+import sys
 import os
 
 load_env()
 postgres_pool = get_postgres_pool()
+storage_client = storage.Client()
 phase = int(sys.argv[1])
 user = int(sys.argv[3])
 area = int(sys.argv[4])
@@ -20,10 +28,14 @@ bucket_name = os.getenv("BUCKET_DEFINITIVO")
 bucket_coldline = os.getenv("BUCKET_COLDLINE")
 bucket_archive = os.getenv("BUCKET_NEARLINE")
 print(bucket_name)
-prefix =f"{os.getenv('PREFIX_DEFINITIVO')}"
-print(prefix)
+prefix_definitivos =f"{os.getenv('PREFIX_DEFINITIVO')}"
+prefix =f"{os.getenv('PREFIX_BLOB')}"
+print(prefix_definitivos)
 url = os.getenv("URL_DEFINITIVO_RECA")
 print(url)
+prefix_term_id = (prefix + '_'+ sys.argv[2])
+print(prefix_term_id)
+
 cuentas = (10000851,10000861,10000868,10000872,1330029515,1350011161,1530002222,1700004823,3070006370,3200089837,
            3200231348,3200534369,3201895226,3201900769,3202077144,3202135111,3300118473,3300576485,3300797221,3300809724,
            3400764001,3500053269,3500058618,6120000991,6442107959,6442128265,6449009395,6449015130,10000884,10000885,
@@ -49,16 +61,140 @@ cuentas = (10000851,10000861,10000868,10000872,1330029515,1350011161,1530002222,
            10001019,10001020,10001021,10001023,10001024,10001025,10001026,10001027,10001029,10001030,10001031,10001032,
            10001033,10001034,10001035,10001036,10001037,10001038,10001039,10001040)
 
+cuentas = (3202077144,3500053269) #,3500053269,6442107959, 10000915, 3070006370,3202077144)
+
+def upload_to_gcs(row):
+    id_value = row["id"]
+    bytea_data = row["fto_imagen"]
+
+    # Convertir bytes a imagen
+    image = Image.open(BytesIO(bytea_data))
+
+    # Guardar imagen localmente (opcional)
+    # image.save(f"local/{id_value}.png")
+
+    # Subir imagen a GCS
+    blob_name = f"{prefix_term_id}/{id_value}.png"
+
+    storage_client = storage.Client()
+    bucket = storage_client.bucket(bucket_name)
+    blob = bucket.blob(blob_name)
+
+    # Convertir imagen a bytes antes de subirla
+    byte_stream = BytesIO()
+    image.save(byte_stream, format="PNG")
+    byte_stream.seek(0)
+
+    blob.upload_from_file(byte_stream, content_type="image/png")
+
+def delete_all_objects(bucket_name, prefix):
+    # Crea una instancia del cliente de Cloud Storage
+    storage_client = storage.Client()
+
+    # Obtiene el bucket
+    bucket = storage_client.bucket(bucket_name)
+
+    # Lista todos los objetos en el bucket con el prefijo especificado
+    blobs = bucket.list_blobs(prefix=prefix)
+
+    # Elimina cada objeto
+    for blob in blobs:
+        #print(f"Eliminando objeto: {blob.name}")
+        blob.delete()
+
+def get_blob_info(bucket_name, prefix):
+    # Crea una instancia del cliente de Cloud Storage
+    storage_client = storage.Client()
+
+    # Obtiene el bucket
+    bucket = storage_client.bucket(bucket_name)
+
+    # Lista todos los objetos en el bucket con el prefijo especificado
+    blobs = bucket.list_blobs(prefix=prefix)
+
+    # Lista para almacenar información de blobs
+    blob_info_list = []
+
+    # Recorre todos los blobs y obtiene información
+    for blob in blobs:
+        # Divide el nombre del blob en partes usando '-'
+        parts = blob.name.split('-')
+
+        # Asegúrate de que haya al menos tres partes en el nombre
+        if len(parts) == 4:
+            # Obtiene la información de id, formato y área
+            blob_info = {
+                "FTC_POSICION_PDF": parts[0].split('/')[1],
+                "FCN_ID_FORMATO_EDOCTA": int(parts[1]),
+                "FCN_ID_AREA": int(parts[2].split('.')[0]),
+                "FTC_URL_IMAGEN": f"https://storage.cloud.google.com/{bucket_name}/{blob.name}",
+                "FTC_IMAGEN": f"{blob.name}",
+                "FTC_SIEFORE": parts[3].split('.')[0] if parts[3].split('.')[0] != 'sinsiefore' else None
+            }
+
+            blob_info_list.append(blob_info)
+
+        if len(parts) > 4:
+            # Obtiene la información de id, formato y área
+            blob_info = {
+                "FTC_POSICION_PDF": parts[0].split('/')[1],
+                "FCN_ID_FORMATO_EDOCTA": int(parts[1]),
+                "FCN_ID_AREA": int(parts[2].split('.')[0]),
+                "FTC_URL_IMAGEN": f"https://storage.cloud.google.com/{bucket_name}/{blob.name}",
+                "FTC_IMAGEN": f"{blob.name}",
+                "FTC_SIEFORE": f"{parts[3]}-{parts[4].split('.')[0]}"
+            }
+
+            blob_info_list.append(blob_info)
+
+    return blob_info_list
+
+def move_blob(source_bucket, destination_bucket, source_blob_name, destination_blob_name):
+    source_blob = source_bucket.blob(source_blob_name)
+    destination_blob = destination_bucket.blob(destination_blob_name)
+
+    # Copiar el blob del bucket fuente al bucket de destino
+    destination_blob.rewrite(source_blob)
+
+def move_files_parallel(source_bucket_name, destination_bucket_name, source_prefix="", destination_prefix="", num_threads=10):
+    # Inicializa los clientes de almacenamiento
+    source_client = storage.Client()
+    destination_client = storage.Client()
+    print("\n",source_bucket_name)
+    print(destination_bucket_name)
+    # Obtén los buckets
+    source_bucket = source_client.get_bucket(source_bucket_name)
+    destination_bucket = destination_client.get_bucket(destination_bucket_name)
+
+    # Lista todos los archivos en el bucket fuente con el prefijo dado
+    blobs = source_bucket.list_blobs(prefix=source_prefix)
+
+    # Usa ThreadPoolExecutor para ejecutar la copia de blobs en paralelo
+    with ThreadPoolExecutor(max_workers=num_threads) as executor:
+        futures = []
+
+        for blob in blobs:
+            # Crear el nombre del blob de destino con el prefijo de destino
+            destination_blob_name = destination_prefix + blob.name[len(source_prefix):]
+            futures.append(executor.submit(move_blob, source_bucket, destination_bucket, blob.name, destination_blob_name))
+
+        # Espera a que todos los hilos hayan completado
+        for future in futures:
+            future.result()
+
+    print("Movimiento de archivos completado")
+
+
 with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, _):
     term = extract_terms(postgres, phase)
     term_id = term["id"]
     start_month = term["start_month"]
     end_month = term["end_month"]
     spark = _get_spark_session(
-    excuetor_memory = '13g',
+    excuetor_memory = '16g',
     memory_overhead ='1g',
     memory_offhead ='1g',
-    driver_memory ='1g',
+    driver_memory ='2g',
     intances = 4,
     parallelims = 18000)
     spark.conf.set("spark.sql.files.maxPartitionBytes", "256m")
@@ -67,6 +203,48 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
 
 
     with register_time(postgres_pool, phase, term_id, user, area):
+
+        ###########################  IMAGENES   #################################################
+        truncate_table(postgres, 'TTEDOCTA_IMAGEN')
+
+        delete_all_objects(bucket_name, prefix_term_id)
+
+        move_files_parallel(bucket_name, bucket_name, source_prefix="profuturo-archivos",destination_prefix=prefix_term_id)
+
+        query = """
+                       SELECT
+                       DISTINCT
+                       concat("FTC_CODIGO_POSICION_PDF",'-',tcie."FCN_ID_FORMATO_ESTADO_CUENTA",'-', ra."FCN_ID_AREA",'-',COALESCE(tcie."FTC_DESCRIPCION_SIEFORE",'sinsiefore')) AS ID,"FTO_IMAGEN" AS FTO_IMAGEN
+                       FROM "GESTOR"."TTGESPRO_CONFIG_IMAGEN_EDOCTA" tcie
+                       INNER JOIN "GESTOR"."TTGESPRO_ROL_USUARIO" ru ON CAST(tcie."FTC_USUARIO" AS INT) = ru."FCN_ID_USUARIO"
+                       INNER JOIN "GESTOR"."TCGESPRO_ROL_AREA" ra ON ru."FCN_ID_ROL" =  ra."FCN_ID_ROL"
+                       """
+
+        imagenes_df = _create_spark_dataframe(spark, configure_postgres_spark, query,
+                                              params={"term": term_id, "start": start_month, "end": end_month,
+                                                      "user": str(user)})
+
+        imagenes_df.show()
+
+        imagenes_df.foreach(upload_to_gcs)
+
+        # Obtiene la información del blob
+        blob_info_list = get_blob_info(bucket_name, prefix)
+
+        schema = StructType([
+            StructField("FTC_POSICION_PDF", StringType(), True),
+            StructField("FCN_ID_FORMATO_EDOCTA", IntegerType(), True),
+            StructField("FCN_ID_AREA", IntegerType(), True),
+            StructField("FTC_URL_IMAGEN", StringType(), True),
+            StructField("FTC_IMAGEN", StringType(), True),
+            StructField("FTC_SIEFORE", StringType(), True)
+        ])
+
+        df = spark.createDataFrame(blob_info_list, schema=schema)
+
+        _write_spark_dataframe(df, configure_postgres_spark, '"ESTADO_CUENTA"."TTEDOCTA_IMAGEN"')
+
+        ########################## GENERACIÓN DE MUESTRAS #################################################
 
         print("truncate general")
         postgres.execute(text("""TRUNCATE TABLE "ESTADO_CUENTA"."TTEDOCTA_GENERAL_TEST"  """), {'end': end_month})
@@ -90,6 +268,11 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
         INNER JOIN "GESTOR"."TCGESPRO_PERIODO" T ON to_date(T."FTC_PERIODO", 'MM/YYYY') BETWEEN :start - INTERVAL '1 month' * PA."FTN_MESES" AND :end
         GROUP BY "FTN_ID_CONFIGURACION_FORMATO_ESTADO_CUENTA"
         )
+        SELECT DISTINCT 
+        "FCN_CUENTA", "FCN_ID_PERIODO", "FTF_MONTO_PESOS","FTN_SUA_DIAS_COTZDOS_BIMESTRE",
+        "FTN_SUA_ULTIMO_SALARIO_INT_PER","FTD_FEH_LIQUIDACION", "FCN_ID_CONCEPTO_MOVIMIENTO",
+        "FTC_SUA_RFC_PATRON","TIPO_SUBCUENA", "FTN_MONPES"
+        FROM (
         SELECT
         R."FCN_CUENTA", R."FCN_ID_PERIODO", R."FTF_MONTO_PESOS",
         R."FTN_SUA_DIAS_COTZDOS_BIMESTRE",R."FTN_SUA_ULTIMO_SALARIO_INT_PER",
@@ -117,6 +300,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
         ON SB."FTN_ID_TIPO_SUBCTA" = R."SUBCUENTA"
         INNER JOIN periodos ON R."FCN_ID_PERIODO" BETWEEN periodos.PERIODO_INICIAL AND periodos.PERIODO_FINAL
         WHERE R."CSIE1_NUMCUE" IN {cuentas}
+        ) X
         """, {"term": term_id, "start": start_month, "end": end_month, "user": str(user)})
 
         spark.sql("DROP TABLE IF EXISTS TTHECHOS_MOVIMIENTO")
@@ -126,6 +310,8 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
             .option("mode", "append") \
             .option("compression", "snappy") \
             .saveAsTable("TTHECHOS_MOVIMIENTO")
+
+        spark.sql(""" select  * from TTHECHOS_MOVIMIENTO """).show(60)
 
         rendimiento_df = _create_spark_dataframe(spark, configure_postgres_spark, f"""
         WITH periodos AS (
@@ -153,8 +339,11 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
             .option("compression", "snappy") \
             .saveAsTable("TTCALCUL_RENDIMIENTO")
 
+        spark.sql(""" select  * from TTCALCUL_RENDIMIENTO WHERE FCN_ID_PERIODO = 202304 order by FCN_CUENTA """).show(80)
+
         dataset_df = _create_spark_dataframe(spark, configure_postgres_spark, f"""
         SELECT
+        DISTINCT
         I."FCN_CUENTA", I."FCN_ID_PERIODO", I."FTB_PENSION", I."FTC_TIPO_CLIENTE", I."FTC_ORIGEN",
         I."FTC_VIGENCIA",I."FTC_GENERACION", I."FTB_BONO", I."FTC_TIPO_PENSION", I."FTC_PERFIL_INVERSION",
         F."FCN_ID_GENERACION" AS "FTN_ID_GRUPO_SEGMENTACION",F."FCN_ID_GENERACION",
@@ -211,6 +400,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                 AND F."FTB_ESTATUS" = true AND I."FCN_CUENTA" IN {cuentas}
         UNION ALL
         SELECT
+        DISTINCT
         I."FCN_CUENTA", I."FCN_ID_PERIODO", I."FTB_PENSION", I."FTC_TIPO_CLIENTE", I."FTC_ORIGEN",
         I."FTC_VIGENCIA",I."FTC_GENERACION", I."FTB_BONO", I."FTC_TIPO_PENSION", I."FTC_PERFIL_INVERSION",
         F."FCN_ID_GENERACION" AS "FTN_ID_GRUPO_SEGMENTACION",F."FCN_ID_GENERACION",
@@ -244,16 +434,17 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
         AND F."FTB_ESTATUS" = true AND I."FCN_CUENTA" IN {cuentas}
         """, {"term": term_id, "start": start_month, "end": end_month, "user": str(user)})
         print("DATASET")
-        print(dataset_df.count())
+        dataset_df.show()
 
         dataset_df.write.format("parquet").partitionBy("FTC_GENERACION","FTN_ID_FORMATO").mode("overwrite").save(
-            f"gs://{bucket_name}/{prefix}/dataset.parquet")
+            f"gs://{bucket_name}/{prefix_definitivos}/dataset.parquet")
 
         clientes_maestros_df = _create_spark_dataframe(spark, configure_postgres_spark, f"""
         SELECT
+        DISTINCT
         "FTN_CUENTA" as "FCN_CUENTA", "FTC_NOMBRE", "FTC_AP_PATERNO", "FTC_AP_MATERNO",
         "FTC_CALLE", "FTC_NUMERO", "FTC_COLONIA", 
-        "FTC_DELEGACION", "FTN_CODIGO_POSTAL",
+        concat_ws(' ',"FTC_DELEGACION", "FTC_MUNICIPIO") as "FTC_DELEGACION", "FTN_CODIGO_POSTAL",
         "FTC_ENTIDAD_FEDERATIVA", "FTC_NSS",
         "FTC_RFC", "FTC_CURP", "FTC_MUNICIPIO",
         "FTC_CORREO", "FTC_TELEFONO"
@@ -268,7 +459,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
         """, {"term": term_id})
 
         clientes_pension_df.write.format("parquet").partitionBy("FTC_TIPO_PENSION").mode("overwrite").save(
-            f"gs://{bucket_name}/{prefix}/TCDATMAE_PENSION.parquet")
+            f"gs://{bucket_name}/{prefix_definitivos}/TCDATMAE_PENSION.parquet")
         print("clientes_pension_df")
 
         indicador_cuenta_df = _create_spark_dataframe(spark, configure_postgres_spark, f"""
@@ -302,13 +493,13 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
         print("periodos_anverso_df")
 
         periodos_anverso_cuatrimestral_df = _create_spark_dataframe(spark, configure_postgres_spark, f"""
-                SELECT F."FCN_ID_FORMATO_ESTADO_CUENTA", min(T."FTN_ID_PERIODO") AS PERIODO_INICIAL, max(T."FTN_ID_PERIODO") AS PERIODO_FINAL
-                FROM "GESTOR"."TTGESPRO_CONFIGURACION_FORMATO_ESTADO_CUENTA" F
-                INNER JOIN "GESTOR"."TCGESPRO_CONFIGURACION_ANVERSO" A ON F."FCN_ID_GENERACION" = A."FCN_GENERACION"
-                INNER JOIN "GESTOR"."TCGESPRO_PERIODICIDAD" P ON F."FCN_ID_PERIODICIDAD_GENERACION" = P."FTN_ID_PERIODICIDAD" AND mod(extract(MONTH FROM :end), P."FTN_MESES") = 0
-                INNER JOIN "GESTOR"."TCGESPRO_PERIODICIDAD" PA ON F."FCN_ID_PERIODICIDAD_REVERSO" = PA."FTN_ID_PERIODICIDAD"
-                INNER JOIN "GESTOR"."TCGESPRO_PERIODO" T ON to_date(T."FTC_PERIODO", 'MM/YYYY') BETWEEN :end - INTERVAL '1 month' * PA."FTN_MESES" AND :end
-                GROUP BY "FTN_ID_CONFIGURACION_FORMATO_ESTADO_CUENTA"
+        SELECT DISTINCT F."FCN_ID_FORMATO_ESTADO_CUENTA", min(T."FTN_ID_PERIODO") AS PERIODO_INICIAL, max(T."FTN_ID_PERIODO") AS PERIODO_FINAL
+        FROM "GESTOR"."TTGESPRO_CONFIGURACION_FORMATO_ESTADO_CUENTA" F
+        INNER JOIN "GESTOR"."TCGESPRO_CONFIGURACION_ANVERSO" A ON F."FCN_ID_GENERACION" = A."FCN_GENERACION"
+        INNER JOIN "GESTOR"."TCGESPRO_PERIODICIDAD" P ON F."FCN_ID_PERIODICIDAD_GENERACION" = P."FTN_ID_PERIODICIDAD" AND mod(extract(MONTH FROM :end), P."FTN_MESES") = 0
+        INNER JOIN "GESTOR"."TCGESPRO_PERIODICIDAD" PA ON F."FCN_ID_PERIODICIDAD_REVERSO" = PA."FTN_ID_PERIODICIDAD"
+        INNER JOIN "GESTOR"."TCGESPRO_PERIODO" T ON to_date(T."FTC_PERIODO", 'MM/YYYY') BETWEEN :end - INTERVAL '1 month' * PA."FTN_MESES" AND :end
+        GROUP BY "FTN_ID_CONFIGURACION_FORMATO_ESTADO_CUENTA"
                 """, {"term": term_id, "start": start_month, "end": end_month, "user": str(user)})
         print("periodos_anverso_cuatrimestral_df")
 
@@ -328,7 +519,8 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
         indicador_cuenta_df.createOrReplaceTempView("TCGESPRO_INDICADOR_ESTADO_CUENTA")
 
         dataset_df = spark.sql(f"""
-        SELECT 
+        SELECT
+        DISTINCT
         I.FCN_CUENTA, I.FCN_ID_PERIODO, I.FTB_PENSION, I.FTC_TIPO_CLIENTE, I.FTC_ORIGEN,
         I.FTC_VIGENCIA,I.FTC_GENERACION, I.FTB_BONO, I.FTC_TIPO_PENSION, I.FTC_PERFIL_INVERSION,
         I.FTN_ID_GRUPO_SEGMENTACION,I.FCN_ID_GENERACION,I.FTC_CANDADO_APERTURA,I.FTN_ID_FORMATO,
@@ -340,15 +532,17 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
         I.FCN_ID_PERIODICIDAD_ANVERSO, I.FCN_ID_PERIODICIDAD_REVERSO,
         I.FTC_TIPO_TRABAJADOR, I.FTD_FECHA_CORTE,TP.FTN_MONTO_PEN AS FTN_PENSION_MENSUAL
         FROM 
-        parquet. `gs://{bucket_name}/{prefix}/dataset.parquet` I
+        parquet. `gs://{bucket_name}/{prefix_definitivos}/dataset.parquet` I
         LEFT JOIN  
-        parquet. `gs://{bucket_name}/{prefix}/TCDATMAE_PENSION.parquet` TP
+        parquet. `gs://{bucket_name}/{prefix_definitivos}/TCDATMAE_PENSION.parquet` TP
         ON TP.FCN_CUENTA = I.FCN_CUENTA 
         WHERE I.FCN_CUENTA IN {cuentas}
         """)
 
         dataset_df = dataset_df.repartition("FCN_ID_GENERACION","FTN_ID_FORMATO")
         dataset_df.createOrReplaceTempView("DATASET")
+
+        spark.sql("""select * from DATASET """).show()
 
         print("Query General Inicio")
 
@@ -508,6 +702,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
         FTC_USUARIO_ALTA
         """)
         print(reverso_df.count())
+        reverso_df.show()
 
         reverso_df = reverso_df.repartition("FTN_ID_FORMATO", "FTC_SECCION", "FTN_ID_CONCEPTO")
 
@@ -530,6 +725,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
 
         bono_df = _create_spark_dataframe(spark, configure_postgres_spark, f"""
         SELECT 
+        DISTINCT 
         "FCN_CUENTA", "FTF_BON_NOM_ACC", "FTF_BON_NOM_PES", "FTF_BON_ACT_ACC", 
         "FTF_BON_ACT_PES", "FCN_ID_PERIODO", "FTD_FEC_RED_BONO", "FTN_FACTOR"
         FROM "HECHOS"."TTCALCUL_BONO"
@@ -569,6 +765,8 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
         INNER JOIN TCGESPRO_PERIODO PR ON PR.FTN_ID_PERIODO = F.FCN_ID_PERIODO
         """)
 
+        anverso_df.show(80)
+
         anverso_df = anverso_df.repartition("FTC_SECCION", "FTC_TIPO_AHORRO","FTN_ORDEN_SDO")
 
         anverso_df = anverso_df.groupBy(
@@ -590,6 +788,8 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
             F.sum("FTN_SALDO_ANTERIOR").alias("FTN_SALDO_ANTERIOR"),
             F.sum("FTN_SALDO_FINAL").alias("FTN_SALDO_FINAL")
         )
+
+        anverso_df.show(80)
 
         bono_df = spark.sql("""
         SELECT
@@ -627,6 +827,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
 
         anverso_cuatrimestral_df = spark.sql(f"""
         SELECT
+        DISTINCT
         F.FCN_CUENTA FCN_NUMERO_CUENTA,
         F.FTN_ID_FORMATO,
         C.FTC_DES_CONCEPTO AS FTC_CONCEPTO_NEGOCIO,
@@ -841,11 +1042,11 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
         general_df = general_df.repartition("FTN_ID_FORMATO","FTC_ENTIDAD_FEDERATIVA","FTC_DESC_SIEFORE")
         anverso_df = anverso_df.repartition("FTC_SECCION","FTC_TIPO_AHORRO","FTN_ORDEN_SDO")
         print("reverso, write")
-        _write_spark_dataframe(reverso_df, configure_postgres_spark, '"ESTADO_CUENTA"."TTEDOCTA_REVERSO_TEST"')
+        #_write_spark_dataframe(reverso_df, configure_postgres_spark, '"ESTADO_CUENTA"."TTEDOCTA_REVERSO"')
         print("general, write")
-        _write_spark_dataframe(general_df, configure_postgres_spark, '"ESTADO_CUENTA"."TTEDOCTA_GENERAL_TEST"')
+        #_write_spark_dataframe(general_df, configure_postgres_spark, '"ESTADO_CUENTA"."TTEDOCTA_GENERAL"')
         print("anverso, write ")
-        _write_spark_dataframe(anverso_df, configure_postgres_spark, '"ESTADO_CUENTA"."TTEDOCTA_ANVERSO_TEST"')
+        #_write_spark_dataframe(anverso_df, configure_postgres_spark, '"ESTADO_CUENTA"."TTEDOCTA_ANVERSO"')
 
 
         for i in range(1800):
@@ -905,11 +1106,11 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
         bucket_anio_anterior = f"{bucket_coldline}"
         destination_archive = f"{bucket_archive}"
 
-        #move_files_parallel(source_bucket_name, source_bucket_name, source_prefix="profuturo-archivos",destination_prefix=str(term_id))
-        #delete_all_objects(bucket_name, 'profuturo-archivos')
-        #move_files_parallel(source_bucket_name, destination_coldline, source_prefix=str(cuatrimestre_anterior),destination_prefix=str(cuatrimestre_anterior))
-        #delete_all_objects(bucket_name, cuatrimestre_anterior)
-        #move_files_parallel(bucket_anio_anterior, destination_archive, source_prefix=str(anio_anterior),destination_prefix=str(anio_anterior))
+        move_files_parallel(source_bucket_name, source_bucket_name, source_prefix="profuturo-archivos",destination_prefix=str(term_id))
+        delete_all_objects(bucket_name, 'profuturo-archivos')
+        move_files_parallel(source_bucket_name, destination_coldline, source_prefix=str(cuatrimestre_anterior),destination_prefix=str(cuatrimestre_anterior))
+        delete_all_objects(bucket_name, cuatrimestre_anterior)
+        move_files_parallel(bucket_anio_anterior, destination_archive, source_prefix=str(anio_anterior),destination_prefix=str(anio_anterior))
 
         general_df = _create_spark_dataframe(spark, configure_postgres_spark, f"""
                 SELECT

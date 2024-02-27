@@ -225,7 +225,6 @@ with define_extraction(phase, area, postgres_pool, bigquery_pool) as (postgres, 
     spark.conf.set("spark.default.parallelism", 100)
 
     with register_time(postgres_pool, phase, term_id, user, area):
-
         filter_reprocessed_samples = ''
         is_reprocess = postgres.execute(text("""
         SELECT EXISTS(
@@ -238,46 +237,6 @@ with define_extraction(phase, area, postgres_pool, bigquery_pool) as (postgres, 
         """), {'term': term_id, "area": area}).fetchone()[0]
 
         print("Reprocess:", is_reprocess)
-        if not is_reprocess:
-            truncate_table(postgres, "TCGESPRO_MUESTRA_SOL_RE_CONSAR")
-            truncate_table(postgres, "TCGESPRO_MUESTRA", term=term_id, area=area)
-
-            cursor = postgres.execute(text("""
-            SELECT "FCN_ID_MOVIMIENTO_CONSAR", "FTN_CANTIDAD"
-            FROM "GESTOR"."TTGESPRO_CONFIGURACION_MUESTRA_AUTOMATICA" WHERE "FTB_VIGENTE" = TRUE
-            """))
-            configurations = {str(configuration[0]): configuration[1] for configuration in cursor.fetchall()}
-            print("configuracion", configurations)
-
-            cursor = postgres.execute(text("""
-            SELECT "FCN_CUENTA", array_agg(CC."FCN_ID_MOVIMIENTO_CONSAR")::varchar[]
-            FROM (
-                SELECT M."FCN_CUENTA", PC."FCN_ID_MOVIMIENTO_CONSAR"
-                FROM "HECHOS"."TTHECHOS_MOVIMIENTO" M
-                    INNER JOIN "GESTOR"."TTGESPRO_MOV_PROFUTURO_CONSAR" PC ON M."FCN_ID_CONCEPTO_MOVIMIENTO" = PC."FCN_ID_MOVIMIENTO_PROFUTURO"
-                WHERE M."FTD_FEH_LIQUIDACION" between :end - INTERVAL '4 MONTH' and :end
-                GROUP BY M."FCN_CUENTA", PC."FCN_ID_MOVIMIENTO_CONSAR"
-            ) AS CC
-            INNER JOIN "GESTOR"."TTGESPRO_CONFIGURACION_MUESTRA_AUTOMATICA" MC ON CC."FCN_ID_MOVIMIENTO_CONSAR" = MC."FCN_ID_MOVIMIENTO_CONSAR" AND "FTB_VIGENTE" = TRUE
-            WHERE "FCN_CUENTA" IN (SELECT "FCN_CUENTA" FROM "MAESTROS"."TCDATMAE_CLIENTE")
-            GROUP BY "FCN_CUENTA"
-            ORDER BY sum(1.0 / "FTN_CANTIDAD") DESC
-            """), {'end': end_month})
-            samples = find_samples(cursor)
-
-            print(samples)
-
-            postgres.execute(text("""
-            INSERT INTO "GESTOR"."TCGESPRO_MUESTRA" ("FCN_CUENTA", "FCN_ID_PERIODO", "FCN_ID_USUARIO", "FCN_ID_AREA", "FTD_FECHAHORA_ALTA") 
-            SELECT DISTINCT HC."FCN_CUENTA", :term, CA."FTC_USUARIO_CARGA"::INT, :area, current_timestamp
-            FROM "HECHOS"."TTHECHOS_CARGA_ARCHIVO" CA
-                INNER JOIN "HECHOS"."TCHECHOS_CLIENTE" HC ON CA."FCN_CUENTA" = HC."FCN_CUENTA"
-            WHERE "FCN_ID_INDICADOR" = 32 AND "FCN_ID_AREA" = :area
-              AND CA."FCN_ID_PERIODO" = :term
-            """), {"term": term_id, "area": area})
-            print("muestra manuales")
-        else:
-            filter_reprocessed_samples = 'INNER JOIN "GESTOR"."TCGESPRO_MUESTRA_SOL_RE_CONSAR" MR ON M."FTN_ID_MUESTRA" = MR."FCN_ID_MUESTRA"'
 
         truncate_table(postgres, 'TTMUESTR_REVERSO')
         truncate_table(postgres, 'TTMUESTR_ANVERSO')
@@ -361,7 +320,7 @@ with define_extraction(phase, area, postgres_pool, bigquery_pool) as (postgres, 
             D."FTC_TIPOGENERACION",D."FTC_DESC_TIPOGENERACION",
             concat_ws(' ',C."FTC_AP_PATERNO", C."FTC_AP_MATERNO", C."FTC_NOMBRE") AS "FTC_NOMBRE_COMPLETO",
             concat_ws(' ',C."FTC_CALLE", C."FTC_NUMERO") AS "FTC_CALLE_NUMERO",
-            C."FTC_COLONIA",concat_ws(' ',"FTC_DELEGACION", "FTC_MUNICIPIO") as "FTC_DELEGACION", C."FTN_CODIGO_POSTAL" AS "FTN_CP",
+            C."FTC_COLONIA",concat_ws(' ',"FTC_ASENTAMIENTO", "FTC_MUNICIPIO") as "FTC_DELEGACION", C."FTC_CODIGO_POSTAL" AS "FTN_CP",
             C."FTC_ENTIDAD_FEDERATIVA",C."FTC_NSS",C."FTC_RFC",C."FTC_CURP",I."FTC_TIPO_PENSION" AS "FTC_TIPO_PENSION",
             D."FTN_PENSION_MENSUAL",
             D."FTC_FORMATO",
@@ -407,7 +366,7 @@ with define_extraction(phase, area, postgres_pool, bigquery_pool) as (postgres, 
             D."FTC_TIPOGENERACION",D."FTC_DESC_TIPOGENERACION",
             concat_ws(' ',C."FTC_AP_PATERNO", C."FTC_AP_MATERNO", C."FTC_NOMBRE") AS "FTC_NOMBRE_COMPLETO",
             concat_ws(' ',C."FTC_CALLE", C."FTC_NUMERO") AS "FTC_CALLE_NUMERO",
-            C."FTC_COLONIA",C."FTC_DELEGACION", C."FTN_CODIGO_POSTAL" AS "FTN_CP",
+            C."FTC_COLONIA",concat_ws(' ',"FTC_ASENTAMIENTO", "FTC_MUNICIPIO") as "FTC_DELEGACION", C."FTC_CODIGO_POSTAL" AS "FTN_CP",
             C."FTC_ENTIDAD_FEDERATIVA",C."FTC_NSS",C."FTC_RFC",C."FTC_CURP",I."FTC_TIPO_PENSION" AS "FTC_TIPO_PENSION",
             D."FTN_PENSION_MENSUAL",
             D."FTC_FORMATO",
@@ -510,7 +469,7 @@ with define_extraction(phase, area, postgres_pool, bigquery_pool) as (postgres, 
         INNER JOIN "GESTOR"."TCGESPRO_CONFIGURACION_ANVERSO" A ON F."FCN_ID_GENERACION" = A."FCN_GENERACION"
         INNER JOIN "GESTOR"."TCGESPRO_PERIODICIDAD" P ON F."FCN_ID_PERIODICIDAD_GENERACION" = P."FTN_ID_PERIODICIDAD" AND mod(extract(MONTH FROM :end), P."FTN_MESES") = 0
         INNER JOIN "GESTOR"."TCGESPRO_PERIODICIDAD" PA ON F."FCN_ID_PERIODICIDAD_REVERSO" = PA."FTN_ID_PERIODICIDAD"
-        INNER JOIN "GESTOR"."TCGESPRO_PERIODO" T ON to_date(T."FTC_PERIODO", 'MM/YYYY') BETWEEN :start - INTERVAL '1 month' * PA."FTN_MESES" AND :end
+        INNER JOIN "GESTOR"."TCGESPRO_PERIODO" T ON to_date(T."FTC_PERIODO", 'MM/YYYY') BETWEEN :end - INTERVAL '1 month' * PA."FTN_MESES" AND :end
         GROUP BY "FTN_ID_CONFIGURACION_FORMATO_ESTADO_CUENTA"
         ), movimientos as (
         SELECT
@@ -683,7 +642,7 @@ with define_extraction(phase, area, postgres_pool, bigquery_pool) as (postgres, 
             INNER JOIN "GESTOR"."TCGESPRO_CONFIGURACION_ANVERSO" A ON F."FCN_ID_GENERACION" = A."FCN_GENERACION"
             INNER JOIN "GESTOR"."TCGESPRO_PERIODICIDAD" P ON F."FCN_ID_PERIODICIDAD_GENERACION" = P."FTN_ID_PERIODICIDAD" AND mod(extract(MONTH FROM :end), P."FTN_MESES") = 0
             INNER JOIN "GESTOR"."TCGESPRO_PERIODICIDAD" PA ON F."FCN_ID_PERIODICIDAD_ANVERSO" = PA."FTN_ID_PERIODICIDAD"
-            INNER JOIN "GESTOR"."TCGESPRO_PERIODO" T ON to_date(T."FTC_PERIODO", 'MM/YYYY') BETWEEN :start - INTERVAL '1 month' * PA."FTN_MESES" AND :end
+            INNER JOIN "GESTOR"."TCGESPRO_PERIODO" T ON to_date(T."FTC_PERIODO", 'MM/YYYY') BETWEEN :end - INTERVAL '1 month' * PA."FTN_MESES" AND :end
         GROUP BY "FTN_ID_CONFIGURACION_FORMATO_ESTADO_CUENTA"
         )
         SELECT
@@ -711,7 +670,7 @@ with define_extraction(phase, area, postgres_pool, bigquery_pool) as (postgres, 
         CASE WHEN R."FCN_ID_TIPO_SUBCTA" = ANY(C."FTA_SUBCUENTAS") AND C."FTC_SECCION" <> 'SDO' THEN R."FTF_ABONO" ELSE 0 END ::numeric(16, 2) AS "FTF_APORTACION",
         CASE WHEN R."FCN_ID_TIPO_SUBCTA" = ANY(C."FTA_SUBCUENTAS") AND C."FTC_SECCION" <> 'SDO' THEN R."FTF_CARGO" ELSE 0 END::numeric(16, 2) AS "FTN_RETIRO",
         CASE WHEN R."FCN_ID_TIPO_SUBCTA" = ANY(C."FTA_SUBCUENTAS") AND C."FTC_SECCION" <> 'SDO' THEN R."FTF_COMISION" ELSE 0 END::numeric(16, 2) AS "FTN_COMISION",
-        CASE WHEN R."FCN_ID_TIPO_SUBCTA" = ANY(C."FTA_SUBCUENTAS") AND C."FTC_SECCION" <> 'SDO' AND R."FCN_ID_PERIODO" = periodos.PERIODO_INICIAL THEN R."FTF_SALDO_FINAL" ELSE 0 END::numeric(16, 2) AS "FTN_SALDO_ANTERIOR",
+        CASE WHEN R."FCN_ID_TIPO_SUBCTA" = ANY(C."FTA_SUBCUENTAS") AND C."FTC_SECCION" <> 'SDO' AND R."FCN_ID_PERIODO" = periodos.PERIODO_INICIAL THEN R."FTF_SALDO_INICIAL" ELSE 0 END::numeric(16, 2) AS "FTN_SALDO_ANTERIOR",
         CASE WHEN R."FCN_ID_TIPO_SUBCTA" = ANY(C."FTA_SUBCUENTAS") AND R."FCN_ID_PERIODO" = periodos.PERIODO_FINAL THEN R."FTF_SALDO_FINAL" ELSE 0 END::numeric(16, 2) AS "FTN_SALDO_FINAL",
         C."FTC_SECCION",
         C."FTC_AHORRO" AS "FTC_TIPO_AHORRO",
@@ -829,7 +788,7 @@ with define_extraction(phase, area, postgres_pool, bigquery_pool) as (postgres, 
         END
         )
         , periodos AS (
-       SELECT F."FCN_ID_FORMATO_ESTADO_CUENTA", min(T."FTN_ID_PERIODO") AS PERIODO_INICIAL, max(T."FTN_ID_PERIODO") AS PERIODO_FINAL
+        SELECT F."FCN_ID_FORMATO_ESTADO_CUENTA", min(T."FTN_ID_PERIODO") AS PERIODO_INICIAL, max(T."FTN_ID_PERIODO") AS PERIODO_FINAL
         FROM "GESTOR"."TTGESPRO_CONFIGURACION_FORMATO_ESTADO_CUENTA" F
         INNER JOIN "GESTOR"."TCGESPRO_CONFIGURACION_ANVERSO" A ON F."FCN_ID_GENERACION" = A."FCN_GENERACION"
         INNER JOIN "GESTOR"."TCGESPRO_PERIODICIDAD" P ON F."FCN_ID_PERIODICIDAD_GENERACION" = P."FTN_ID_PERIODICIDAD" AND mod(extract(MONTH FROM :end), P."FTN_MESES") = 0
@@ -891,13 +850,12 @@ with define_extraction(phase, area, postgres_pool, bigquery_pool) as (postgres, 
                     col("FTF_APORTACION") + col("FTN_SALDO_ANTERIOR") - col("FTN_COMISION") - col("FTN_RETIRO")))
 
         anverso_cuatrimestral_df.show()
-        df = anverso_cuatrimestral_df.select("FCN_NUMERO_CUENTA").show()
         anverso_cuatrimestral_df.createOrReplaceTempView("anverso_cuatrimestral")
 
         general_df = spark.sql("""
         SELECT
         C.FTN_ID_GRUPO_SEGMENTACION,C.FTC_CANDADO_APERTURA,C.FTN_ID_FORMATO,C.FCN_ID_PERIODO,
-        cast(C.FCN_NUMERO_CUENTA as bigint) FCN_NUMERO_CUENTA,C.FTD_FECHA_CORTE,C.FTD_FECHA_GRAL_INICIO,C.FTD_FECHA_GRAL_FIN,C.FTD_FECHA_MOV_INICIO,
+        cast(C.FCN_NUMERO_CUENTA as bigint) as FCN_NUMERO_CUENTA,C.FTD_FECHA_CORTE,C.FTD_FECHA_GRAL_INICIO,C.FTD_FECHA_GRAL_FIN,C.FTD_FECHA_MOV_INICIO,
         C.FTD_FECHA_MOV_FIN,C.FTN_ID_SIEFORE,C.FTC_DESC_SIEFORE,C.FTC_TIPOGENERACION,C.FTC_DESC_TIPOGENERACION,
         C.FTC_NOMBRE_COMPLETO,C.FTC_CALLE_NUMERO,C.FTC_COLONIA,C.FTC_DELEGACION,C.FTN_CP,C.FTC_ENTIDAD_FEDERATIVA,
         C.FTC_NSS,C.FTC_RFC,C.FTC_CURP,C.FTC_TIPO_PENSION,C.FTN_PENSION_MENSUAL,C.FTC_FORMATO,C.FTC_TIPO_TRABAJADOR,
