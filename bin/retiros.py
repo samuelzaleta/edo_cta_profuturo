@@ -37,8 +37,6 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
 
     with register_time(postgres_pool, phase, term_id, user, area):
         truncate_table(postgres, 'TTHECHOS_RETIRO', term=term_id)
-        #truncate_table(postgres, 'TTHECHOS_RETIRO_LIQUIDACIONES', term=term_id)
-        #truncate_table(postgres, 'TTHECHOS_RETIRO_SALDOS_INICIALES', term=term_id)
 
         query_retiros = """
         WITH LIQ_SOLICITUDES AS (
@@ -625,7 +623,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                 case
                 when "FTC_FON_ENTIDAD" is not null then "FTN_SDO_TRA_VIVIENDA" + "FTN_SDO_TRA_AHORRORET"
                     else 0
-                    end FTN_MONTO_TRANSFERIDO,
+                    end "FTN_MONTO_TRANSFERIDO",
                 TO_CHAR("FTD_FECHA_EMISION",'YYYYMMDD') AS "FTD_FECHA_EMISION",
                 --0 AS FTN_RECURSO_RETENCION_ISR,
                 "FTC_ENT_REC_TRAN",
