@@ -242,43 +242,6 @@ with define_extraction(phase, area, postgres_pool, bigquery_pool) as (postgres, 
         truncate_table(postgres, 'TTMUESTR_ANVERSO')
         truncate_table(postgres, 'TTMUESTR_GENERAL')
 
-        ###########################  IMAGENES   #################################################
-        truncate_table(postgres, 'TTEDOCTA_IMAGEN')
-
-        delete_all_objects(bucket_name, prefix)
-
-        delete_all_objects(bucket_name, 'profuturo-archivos')
-
-        query = """
-                SELECT
-                DISTINCT
-                concat("FTC_CODIGO_POSICION_PDF",'-',tcie."FCN_ID_FORMATO_ESTADO_CUENTA",'-', ra."FCN_ID_AREA",'-',COALESCE(tcie."FTC_DESCRIPCION_SIEFORE",'sinsiefore')) AS ID,"FTO_IMAGEN" AS FTO_IMAGEN
-                FROM "GESTOR"."TTGESPRO_CONFIG_IMAGEN_EDOCTA" tcie
-                INNER JOIN "GESTOR"."TTGESPRO_ROL_USUARIO" ru ON CAST(tcie."FTC_USUARIO" AS INT) = ru."FCN_ID_USUARIO"
-                INNER JOIN "GESTOR"."TCGESPRO_ROL_AREA" ra ON ru."FCN_ID_ROL" =  ra."FCN_ID_ROL"
-                """
-
-        imagenes_df = _create_spark_dataframe(spark, configure_postgres_spark, query,params={"term": term_id, "start": start_month, "end": end_month, "user": str(user)})
-
-        imagenes_df.show()
-
-        imagenes_df.foreach(upload_to_gcs)
-
-        # Obtiene la información del blob
-        blob_info_list = get_blob_info(bucket_name, prefix)
-
-        schema = StructType([
-            StructField("FTC_POSICION_PDF", StringType(), True),
-            StructField("FCN_ID_FORMATO_EDOCTA", IntegerType(), True),
-            StructField("FCN_ID_AREA", IntegerType(), True),
-            StructField("FTC_URL_IMAGEN", StringType(), True),
-            StructField("FTC_IMAGEN", StringType(), True),
-            StructField("FTC_SIEFORE", StringType(), True)
-        ])
-
-        df = spark.createDataFrame(blob_info_list, schema=schema)
-
-        _write_spark_dataframe(df, configure_postgres_spark, '"ESTADO_CUENTA"."TTEDOCTA_IMAGEN"')
 
         ########################## GENERACIÓN DE MUESTRAS #################################################
         char1 = random.choice(string.ascii_letters).upper()
@@ -288,7 +251,8 @@ with define_extraction(phase, area, postgres_pool, bigquery_pool) as (postgres, 
         general_df = _create_spark_dataframe(spark, configure_postgres_spark, f"""
         WITH DATASET AS (
             SELECT
-            DISTINCT F."FCN_ID_GENERACION" AS "FTN_ID_GRUPO_SEGMENTACION",F."FCN_ID_GENERACION",
+            DISTINCT 
+            F."FCN_ID_GENERACION" AS "FTN_ID_GRUPO_SEGMENTACION",F."FCN_ID_GENERACION",
             'CANDADO' AS "FTC_CANDADO_APERTURA",F."FCN_ID_FORMATO_ESTADO_CUENTA" AS "FTN_ID_FORMATO",
             M."FCN_ID_PERIODO",M."FCN_CUENTA",F."FCN_ID_INDICADOR_CLIENTE",F."FCN_ID_INDICADOR_AFILIACION",
             F."FCN_ID_INDICADOR_BONO",CAST(:end as TIMESTAMP) AS "FTD_FECHA_CORTE",
@@ -320,7 +284,15 @@ with define_extraction(phase, area, postgres_pool, bigquery_pool) as (postgres, 
             D."FTC_TIPOGENERACION",D."FTC_DESC_TIPOGENERACION",
             concat_ws(' ',C."FTC_AP_PATERNO", C."FTC_AP_MATERNO", C."FTC_NOMBRE") AS "FTC_NOMBRE_COMPLETO",
             concat_ws(' ',C."FTC_CALLE", C."FTC_NUMERO") AS "FTC_CALLE_NUMERO",
-            C."FTC_COLONIA",concat_ws(' ',"FTC_ASENTAMIENTO", "FTC_MUNICIPIO") as "FTC_DELEGACION", C."FTC_CODIGO_POSTAL" AS "FTN_CP",
+            CASE
+            WHEN  C."FTC_COLONIA" LIKE '%NO ASIGNADO%' THEN ''
+            ELSE C."FTC_COLONIA"
+            END "FTC_COLONIA",
+            CASE 
+            WHEN C."FTC_COLONIA" = C."FTC_ASENTAMIENTO" THEN C."FTC_MUNICIPIO"
+            WHEN C."FTC_ASENTAMIENTO" LIKE '%NO ASIGNADO%' THEN  C."FTC_MUNICIPIO"
+            ELSE concat_ws(' ',"FTC_ASENTAMIENTO", "FTC_MUNICIPIO")  
+            END "FTC_DELEGACION", C."FTC_CODIGO_POSTAL" AS "FTN_CP",
             C."FTC_ENTIDAD_FEDERATIVA",C."FTC_NSS",C."FTC_RFC",C."FTC_CURP",I."FTC_TIPO_PENSION" AS "FTC_TIPO_PENSION",
             D."FTN_PENSION_MENSUAL",
             D."FTC_FORMATO",
@@ -366,7 +338,15 @@ with define_extraction(phase, area, postgres_pool, bigquery_pool) as (postgres, 
             D."FTC_TIPOGENERACION",D."FTC_DESC_TIPOGENERACION",
             concat_ws(' ',C."FTC_AP_PATERNO", C."FTC_AP_MATERNO", C."FTC_NOMBRE") AS "FTC_NOMBRE_COMPLETO",
             concat_ws(' ',C."FTC_CALLE", C."FTC_NUMERO") AS "FTC_CALLE_NUMERO",
-            C."FTC_COLONIA",concat_ws(' ',"FTC_ASENTAMIENTO", "FTC_MUNICIPIO") as "FTC_DELEGACION", C."FTC_CODIGO_POSTAL" AS "FTN_CP",
+            CASE
+            WHEN  C."FTC_COLONIA" LIKE '%NO ASIGNADO%' THEN ''
+            ELSE C."FTC_COLONIA"
+            END "FTC_COLONIA",
+            CASE 
+            WHEN C."FTC_COLONIA" = C."FTC_ASENTAMIENTO" THEN C."FTC_MUNICIPIO"
+            WHEN C."FTC_ASENTAMIENTO" LIKE '%NO ASIGNADO%' THEN  C."FTC_MUNICIPIO"
+            ELSE concat_ws(' ',"FTC_ASENTAMIENTO", "FTC_MUNICIPIO")  
+            END "FTC_DELEGACION", C."FTC_CODIGO_POSTAL" AS "FTN_CP",
             C."FTC_ENTIDAD_FEDERATIVA",C."FTC_NSS",C."FTC_RFC",C."FTC_CURP",I."FTC_TIPO_PENSION" AS "FTC_TIPO_PENSION",
             D."FTN_PENSION_MENSUAL",
             D."FTC_FORMATO",
@@ -835,7 +815,7 @@ with define_extraction(phase, area, postgres_pool, bigquery_pool) as (postgres, 
         INNER JOIN periodos ON R."FCN_ID_PERIODO" BETWEEN periodos.PERIODO_INICIAL AND periodos.PERIODO_FINAL and periodos."FCN_ID_FORMATO_ESTADO_CUENTA" = D."FTN_ID_FORMATO"
         INNER JOIN "GESTOR"."TCGESPRO_PERIODO" T ON R."FCN_ID_PERIODO" = T."FTN_ID_PERIODO"
         INNER JOIN "GESTOR"."TCGESPRO_PERIODO" PR ON PR."FTN_ID_PERIODO" = :term
-        where "FTC_SECCION" NOT IN ('SDO') AND "FTC_AHORRO" NOT IN ('VIV')
+        where "FTC_SECCION" NOT IN ('SDO')
         ) X
         GROUP BY
         "FCN_NUMERO_CUENTA",
