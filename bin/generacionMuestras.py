@@ -238,9 +238,90 @@ with define_extraction(phase, area, postgres_pool, bigquery_pool) as (postgres, 
 
         print("Reprocess:", is_reprocess)
 
+        if not is_reprocess:
+            truncate_table(postgres, "TCGESPRO_MUESTRA_SOL_RE_CONSAR")
+            truncate_table(postgres, "TCGESPRO_MUESTRA", term=term_id, area=area)
+
+            cursor = postgres.execute(text("""
+            SELECT "FCN_ID_MOVIMIENTO_CONSAR", "FTN_CANTIDAD"
+            FROM "GESTOR"."TTGESPRO_CONFIGURACION_MUESTRA_AUTOMATICA" WHERE "FTB_VIGENTE" = TRUE
+            """))
+            configurations = {str(configuration[0]): configuration[1] for configuration in cursor.fetchall()}
+            print("configuracion", configurations)
+
+            cursor = postgres.execute(text("""
+            SELECT "FCN_CUENTA", array_agg(CC."FCN_ID_MOVIMIENTO_CONSAR")::varchar[]
+            FROM (
+                SELECT M."FCN_CUENTA", PC."FCN_ID_MOVIMIENTO_CONSAR"
+                FROM "HECHOS"."TTHECHOS_MOVIMIENTO" M
+                    INNER JOIN "GESTOR"."TTGESPRO_MOV_PROFUTURO_CONSAR" PC ON M."FCN_ID_CONCEPTO_MOVIMIENTO" = PC."FCN_ID_MOVIMIENTO_PROFUTURO"
+                WHERE M."FTD_FEH_LIQUIDACION" between :end - INTERVAL '4 MONTH' and :end
+                GROUP BY M."FCN_CUENTA", PC."FCN_ID_MOVIMIENTO_CONSAR"
+            ) AS CC
+            INNER JOIN "GESTOR"."TTGESPRO_CONFIGURACION_MUESTRA_AUTOMATICA" MC ON CC."FCN_ID_MOVIMIENTO_CONSAR" = MC."FCN_ID_MOVIMIENTO_CONSAR" AND "FTB_VIGENTE" = TRUE
+            WHERE "FCN_CUENTA" IN (SELECT "FCN_CUENTA" FROM "MAESTROS"."TCDATMAE_CLIENTE")
+            GROUP BY "FCN_CUENTA"
+            ORDER BY sum(1.0 / "FTN_CANTIDAD") DESC
+            """), {'end': end_month})
+            samples = find_samples(cursor)
+
+            print(samples)
+
+            postgres.execute(text("""
+            INSERT INTO "GESTOR"."TCGESPRO_MUESTRA" ("FCN_CUENTA", "FCN_ID_PERIODO", "FCN_ID_USUARIO", "FCN_ID_AREA", "FTD_FECHAHORA_ALTA") 
+            SELECT DISTINCT HC."FCN_CUENTA", :term, CA."FTC_USUARIO_CARGA"::INT, :area, current_timestamp
+            FROM "HECHOS"."TTHECHOS_CARGA_ARCHIVO" CA
+                INNER JOIN "HECHOS"."TCHECHOS_CLIENTE" HC ON CA."FCN_CUENTA" = HC."FCN_CUENTA"
+            WHERE "FCN_ID_INDICADOR" = 32 AND "FCN_ID_AREA" = :area
+              AND CA."FCN_ID_PERIODO" = :term
+            """), {"term": term_id, "area": area})
+            print("muestra manuales")
+        else:
+            filter_reprocessed_samples = 'INNER JOIN "GESTOR"."TCGESPRO_MUESTRA_SOL_RE_CONSAR" MR ON M."FTN_ID_MUESTRA" = MR."FCN_ID_MUESTRA"'
+
+
         truncate_table(postgres, 'TTMUESTR_REVERSO')
         truncate_table(postgres, 'TTMUESTR_ANVERSO')
         truncate_table(postgres, 'TTMUESTR_GENERAL')
+
+        ###########################  IMAGENES   #################################################
+        truncate_table(postgres, 'TTEDOCTA_IMAGEN')
+
+        delete_all_objects(bucket_name, prefix)
+
+        delete_all_objects(bucket_name, 'profuturo-archivos')
+
+        query = """
+                SELECT
+                DISTINCT
+                concat("FTC_CODIGO_POSICION_PDF",'-',tcie."FCN_ID_FORMATO_ESTADO_CUENTA",'-', ra."FCN_ID_AREA",'-',COALESCE(tcie."FTC_DESCRIPCION_SIEFORE",'sinsiefore')) AS ID,"FTO_IMAGEN" AS FTO_IMAGEN
+                FROM "GESTOR"."TTGESPRO_CONFIG_IMAGEN_EDOCTA" tcie
+                INNER JOIN "GESTOR"."TTGESPRO_ROL_USUARIO" ru ON CAST(tcie."FTC_USUARIO" AS INT) = ru."FCN_ID_USUARIO"
+                INNER JOIN "GESTOR"."TCGESPRO_ROL_AREA" ra ON ru."FCN_ID_ROL" =  ra."FCN_ID_ROL"
+                """
+
+        imagenes_df = _create_spark_dataframe(spark, configure_postgres_spark, query,params={"term": term_id, "start": start_month, "end": end_month, "user": str(user)})
+
+        imagenes_df.show()
+
+        imagenes_df.foreach(upload_to_gcs)
+
+        # Obtiene la información del blob
+        blob_info_list = get_blob_info(bucket_name, prefix)
+
+        schema = StructType([
+            StructField("FTC_POSICION_PDF", StringType(), True),
+            StructField("FCN_ID_FORMATO_EDOCTA", IntegerType(), True),
+            StructField("FCN_ID_AREA", IntegerType(), True),
+            StructField("FTC_URL_IMAGEN", StringType(), True),
+            StructField("FTC_IMAGEN", StringType(), True),
+            StructField("FTC_SIEFORE", StringType(), True)
+        ])
+
+        df = spark.createDataFrame(blob_info_list, schema=schema)
+
+        _write_spark_dataframe(df, configure_postgres_spark, '"ESTADO_CUENTA"."TTEDOCTA_IMAGEN"')
+
 
 
         ########################## GENERACIÓN DE MUESTRAS #################################################
@@ -649,6 +730,7 @@ with define_extraction(phase, area, postgres_pool, bigquery_pool) as (postgres, 
         D."FCN_NUMERO_CUENTA",
         D."FTN_ID_FORMATO",
         C."FTC_DES_CONCEPTO" AS "FTC_CONCEPTO_NEGOCIO",
+        R."FCN_ID_TIPO_SUBCTA",
         CASE WHEN R."FCN_ID_TIPO_SUBCTA" = ANY(C."FTA_SUBCUENTAS") AND C."FTC_SECCION" <> 'SDO' THEN R."FTF_ABONO" ELSE 0 END ::numeric(16, 2) AS "FTF_APORTACION",
         CASE WHEN R."FCN_ID_TIPO_SUBCTA" = ANY(C."FTA_SUBCUENTAS") AND C."FTC_SECCION" <> 'SDO' THEN R."FTF_CARGO" ELSE 0 END::numeric(16, 2) AS "FTN_RETIRO",
         CASE WHEN R."FCN_ID_TIPO_SUBCTA" = ANY(C."FTA_SUBCUENTAS") AND C."FTC_SECCION" <> 'SDO' THEN R."FTF_COMISION" ELSE 0 END::numeric(16, 2) AS "FTN_COMISION",
@@ -827,6 +909,8 @@ with define_extraction(phase, area, postgres_pool, bigquery_pool) as (postgres, 
         "FTC_USUARIO_ALTA"
         """, {"term": term_id, "start": start_month, "end": end_month, "user": str(user)})
 
+        anverso_cuatrimestral_df.show(10)
+
         anverso_cuatrimestral_df.write.format("parquet").mode("overwrite").save(f"gs://{bucket_name}/{prefix}/anverso_cuatri.parquet")
         anverso_cuatrimestral_df = spark.read.format("parquet").load(f"gs://{bucket_name}/{prefix}/anverso_cuatri.parquet").repartition(10)
         anverso_cuatrimestral_df = anverso_cuatrimestral_df.withColumn("FTN_RENDIMIENTO", col("FTN_SALDO_FINAL") - (
@@ -989,11 +1073,11 @@ with define_extraction(phase, area, postgres_pool, bigquery_pool) as (postgres, 
         reverso_df = reverso_df.drop(col("FTN_ID_FORMATO"))
 
         print("reverso")
-        _write_spark_dataframe(reverso_df, configure_postgres_spark, '"ESTADO_CUENTA"."TTMUESTR_REVERSO"')
+        #_write_spark_dataframe(reverso_df, configure_postgres_spark, '"ESTADO_CUENTA"."TTMUESTR_REVERSO"')
         print("anverso")
-        _write_spark_dataframe(anverso_df, configure_postgres_spark, '"ESTADO_CUENTA"."TTMUESTR_ANVERSO"')
+        #_write_spark_dataframe(anverso_df, configure_postgres_spark, '"ESTADO_CUENTA"."TTMUESTR_ANVERSO"')
         print("general")
-        _write_spark_dataframe(general_df, configure_postgres_spark, '"ESTADO_CUENTA"."TTMUESTR_GENERAL"')
+        #_write_spark_dataframe(general_df, configure_postgres_spark, '"ESTADO_CUENTA"."TTMUESTR_GENERAL"')
 
         reverso_df.unpersist()
         anverso_df.unpersist()
