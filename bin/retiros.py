@@ -472,7 +472,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                        FCN_ID_SIEFORE, r.FTD_FEH_CRE,SUM(FTN_DIA_PESOS) PESOS
                 FROM TTAFOGRAL_BALANCE_MOVS_CHEQ q
                     INNER JOIN RETIROS r ON q.FTN_NUM_CTA_INVDUAL = r.FCN_CUENTA
-                WHERE FTD_FEH_LIQUIDACION < :start
+                WHERE trunc(q.FTD_FEH_CRE) < trunc(r.FTD_FEH_CRE)
                   AND q.FCN_ID_SUBPROCESO NOT IN (10562,10573)
                  -- AND R.FTC_TMC_DESC_ITGY IN ('TJU', 'TGF', 'TPG', 'TRJ', 'TRU', 'TIV')
                 GROUP BY FTN_NUM_CTA_INVDUAL, FCN_ID_TIPO_SUBCTA, FCN_ID_SIEFORE, r.FTC_TMC_DESC_ITGY, r.FTD_FEH_CRE
