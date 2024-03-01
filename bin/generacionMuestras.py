@@ -248,25 +248,26 @@ with define_extraction(phase, area, postgres_pool, bigquery_pool) as (postgres, 
             """))
             configurations = {str(configuration[0]): configuration[1] for configuration in cursor.fetchall()}
             print("configuracion", configurations)
+            try:
+                cursor = postgres.execute(text("""
+                SELECT "FCN_CUENTA", array_agg(CC."FCN_ID_MOVIMIENTO_CONSAR")::varchar[]
+                FROM (
+                    SELECT M."FCN_CUENTA", PC."FCN_ID_MOVIMIENTO_CONSAR"
+                    FROM "HECHOS"."TTHECHOS_MOVIMIENTO" M
+                        INNER JOIN "GESTOR"."TTGESPRO_MOV_PROFUTURO_CONSAR" PC ON M."FCN_ID_CONCEPTO_MOVIMIENTO" = PC."FCN_ID_MOVIMIENTO_PROFUTURO"
+                    WHERE M."FTD_FEH_LIQUIDACION" between :end - INTERVAL '4 MONTH' and :end
+                    GROUP BY M."FCN_CUENTA", PC."FCN_ID_MOVIMIENTO_CONSAR"
+                ) AS CC
+                INNER JOIN "GESTOR"."TTGESPRO_CONFIGURACION_MUESTRA_AUTOMATICA" MC ON CC."FCN_ID_MOVIMIENTO_CONSAR" = MC."FCN_ID_MOVIMIENTO_CONSAR" AND "FTB_VIGENTE" = TRUE
+                WHERE "FCN_CUENTA" IN (SELECT "FCN_CUENTA" FROM "MAESTROS"."TCDATMAE_CLIENTE")
+                GROUP BY "FCN_CUENTA"
+                ORDER BY sum(1.0 / "FTN_CANTIDAD") DESC
+                """), {'end': end_month})
+                samples = find_samples(cursor)
 
-            cursor = postgres.execute(text("""
-            SELECT "FCN_CUENTA", array_agg(CC."FCN_ID_MOVIMIENTO_CONSAR")::varchar[]
-            FROM (
-                SELECT M."FCN_CUENTA", PC."FCN_ID_MOVIMIENTO_CONSAR"
-                FROM "HECHOS"."TTHECHOS_MOVIMIENTO" M
-                    INNER JOIN "GESTOR"."TTGESPRO_MOV_PROFUTURO_CONSAR" PC ON M."FCN_ID_CONCEPTO_MOVIMIENTO" = PC."FCN_ID_MOVIMIENTO_PROFUTURO"
-                WHERE M."FTD_FEH_LIQUIDACION" between :end - INTERVAL '4 MONTH' and :end
-                GROUP BY M."FCN_CUENTA", PC."FCN_ID_MOVIMIENTO_CONSAR"
-            ) AS CC
-            INNER JOIN "GESTOR"."TTGESPRO_CONFIGURACION_MUESTRA_AUTOMATICA" MC ON CC."FCN_ID_MOVIMIENTO_CONSAR" = MC."FCN_ID_MOVIMIENTO_CONSAR" AND "FTB_VIGENTE" = TRUE
-            WHERE "FCN_CUENTA" IN (SELECT "FCN_CUENTA" FROM "MAESTROS"."TCDATMAE_CLIENTE")
-            GROUP BY "FCN_CUENTA"
-            ORDER BY sum(1.0 / "FTN_CANTIDAD") DESC
-            """), {'end': end_month})
-            samples = find_samples(cursor)
-
-            print(samples)
-
+                print(samples)
+            except:
+                pass
             postgres.execute(text("""
             INSERT INTO "GESTOR"."TCGESPRO_MUESTRA" ("FCN_CUENTA", "FCN_ID_PERIODO", "FCN_ID_USUARIO", "FCN_ID_AREA", "FTD_FECHAHORA_ALTA") 
             SELECT DISTINCT HC."FCN_CUENTA", :term, CA."FTC_USUARIO_CARGA"::INT, :area, current_timestamp
@@ -537,7 +538,10 @@ with define_extraction(phase, area, postgres_pool, bigquery_pool) as (postgres, 
         DISTINCT
         R."FCN_CUENTA",
         R."FCN_ID_PERIODO",
-        R."FTF_MONTO_PESOS",
+        CASE
+        WHEN R."FCN_ID_TIPO_MOVIMIENTO" = '180' THEN (R."FTF_MONTO_PESOS" * -1)
+        WHEN R."FCN_ID_TIPO_MOVIMIENTO" = '181' THEN R."FTF_MONTO_PESOS"
+        END "FTF_MONTO_PESOS",
         R."FTN_SUA_DIAS_COTZDOS_BIMESTRE",
         R."FTN_SUA_ULTIMO_SALARIO_INT_PER",
         R."FTD_FEH_LIQUIDACION",
@@ -555,7 +559,10 @@ with define_extraction(phase, area, postgres_pool, bigquery_pool) as (postgres, 
         SELECT
         R."CSIE1_NUMCUE",
         R."FCN_ID_PERIODO",
-        R."MONTO" AS "FTF_MONTO_PESOS",
+        CASE
+        WHEN CAST(R."CSIE1_CODMOV" AS INT) <= 500 THEN (R."MONTO" * -1)
+        WHEN CAST(R."CSIE1_CODMOV" AS INT) > 500 THEN R."MONTO"
+        END "FTF_MONTO_PESOS",
         NULL AS "FTN_SUA_DIAS_COTZDOS_BIMESTRE",
         NULL AS "FTN_SUA_ULTIMO_SALARIO_INT_PER",
         to_date(cast(R."CSIE1_FECCON" as varchar),'YYYYMMDD') AS "FTD_FEH_LIQUIDACION",
@@ -728,6 +735,7 @@ with define_extraction(phase, area, postgres_pool, bigquery_pool) as (postgres, 
         SELECT
         DISTINCT
         D."FCN_NUMERO_CUENTA",
+        R."FCN_ID_PERIODO",
         D."FTN_ID_FORMATO",
         C."FTC_DES_CONCEPTO" AS "FTC_CONCEPTO_NEGOCIO",
         R."FCN_ID_TIPO_SUBCTA",
@@ -860,7 +868,7 @@ with define_extraction(phase, area, postgres_pool, bigquery_pool) as (postgres, 
         INNER JOIN "GESTOR"."TCGESPRO_PERIODO" T ON to_date(T."FTC_PERIODO", 'MM/YYYY') BETWEEN :end - INTERVAL '1 month' * PA."FTN_MESES" AND :end
         GROUP BY "FTN_ID_CONFIGURACION_FORMATO_ESTADO_CUENTA"
         )
-        SELECT
+                SELECT
         "FCN_NUMERO_CUENTA",
         "FTN_ID_FORMATO",
         "FTC_CONCEPTO_NEGOCIO",
@@ -870,6 +878,10 @@ with define_extraction(phase, area, postgres_pool, bigquery_pool) as (postgres, 
         SUM("FTN_SALDO_ANTERIOR") AS "FTN_SALDO_ANTERIOR",
         SUM("FTN_SALDO_FINAL") AS "FTN_SALDO_FINAL",
         "FTC_SECCION",
+        NULL ::numeric(16, 2) AS  "FTN_VALOR_ACTUAL_PESO",
+        NULL ::numeric(16, 6) AS "FTN_VALOR_ACTUAL_UDI",
+        NULL ::numeric(16, 2) AS "FTN_VALOR_NOMINAL_PESO",
+        NULL ::numeric(16, 6) AS "FTN_VALOR_NOMINAL_UDI",
         "FTC_TIPO_AHORRO",
         "FTN_ORDEN_SDO",
         :user AS "FTC_USUARIO_ALTA"
@@ -879,10 +891,11 @@ with define_extraction(phase, area, postgres_pool, bigquery_pool) as (postgres, 
         D."FCN_NUMERO_CUENTA",
         D."FTN_ID_FORMATO",
         C."FTC_DES_CONCEPTO" AS "FTC_CONCEPTO_NEGOCIO",
+        R."FCN_ID_TIPO_SUBCTA",
         CASE WHEN R."FCN_ID_TIPO_SUBCTA" = ANY(C."FTA_SUBCUENTAS") AND C."FTC_SECCION" <> 'SDO' THEN R."FTF_ABONO" ELSE 0 END ::numeric(16, 2) AS "FTF_APORTACION",
         CASE WHEN R."FCN_ID_TIPO_SUBCTA" = ANY(C."FTA_SUBCUENTAS") AND C."FTC_SECCION" <> 'SDO' THEN R."FTF_CARGO" ELSE 0 END::numeric(16, 2) AS "FTN_RETIRO",
         CASE WHEN R."FCN_ID_TIPO_SUBCTA" = ANY(C."FTA_SUBCUENTAS") AND C."FTC_SECCION" <> 'SDO' THEN R."FTF_COMISION" ELSE 0 END::numeric(16, 2) AS "FTN_COMISION",
-        CASE WHEN R."FCN_ID_TIPO_SUBCTA" = ANY(C."FTA_SUBCUENTAS") AND C."FTC_SECCION" <> 'SDO' AND R."FCN_ID_PERIODO" = periodos.PERIODO_INICIAL THEN R."FTF_SALDO_FINAL" ELSE 0 END::numeric(16, 2) AS "FTN_SALDO_ANTERIOR",
+        CASE WHEN R."FCN_ID_TIPO_SUBCTA" = ANY(C."FTA_SUBCUENTAS") AND C."FTC_SECCION" <> 'SDO' AND R."FCN_ID_PERIODO" = periodos.PERIODO_INICIAL THEN R."FTF_SALDO_INICIAL" ELSE 0 END::numeric(16, 2) AS "FTN_SALDO_ANTERIOR",
         CASE WHEN R."FCN_ID_TIPO_SUBCTA" = ANY(C."FTA_SUBCUENTAS") AND R."FCN_ID_PERIODO" = periodos.PERIODO_FINAL THEN R."FTF_SALDO_FINAL" ELSE 0 END::numeric(16, 2) AS "FTN_SALDO_FINAL",
         C."FTC_SECCION",
         C."FTC_AHORRO" AS "FTC_TIPO_AHORRO",
@@ -897,7 +910,7 @@ with define_extraction(phase, area, postgres_pool, bigquery_pool) as (postgres, 
         INNER JOIN periodos ON R."FCN_ID_PERIODO" BETWEEN periodos.PERIODO_INICIAL AND periodos.PERIODO_FINAL and periodos."FCN_ID_FORMATO_ESTADO_CUENTA" = D."FTN_ID_FORMATO"
         INNER JOIN "GESTOR"."TCGESPRO_PERIODO" T ON R."FCN_ID_PERIODO" = T."FTN_ID_PERIODO"
         INNER JOIN "GESTOR"."TCGESPRO_PERIODO" PR ON PR."FTN_ID_PERIODO" = :term
-        where "FTC_SECCION" NOT IN ('SDO')
+        --where "FTC_SECCION" <> 'SDO' and C."FTC_DES_CONCEPTO" = 'Ahorro para el retiro 92 y 97<sup>1</sup>'
         ) X
         GROUP BY
         "FCN_NUMERO_CUENTA",
@@ -1073,11 +1086,11 @@ with define_extraction(phase, area, postgres_pool, bigquery_pool) as (postgres, 
         reverso_df = reverso_df.drop(col("FTN_ID_FORMATO"))
 
         print("reverso")
-        #_write_spark_dataframe(reverso_df, configure_postgres_spark, '"ESTADO_CUENTA"."TTMUESTR_REVERSO"')
+        _write_spark_dataframe(reverso_df, configure_postgres_spark, '"ESTADO_CUENTA"."TTMUESTR_REVERSO"')
         print("anverso")
-        #_write_spark_dataframe(anverso_df, configure_postgres_spark, '"ESTADO_CUENTA"."TTMUESTR_ANVERSO"')
+        _write_spark_dataframe(anverso_df, configure_postgres_spark, '"ESTADO_CUENTA"."TTMUESTR_ANVERSO"')
         print("general")
-        #_write_spark_dataframe(general_df, configure_postgres_spark, '"ESTADO_CUENTA"."TTMUESTR_GENERAL"')
+        _write_spark_dataframe(general_df, configure_postgres_spark, '"ESTADO_CUENTA"."TTMUESTR_GENERAL"')
 
         reverso_df.unpersist()
         anverso_df.unpersist()
