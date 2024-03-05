@@ -42,6 +42,8 @@ def extract_terms(conn: Connection, phase: int, term_id: int = None) -> Dict[str
             #MENOS UN MES#
             end_saldos_anterior = start_month
             valor_accion_anterior = valor_accion - relativedelta(months=1)
+            #MAS UN MES#
+            start_next_mes = start_month + relativedelta(months=1)
             print(f"Extracting period: from {start_month} to {end_month}")
             return {
                 "id": term_id,
@@ -51,6 +53,7 @@ def extract_terms(conn: Connection, phase: int, term_id: int = None) -> Dict[str
                 "time_period": time_period,
                 "end_saldos_anterior": end_saldos_anterior,
                 "valor_accion_anterior": valor_accion_anterior,
+                "start_next_mes": start_next_mes
             }
 
         raise RuntimeError("Can not retrieve the term")
