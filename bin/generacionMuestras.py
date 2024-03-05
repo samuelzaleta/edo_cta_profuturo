@@ -225,6 +225,18 @@ with define_extraction(phase, area, postgres_pool, bigquery_pool) as (postgres, 
     spark.conf.set("spark.default.parallelism", 100)
 
     with register_time(postgres_pool, phase, term_id, user, area):
+        postgres.execute(text("""
+        UPDATE "HECHOS"."TCHECHOS_CLIENTE"
+        SET "FTC_GENERACION" = 'DECIMO TRANSITORIO'
+        WHERE "FCN_CUENTA" IN (SELECT "FCN_CUENTA" FROM "HECHOS"."TTHECHOS_CARGA_ARCHIVO" WHERE "FCN_ID_INDICADOR" = 28)
+                    """), {"term": term_id, "area": area})
+
+        postgres.execute(text("""
+        UPDATE "HECHOS"."TCHECHOS_CLIENTE"
+        SET "FTB_PENSION" = 'true'
+        WHERE "FCN_CUENTA" IN (SELECT "FCN_CUENTA" FROM "HECHOS"."TTHECHOS_CARGA_ARCHIVO" WHERE "FCN_ID_INDICADOR" = 73)
+        """), {"term": term_id, "area": area})
+
         filter_reprocessed_samples = ''
         is_reprocess = postgres.execute(text("""
         SELECT EXISTS(
@@ -560,8 +572,8 @@ with define_extraction(phase, area, postgres_pool, bigquery_pool) as (postgres, 
         R."CSIE1_NUMCUE",
         R."FCN_ID_PERIODO",
         CASE
-        WHEN CAST(R."CSIE1_CODMOV" AS INT) <= 500 THEN (R."MONTO" * -1)
-        WHEN CAST(R."CSIE1_CODMOV" AS INT) > 500 THEN R."MONTO"
+        WHEN CAST(R."CSIE1_CODMOV" AS INT) > 500 THEN (R."MONTO" * -1)
+        WHEN CAST(R."CSIE1_CODMOV" AS INT) <= 500 THEN R."MONTO"
         END "FTF_MONTO_PESOS",
         NULL AS "FTN_SUA_DIAS_COTZDOS_BIMESTRE",
         NULL AS "FTN_SUA_ULTIMO_SALARIO_INT_PER",

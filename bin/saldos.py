@@ -104,7 +104,8 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
         GROUP BY SH.FTN_NUM_CTA_INVDUAL, SH.FCN_ID_SIEFORE, SH.FCN_ID_TIPO_SUBCTA, SH.FTD_FEH_LIQUIDACION
         """
 
-        postgres.execute(text(f"""TRUNCATE TABLE "ESTADO_CUENTA"."THHECHOS_SALDO_HISTORICO" WHERE FCN_ID_PERIODO = {term_id}  """))
+        truncate_table(postgres, "THHECHOS_SALDO_HISTORICO", term=term_id)
+
         extract_dataset_spark(
             configure_mit_spark,
             configure_postgres_spark,
