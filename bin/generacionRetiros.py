@@ -1,4 +1,3 @@
-from smbprotocol import open_file, register_session
 import requests
 import sys
 import math
@@ -7,7 +6,26 @@ from profuturo.database import get_postgres_pool, configure_postgres_spark
 from profuturo.extraction import extract_terms, _get_spark_session, read_table_insert_temp_view
 from profuturo.reporters import HtmlReporter
 from google.cloud import storage, secretmanager
+from profuturo.env import load_env
 import pyspark.sql.functions as f
+#from smbprotocol import open_file, register_session
+import requests
+import smtplib
+import math
+import sys
+import os
+
+
+
+
+load_env()
+host = os.getenv("SMTP_HOST")
+addres = os.getenv("SMTP_ADDRESS_SENDER")
+password= os.getenv("SMTP_PASSWORD")
+port = os.getenv("SMTP_PORT")
+
+url ='https://10.60.1.8:443/procesos/email/send'
+
 
 spark = _get_spark_session()
 
@@ -19,14 +37,6 @@ user = int(sys.argv[3])
 area = int(sys.argv[4])
 
 storage_client = storage.Client()
-
-client = secretmanager.SecretManagerServiceClient()
-smb_host = client.access_secret_version(name="SFTP_HOST").payload.data.decode("UTF-8")
-smb_port = client.access_secret_version(name="SFTP_PORT").payload.data.decode("UTF-8")
-smb_user = client.access_secret_version(name="SFTP_USERNAME").payload.data.decode("UTF-8")
-smb_pass = client.access_secret_version(name="SFTP_PASSWORD").payload.data.decode("UTF-8")
-smb_remote_file_path = client.access_secret_version(name="SFTP_CARPETA_DESTINO").payload.data.decode("UTF-8")
-
 
 def get_buckets():
     buckets = storage_client.list_buckets()
@@ -49,7 +59,7 @@ else:
 
 def str_to_gcs(data, name):
     blob = bucket.blob(f"correspondencia/{name}")
-    blob.upload_from_string(data.encode("ansi"), content_type="text/plain")
+    blob.upload_from_string(data.encode("utf-8"), content_type="text/plain")
 
 
 def upload_file_to_smb(remote_file_path, filename, data):
@@ -57,21 +67,22 @@ def upload_file_to_smb(remote_file_path, filename, data):
         fd.write(data)
 
 
-def send_email(url, receiver, subject, text):
-    data = {
-        "to": f"{receiver};",
-        "subject": subject,
-        "text": text
+def send_email(to_address, subject, body):
+
+    message = "{}\n\n{}".format(subject, body)
+    datos = {
+        'to': to_address,
+        'subject': subject,
+        'text': message
     }
-    headers = {
-        "Content-Type": "application/json"
-    }
-    response = requests.request("POST", url, data=data, headers=headers)
+    response = requests.post(url, data=datos,  verify=False)
 
     if response.status_code == 200:
-        print("Correo enviado con éxito!")
+        # Si la petición fue exitosa, puedes acceder al contenido de la respuesta de la siguiente manera:
+        print("La solicitud fue exitosa")
     else:
-        print(f"Error al enviar correo: {response.status_code}")
+        # Si la petición no fue exitosa, puedes imprimir el código de estado para obtener más información
+        print(f"La solicitud no fue exitosa. Código de estado: {response.status_code}")
 
 
 with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, _):
@@ -94,6 +105,8 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
         )
 
         retiros_general = spark.sql("SELECT * FROM retiros_general")
+
+        retiros_count = retiros_general.count()
 
         retiros_general = (
             retiros_general.filter(
@@ -216,11 +229,13 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                 res = "\n".join("".join(str(item) for item in row) for row in processed_data_part)
                 name = f"retiros_mensual_{regimen}_{str(term_id)[:4]}_{str(term_id)[-2:]}_{part}-{num_parts}.txt"
                 str_to_gcs(res, name)
-                upload_file_to_smb(smb_remote_file_path, name, res)
-                body_message += f"Se generó el archivo de {name} con un total de {len(processed_data_part)} registros\n"
+                #upload_file_to_smb(smb_remote_file_path, name, res)
+                body_message += f"Se generó el archivo de {name} con un total de {retiros_count} registros\n"
                 processed_data = [i for i in processed_data if i not in processed_data_part]
 
-        send_email(email_url, "", "Generacion de los archivos de retiros", body_message)
+        send_email( to_address="alfredo.guerra@profuturo.com.mx",
+        subject="Generacion de los archivos de retiros",
+        body=body_message)
 
         """notify(
             postgres,

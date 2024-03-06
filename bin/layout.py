@@ -6,6 +6,7 @@ from pyspark.sql.functions import monotonically_increasing_id
 from pyspark.sql.types import DecimalType
 from google.cloud import storage, bigquery
 from profuturo.env import load_env
+from sqlalchemy import text
 import requests
 import sys
 import math
@@ -57,8 +58,9 @@ cuentas = (10000851,10000861,10000868,10000872,1330029515,1350011161,1530002222,
            10001019,10001020,10001021,10001023,10001024,10001025,10001026,10001027,10001029,10001030,10001031,10001032,
            10001033,10001034,10001035,10001036,10001037,10001038,10001039,10001040
            )
-cuentas = (3300576485, 3200231348
-)
+
+cuentas = (3200089837,	3201423324,	3201693866,	3202486462,	3300118473,	3300780661,	3300809724,	3300835243,	3400764001,	6120000991,	6130000050,	6442107959,	6449015130,	6449061689,	6449083099,	8051533577,	8052970237,	1700004823,	3500058618,	3200231348,	3300576485,	3500053269,	1530002222,	3200840759,	3201292580,	3202135111,	8052710429,	3202077144,	3200474366,	3200767640,	3300797020,	3300797221,	3400958595,	3201900769,	3201895226,	3200534369,	1350011161,	3200996343,	1330029515,	3200976872,	3201368726,	3070006370,	6449009395,	6442128265,	3201096947 )
+
 def get_buckets():
     buckets = storage_client.list_buckets()
 
@@ -113,6 +115,18 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
 
     with register_time(postgres_pool, phase, term_id, user, area):
         body_message = ""
+
+        fechas = postgres.execute(text("""
+                    SELECT "FTD_FECHA_MOV_INICIO", "FTD_FECHA_MOV_FIN" FROM "ESTADO_CUENTA"."TTMUESTR_GENERAL"
+                    limit 1 
+                    """)).fetchone()[:]
+
+        (fecha1,fecha2) = fechas
+
+        fecha1 = fecha1.strftime("%d%m%Y")
+        fecha2 = fecha2.strftime("%d%m%Y")
+
+
         query = f"""
         SELECT
         DISTINCT
@@ -133,7 +147,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
         CASE
         WHEN "FTC_TIPOGENERACION" = 'IMSS - ISSSTE (MIXTO)' THEN 'MIX'
         WHEN "FTC_TIPOGENERACION" = 'GENERACIÓN AFORE' THEN 'GAF'
-        WHEN "FTC_TIPOGENERACION" = 'GENERACIÓN DE TRANSICIÓN' THEN 'MIX'
+        WHEN "FTC_TIPOGENERACION" = 'GENERACIÓN DE TRANSICIÓN' THEN 'GTR'
         ELSE 'DEC' END "FTC_GENERACION",
         "FTC_DESC_SIEFORE",
         to_char("FTD_FECHA_CORTE", 'ddmmyyyy') AS "FTD_FECHA_CORTE",
@@ -146,11 +160,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
         FROM "ESTADO_CUENTA"."TTMUESTR_GENERAL" G
         LEFT JOIN "ESTADO_CUENTA"."TTEDOCTA_CLIENTE_INDICADOR" I
         ON "FCN_NUMERO_CUENTA" = "FCN_CUENTA"
-        WHERE -- "FTB_IMPRESION" = TRUE
-        --AND "FTB_GENERACION" = TRUE
-        --AND "FTB_ENVIO" = FALSE
-        --AND I."FCN_ID_PERIODO" = :term
-        --AND 
+        WHERE 
         "FCN_NUMERO_CUENTA" IN {cuentas}
         """
         general_df = _create_spark_dataframe(spark, configure_postgres_spark, query,
@@ -219,11 +229,14 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
 
         anverso_seccion_ahor = anverso_seccion_ahor.repartition("FTC_CONCEPTO_NEGOCIO")
 
+        anverso_seccion_ahor.show()
+
         anverso_seccion_bono = anverso_df.select(col("NUMERO_SECCION").alias("NUMERO_SECCION_BON"),lpad(col("FCN_NUMERO_CUENTA").cast("string"), 10, "0").alias("FCN_NUMERO_CUENTA_BON"),
                                                  col("FTC_CONCEPTO_NEGOCIO").alias("FTC_CONCEPTO_NEGOCIO_BON"), col("FTN_VALOR_ACTUAL_UDI"),
                                                 col("FTN_VALOR_NOMINAL_UDI"), col("FTN_VALOR_ACTUAL_PESO"),
                                                 col("FTN_VALOR_NOMINAL_PESO")).filter(col("NUMERO_SECCION") == 3)
 
+        anverso_seccion_bono.show()
 
         anverso_seccion_sdo = anverso_df.select(col("NUMERO_SECCION").alias("NUMERO_SECCION_SDO"),lpad(col("FCN_NUMERO_CUENTA").cast("string"), 10, "0").alias("FCN_NUMERO_CUENTA_SDO"),
                                                 col("FTC_CONCEPTO_NEGOCIO").alias("FTC_CONCEPTO_NEGOCIO_SDO"),col("GRUPO_CONCEPTO"),
@@ -231,6 +244,8 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                                                 ).filter(col("NUMERO_SECCION") == 4)
 
         anverso_seccion_sdo = anverso_seccion_sdo.repartition("FTC_CONCEPTO_NEGOCIO","GRUPO_CONCEPTO")
+
+        anverso_seccion_sdo.show()
 
         joined_anverso = (
             general_df
@@ -284,6 +299,8 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
 
             general_df = general_df.dropDuplicates()
 
+            general_df.show()
+
             anverso_seccion_ahor = joined_anverso.select(
                                                      col("FCN_NUMERO_CUENTA_AHO"),
                                                      col("FTC_CONCEPTO_NEGOCIO_AHO"),
@@ -296,6 +313,9 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
             )
 
             anverso_seccion_ahor = anverso_seccion_ahor.dropDuplicates()
+            anverso_seccion_ahor = anverso_seccion_ahor.filter(col("FCN_NUMERO_CUENTA_AHO").isNotNull())
+
+            anverso_seccion_ahor.show()
 
             anverso_seccion_bono = joined_anverso.select(
                                                      col("FCN_NUMERO_CUENTA_BON"),
@@ -304,6 +324,9 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                                                      col("FTN_VALOR_NOMINAL_PESO").cast(decimal_pesos))
 
             anverso_seccion_bono = anverso_seccion_bono.dropDuplicates()
+            anverso_seccion_bono = anverso_seccion_bono.filter(col("FCN_NUMERO_CUENTA_BON").isNotNull())
+
+            anverso_seccion_bono.show()
 
             anverso_seccion_sdo = joined_anverso.select(
                                                     col("FCN_NUMERO_CUENTA_SDO"),
@@ -312,6 +335,9 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                                                     )
 
             anverso_seccion_sdo = anverso_seccion_sdo.dropDuplicates()
+            anverso_seccion_sdo = anverso_seccion_sdo.filter(col("FCN_NUMERO_CUENTA_SDO").isNotNull())
+
+            anverso_seccion_sdo.show()
 
             general_count = general_df.count()
             ahorro_count = anverso_seccion_ahor.count()
@@ -387,7 +413,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
             if len(reverso_data) < partition_size:
                 reverso_data_part = reverso_data
                 res = "\n".join("|".join(str(item) if item is not None else '' for item in row) for row in reverso_data_part)
-                reverso_final_row = f"\n2|{ret}|{vol}|{viv}|{total}"
+                reverso_final_row = f"\n2|{ret}|{vol}|{viv}|{total}|{fecha1}|{fecha2}"
                 res = res + reverso_final_row
             else:
                 reverso_data_part = reverso_data[:partition_size]

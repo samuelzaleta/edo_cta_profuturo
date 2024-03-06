@@ -190,7 +190,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                 AND  PCR.IDROL=787
                 AND C.IDLINEANEGOCIO = 763
                   )            
-                group by FTN_CUENTA       
+                group by IDPERSONA, TO_NUMBER(REGEXP_REPLACE(TO_CHAR(C.NUMERO), '[^0-9]', ''))    
             )
           ) 
         """

@@ -34,9 +34,14 @@ with define_extraction(phase, area, postgres_pool, bigquery_pool) as (postgres,b
         postgres.execute(text("""
         UPDATE "HECHOS"."TCHECHOS_CLIENTE"
         SET "FTC_GENERACION" = 'DECIMO TRANSITORIO'
-        WHERE "FCN_CUENTA" IN (SELECT "FCN_CUENTA" FROM "HECHOS"."TTHECHOS_CARGA_ARCHIVO" WHERE "FCN_ID_INDICADOR" = 50)
-        AND "FCN_ID_PERIODO" = :term
+        WHERE "FCN_CUENTA" IN (SELECT "FCN_CUENTA" FROM "HECHOS"."TTHECHOS_CARGA_ARCHIVO" WHERE "FCN_ID_INDICADOR" = 28)
                     """), {"term": term_id, "area": area})
+
+        postgres.execute(text("""
+        UPDATE "HECHOS"."TCHECHOS_CLIENTE"
+        SET "FTB_PENSION" = 'true'
+        WHERE "FCN_CUENTA" IN (SELECT "FCN_CUENTA" FROM "HECHOS"."TTHECHOS_CARGA_ARCHIVO" WHERE "FCN_ID_INDICADOR" = 73)
+        """), {"term": term_id, "area": area})
 
         indicators = postgres.execute(text("""
         SELECT "FTN_ID_INDICADOR", "FTC_DESCRIPCION", "FTB_DISPONIBLE", "FTB_IMPRESION", "FTB_ENVIO", "FTB_GENERACION"
