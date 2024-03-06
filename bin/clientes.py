@@ -127,9 +127,9 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
         """
         queryCorreo = """
         SELECT 
-        FTN_IDPERSONA AS FCN_CUENTA, FTC_CORREO_ELEC AS FTC_CORREO,
+        FTN_CUENTA AS FCN_CUENTA, FTC_CORREO_ELEC AS FTC_CORREO,
         COALESCE(FTC_TEL_PREF,FTC_TEL_OFICINA,FTC_TEL_FIJO,FTN_CELULAR,FTC_TEL_RECADO) AS FTC_TELEFONO   
-        FROM (SELECT  IDPERSONA AS FTN_IDPERSONA,  FTC_CORREO_PREFERENTE,
+        FROM (SELECT FTN_CUENTA, IDPERSONA AS FTN_IDPERSONA,  FTC_CORREO_PREFERENTE,
         (CASE WHEN EMAIL_PREFERENTE IS NOT  NULL THEN EMAIL_PREFERENTE
             ELSE 
                      CASE WHEN CORREO1 IS NOT NULL THEN CORREO1
@@ -138,12 +138,13 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                      END) AS FTC_CORREO_ELEC,  
         FTC_TEL_PREF,  FTC_TELEFONO_PREFERENTE, FTC_TEL_OFICINA, FTC_TEL_FIJO ,   FTN_CELULAR,  FTC_TEL_RECADO 
         FROM (
-        SELECT IDPERSONA, MAX(EMAIL_PREFERENTE) AS EMAIL_PREFERENTE, MAX(FTC_CORREO_PREFERENTE)AS FTC_CORREO_PREFERENTE, MAX(CORREO1) AS CORREO1, MAX(CORREO2) AS CORREO2, 
+        SELECT FTN_CUENTA,IDPERSONA, MAX(EMAIL_PREFERENTE) AS EMAIL_PREFERENTE, MAX(FTC_CORREO_PREFERENTE)AS FTC_CORREO_PREFERENTE, MAX(CORREO1) AS CORREO1, MAX(CORREO2) AS CORREO2, 
               MAX(FTC_TEL_PREFERENTE) AS FTC_TEL_PREF, MAX(FTC_TELEFONO_PREFERENTE) AS FTC_TELEFONO_PREFERENTE, MAX (ftc_tel_fijo) AS FTC_TEL_FIJO,
             MAX (ftc_tel_oficina) AS FTC_TEL_OFICINA, MAX (ftn_celular) AS FTN_CELULAR, MAX ( FTC_TEL_RECADO) AS FTC_TEL_RECADO
         FROM 
         (        
             SELECT /*+PARALLEL(C 20) PARALLEL(E 20) PARALLEL(T 20) PARALLEL(TP_TEL 20) USE_HASH(MC) ORDERED */
+                 TO_NUMBER(REGEXP_REPLACE(TO_CHAR(C.NUMERO), '[^0-9]', '')) AS FTN_CUENTA,
                   MCP.IDPERSONA, 
                             (CASE WHEN MC.PREFERENTE = 1 AND E.IDMEDIOCONTACTO IS NOT NULL THEN e.email  ELSE ''   END ) "EMAIL_PREFERENTE" , 
                             (CASE WHEN MC.PREFERENTE = 1 THEN '1' ELSE '0' END )as FTC_CORREO_PREFERENTE,
@@ -155,7 +156,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                             (CASE WHEN IDTIPOTELEFONO = 800 THEN (clavenacional || T.numero) ELSE '' END) "FTC_TEL_OFICINA",
                             (CASE WHEN IDTIPOTELEFONO = 801 THEN (clavenacional || T.numero) ELSE '' END) "FTN_CELULAR",
                             (CASE WHEN IDTIPOTELEFONO = 802 THEN (clavenacional || T.numero) ELSE '' END) "FTC_TEL_RECADO"
-                from CLUNICO.MEDIO_CONT_PERSONA  MCP 
+                FROM CLUNICO.MEDIO_CONT_PERSONA  MCP 
                   INNER JOIN CLUNICO.MEDIO_CONTACTO MC ON (MC.IDMEDIOCONTACTO = MCP.IDMEDIOCONTACTO and MC.IDSTATUSMCONTACTO = 757 )   
                   INNER JOIN CLUNICO.PERSONA_CONT_ROL pcr ON (MCP.IDPERSONA = PCR.IDPERSONA)
                   LEFT JOIN CLUNICO.CONTRATO C ON (C.IDCONTRATO = PCR.IDCONTRATO)
@@ -166,7 +167,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                 AND  PCR.IDROL=787
                 AND C.IDLINEANEGOCIO = 763
                   )            
-                group by IDPERSONA       
+                group by FTN_CUENTA       
             )
           ) 
         """
