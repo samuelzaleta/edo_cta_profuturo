@@ -1,7 +1,6 @@
 from profuturo.common import register_time, define_extraction, notify, truncate_table
 from profuturo.database import get_postgres_pool, configure_buc_spark, configure_mit_spark, configure_postgres_spark
-from profuturo.extraction import _get_spark_session, _write_spark_dataframe, _create_spark_dataframe, \
-    read_table_insert_temp_view, extract_dataset_spark
+from profuturo.extraction import _get_spark_session, _write_spark_dataframe, _create_spark_dataframe, read_table_insert_temp_view, extract_dataset_spark
 from profuturo.reporters import HtmlReporter
 from profuturo.extraction import extract_terms
 from sqlalchemy import text
@@ -406,6 +405,18 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
         df = df.repartition(60)
 
         _write_spark_dataframe(df, configure_postgres_spark, '"HECHOS"."TCHECHOS_CLIENTE"')
+
+        postgres.execute(text("""
+                UPDATE "HECHOS"."TCHECHOS_CLIENTE"
+                SET "FTC_GENERACION" = 'DECIMO TRANSITORIO'
+                WHERE "FCN_CUENTA" IN (SELECT "FCN_CUENTA" FROM "HECHOS"."TTHECHOS_CARGA_ARCHIVO" WHERE "FCN_ID_INDICADOR" = 28)
+                            """), {"term": term_id, "area": area})
+
+        postgres.execute(text("""
+                UPDATE "HECHOS"."TCHECHOS_CLIENTE"
+                SET "FTB_PENSION" = 'true'
+                WHERE "FCN_CUENTA" IN (SELECT "FCN_CUENTA" FROM "HECHOS"."TTHECHOS_CARGA_ARCHIVO" WHERE "FCN_ID_INDICADOR" = 73)
+                """), {"term": term_id, "area": area})
 
         query_pension = """
                 SELECT
