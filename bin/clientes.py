@@ -182,7 +182,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                 FROM CLUNICO.MEDIO_CONT_PERSONA  MCP 
                   INNER JOIN CLUNICO.MEDIO_CONTACTO MC ON (MC.IDMEDIOCONTACTO = MCP.IDMEDIOCONTACTO and MC.IDSTATUSMCONTACTO = 757 )   
                   INNER JOIN CLUNICO.PERSONA_CONT_ROL pcr ON (MCP.IDPERSONA = PCR.IDPERSONA)
-                  LEFT JOIN CLUNICO.CONTRATO C ON (C.IDCONTRATO = PCR.IDCONTRATO)
+                  INNER JOIN CLUNICO.CONTRATO C ON (C.IDCONTRATO = PCR.IDCONTRATO)
                   LEFT  JOIN CLUNICO.EMAIL E ON (mcp.IDMEDIOCONTACTO = E.IDMEDIOCONTACTO AND INSTR(E.EMAIL,'@') > 0)  
                   LEFT  JOIN CLUNICO.TELEFONO T ON (mcp.IDMEDIOCONTACTO = T.IDMEDIOCONTACTO ) 
                   LEFT JOIN CLUNICO.catalogo_general TP_TEL ON (T.IDTIPOTELEFONO=TP_TEL.idcatalogogral)    
@@ -190,7 +190,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                 AND  PCR.IDROL=787
                 AND C.IDLINEANEGOCIO = 763
                   )            
-                group by IDPERSONA, TO_NUMBER(REGEXP_REPLACE(TO_CHAR(C.NUMERO), '[^0-9]', ''))    
+                group by IDPERSONA, FTN_CUENTA
             )
           ) 
         """
