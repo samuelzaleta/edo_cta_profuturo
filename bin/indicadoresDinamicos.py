@@ -1,6 +1,6 @@
 from sqlalchemy import text
 from profuturo.common import define_extraction, truncate_table, notify,register_time
-from profuturo.database import SparkConnectionConfigurator, get_postgres_pool, configure_mit_spark, configure_postgres_spark, configure_buc_spark, configure_integrity_spark, configure_bigquery_spark, get_bigquery_pool
+from profuturo.database import SparkConnectionConfigurator, get_postgres_pool,get_postgres_oci_pool, configure_mit_spark, configure_postgres_spark, configure_buc_spark, configure_integrity_spark, configure_postgres_oci_spark, get_bigquery_pool
 from profuturo.extraction import update_indicator_spark, extract_dataset_spark, _get_spark_session, _write_spark_dataframe
 from profuturo.reporters import HtmlReporter
 from profuturo.extraction import extract_terms, read_table_insert_temp_view
@@ -8,13 +8,14 @@ import sys
 
 html_reporter = HtmlReporter()
 postgres_pool = get_postgres_pool()
+postgres_oci_pool = get_postgres_oci_pool()
 bigquery_pool = get_bigquery_pool()
 
 phase = int(sys.argv[1])
 user = int(sys.argv[3])
 area = int(sys.argv[4])
 
-with define_extraction(phase, area, postgres_pool, bigquery_pool) as (postgres,bigquery):
+with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgres, postgres_oci):
     term = extract_terms(postgres, phase)
     term_id = term["id"]
     time_period = term["time_period"]
@@ -85,7 +86,7 @@ with define_extraction(phase, area, postgres_pool, bigquery_pool) as (postgres,b
             print(f"Done extracting {indicator[1]}!")
 
         # Indicadores manuales
-        extract_dataset_spark(configure_postgres_spark, configure_postgres_spark, """
+        extract_dataset_spark(configure_postgres_spark, configure_postgres_oci_spark, """
         SELECT
         "FCN_CUENTA",
         "FCN_ID_INDICADOR",
@@ -102,7 +103,7 @@ with define_extraction(phase, area, postgres_pool, bigquery_pool) as (postgres,b
 
         truncate_table(postgres, 'TTEDOCTA_CLIENTE_INDICADOR', term=term_id)
 
-        extract_dataset_spark(configure_postgres_spark, configure_postgres_spark, """
+        extract_dataset_spark(configure_postgres_spark, configure_postgres_oci_spark, """
         SELECT
         DISTINCT
         "FCN_CUENTA",

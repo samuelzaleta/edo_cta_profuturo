@@ -1,6 +1,6 @@
 from profuturo.common import define_extraction, register_time, notify, truncate_table
-from profuturo.database import get_postgres_pool, configure_postgres_spark
-from profuturo.extraction import _write_spark_dataframe, extract_terms, _get_spark_session, _create_spark_dataframe
+from profuturo.database import get_postgres_pool, configure_postgres_spark, get_postgres_oci_pool
+from profuturo.extraction import _write_spark_dataframe, extract_terms, _get_spark_session, _create_spark_dataframe, configure_postgres_oci_spark
 from pyspark.sql.functions import concat, col, row_number, lit, lpad
 from pyspark.sql.types import StringType, StructType, StructField, IntegerType
 from concurrent.futures import ThreadPoolExecutor
@@ -20,6 +20,7 @@ import os
 
 load_env()
 postgres_pool = get_postgres_pool()
+postgres_oci_pool = get_postgres_oci_pool()
 storage_client = storage.Client()
 phase = int(sys.argv[1])
 user = int(sys.argv[3])
@@ -159,7 +160,7 @@ def move_files_parallel(source_bucket_name, destination_bucket_name, source_pref
     print("Movimiento de archivos completado")
 
 
-with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, _):
+with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgres, postgres_oci):
     term = extract_terms(postgres, phase)
     term_id = term["id"]
     start_month = term["start_month"]
@@ -216,7 +217,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
 
         df = spark.createDataFrame(blob_info_list, schema=schema)
 
-        _write_spark_dataframe(df, configure_postgres_spark, '"ESTADO_CUENTA"."TTEDOCTA_IMAGEN"')
+        _write_spark_dataframe(df, configure_postgres_oci_spark, '"ESTADO_CUENTA"."TTEDOCTA_IMAGEN"')
 
         ########################## GENERACIÓN DE MUESTRAS #################################################
 
@@ -1016,11 +1017,11 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
         general_df = general_df.repartition("FTN_ID_FORMATO","FTC_ENTIDAD_FEDERATIVA","FTC_DESC_SIEFORE")
         anverso_df = anverso_df.repartition("FTC_SECCION","FTC_TIPO_AHORRO","FTN_ORDEN_SDO")
         print("reverso, write")
-        #_write_spark_dataframe(reverso_df, configure_postgres_spark, '"ESTADO_CUENTA"."TTEDOCTA_REVERSO"')
+        _write_spark_dataframe(reverso_df, configure_postgres_oci_spark, '"ESTADO_CUENTA"."TTEDOCTA_REVERSO"')
         print("general, write")
-        #_write_spark_dataframe(general_df, configure_postgres_spark, '"ESTADO_CUENTA"."TTEDOCTA_GENERAL"')
+        _write_spark_dataframe(general_df, configure_postgres_oci_spark, '"ESTADO_CUENTA"."TTEDOCTA_GENERAL"')
         print("anverso, write ")
-        #_write_spark_dataframe(anverso_df, configure_postgres_spark, '"ESTADO_CUENTA"."TTEDOCTA_ANVERSO"')
+        _write_spark_dataframe(anverso_df, configure_postgres_oci_spark, '"ESTADO_CUENTA"."TTEDOCTA_ANVERSO"')
 
 
         for i in range(1800):
@@ -1116,7 +1117,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
             lit(".pdf")
         ))
 
-        #_write_spark_dataframe(general_df, configure_postgres_spark, '"ESTADO_CUENTA"."TTEDOCTA_URL"')
+        _write_spark_dataframe(general_df, configure_postgres_oci_spark, '"ESTADO_CUENTA"."TTEDOCTA_URL"')
 
         notify(
             postgres,

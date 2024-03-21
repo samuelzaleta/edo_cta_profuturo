@@ -69,6 +69,16 @@ def get_postgres_conn():
         options='-c search_path="MAESTROS","GESTOR","HECHOS","RESULTADOS","ESTADO_CUENTA"',
     )
 
+def get_postgres_oci_conn():
+    return psycopg2.connect(
+        host=os.getenv("POSTGRES_HOST_OCI"),
+        port=int(os.getenv("POSTGRES_PORT_OCI")),
+        database=os.getenv("POSTGRES_DATABASE_OCI"),
+        user=os.getenv("POSTGRES_USER_OCI"),
+        password=os.getenv("POSTGRES_PASSWORD_OCI"),
+        options='-c search_path="MAESTROS","GESTOR","HECHOS","RESULTADOS","ESTADO_CUENTA"',
+    )
+
 
 def get_integrity_conn(database: str):
     def creator():
@@ -116,6 +126,13 @@ def get_postgres_pool():
     return sqlalchemy.create_engine(
         "postgresql+psycopg2://",
         creator=get_postgres_conn,
+        execution_options={"isolation_level": "AUTOCOMMIT"},
+    )
+
+def get_postgres_oci_pool():
+    return sqlalchemy.create_engine(
+        "postgresql+psycopg2://",
+        creator=get_postgres_oci_conn,
         execution_options={"isolation_level": "AUTOCOMMIT"},
     )
 
@@ -203,6 +220,20 @@ def configure_postgres_spark(connection: SparkConnection, table: str, reading: b
     database = os.getenv("POSTGRES_DATABASE")
     user = os.getenv("POSTGRES_USER")
     password = os.getenv("POSTGRES_PASSWORD")
+
+    return configure_jdbc_spark(connection, table, reading) \
+        .option("url", f"jdbc:postgresql://{host}:{port}/{database}") \
+        .option("driver", "org.postgresql.Driver") \
+        .option("search_path", '"MAESTROS","GESTOR","HECHOS","RESULTADOS","ESTADO_CUENTA"') \
+        .option("user", user) \
+        .option("password", password)
+
+def configure_postgres_oci_spark(connection: SparkConnection, table: str, reading: bool) -> SparkConnection:
+    host = os.getenv("POSTGRES_HOST_OCI")
+    port = int(os.getenv("POSTGRES_PORT_OCI"))
+    database = os.getenv("POSTGRES_DATABASE_OCI")
+    user = os.getenv("POSTGRES_USER_OCI")
+    password = os.getenv("POSTGRES_PASSWORD_OCI")
 
     return configure_jdbc_spark(connection, table, reading) \
         .option("url", f"jdbc:postgresql://{host}:{port}/{database}") \

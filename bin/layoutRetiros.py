@@ -1,5 +1,5 @@
 from profuturo.extraction import read_table_insert_temp_view, extract_terms, _get_spark_session, _create_spark_dataframe
-from profuturo.database import get_postgres_pool, configure_postgres_spark, get_bigquery_pool
+from profuturo.database import get_postgres_pool,get_postgres_oci_pool, configure_postgres_oci_spark, get_bigquery_pool
 from pyspark.sql.functions import concat, col, row_number, lit, lpad, udf,date_format, rpad, translate
 from pyspark.sql.functions import monotonically_increasing_id
 from profuturo.common import define_extraction, register_time
@@ -15,6 +15,7 @@ import os
 
 load_env()
 postgres_pool = get_postgres_pool()
+postgres_oci_pool = get_postgres_oci_pool()
 bigquery_pool = get_bigquery_pool()
 storage_client = storage.Client()
 phase = int(sys.argv[1])
@@ -96,7 +97,7 @@ def process_dataframe(df, identifier):
     return df.rdd.flatMap(lambda row: [([identifier] + [row[i] for i in range(len(row))])]).collect()
 
 
-with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, _):
+with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgres, postgres_oci):
     term = extract_terms(postgres, phase)
     term_id = term["id"]
     start_month = term["start_month"]
@@ -145,14 +146,14 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
         FROM "ESTADO_CUENTA"."TTEDOCTA_RETIRO_GENERAL"
         """
 
-        retiros_general_df = _create_spark_dataframe(spark, configure_postgres_spark, query_general_retiro,
+        retiros_general_df = _create_spark_dataframe(spark, configure_postgres_oci_spark, query_general_retiro,
                                              params={"term": term_id, "start": start_month, "end": end_month,
                                                      "user": str(user)})
 
         retiros_general_df = retiros_general_df.withColumn("FCN_NUMERO_CUENTA", lpad(col("FCN_NUMERO_CUENTA").cast("string"), 10, "0"))
 
 
-        retiros_df = _create_spark_dataframe(spark, configure_postgres_spark, query_retiro,
+        retiros_df = _create_spark_dataframe(spark, configure_postgres_oci_spark, query_retiro,
                                                      params={"term": term_id, "start": start_month, "end": end_month,
                                                              "user": str(user)})
 

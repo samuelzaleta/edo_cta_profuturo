@@ -1,5 +1,5 @@
 from profuturo.common import define_extraction, register_time
-from profuturo.database import get_postgres_pool, configure_postgres_spark, get_bigquery_pool
+from profuturo.database import get_postgres_pool,get_postgres_oci_pool, configure_postgres_spark, get_bigquery_pool, configure_postgres_oci_spark
 from profuturo.extraction import read_table_insert_temp_view, extract_terms, _get_spark_session, _create_spark_dataframe
 from pyspark.sql.functions import concat, col, row_number, lit, lpad, udf,date_format
 from pyspark.sql.functions import monotonically_increasing_id
@@ -16,6 +16,7 @@ import os
 
 load_env()
 postgres_pool = get_postgres_pool()
+postgres_oci_pool = get_postgres_oci_pool()
 bigquery_pool = get_bigquery_pool()
 storage_client = storage.Client()
 phase = int(sys.argv[1])
@@ -97,7 +98,7 @@ def process_dataframe(df, identifier):
     return df.rdd.flatMap(lambda row: [([identifier] + [row[i] for i in range(len(row))])]).collect()
 
 
-with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, _):
+with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgres, postgres_oci):
     term = extract_terms(postgres, phase)
     term_id = term["id"]
     start_month = term["start_month"]
@@ -163,7 +164,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
         WHERE 
         "FCN_NUMERO_CUENTA" IN {cuentas}
         """
-        general_df = _create_spark_dataframe(spark, configure_postgres_spark, query,
+        general_df = _create_spark_dataframe(spark, configure_postgres_oci_spark, query,
         params={"term": term_id, "start": start_month, "end": end_month, "user": str(user)})
 
         general_df = general_df.withColumn("FCN_NUMERO_CUENTA", lpad(col("FCN_NUMERO_CUENTA").cast("string"), 10, "0"))
@@ -217,7 +218,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
         ) X
         ORDER BY "FCN_NUMERO_CUENTA","NUMERO_SECCION","FTC_SECCION", "FTN_ORDEN_SDO"
         """
-        anverso_df =_create_spark_dataframe(spark, configure_postgres_spark, query_anverso,params={"term": term_id, "start": start_month, "end": end_month, "user": str(user)})
+        anverso_df =_create_spark_dataframe(spark, configure_postgres_oci_spark, query_anverso,params={"term": term_id, "start": start_month, "end": end_month, "user": str(user)})
 
         anverso_seccion_ahor = anverso_df.select(col("NUMERO_SECCION").alias("NUMERO_SECCION_AHO"),lpad(col("FCN_NUMERO_CUENTA").cast("string"), 10, "0").alias("FCN_NUMERO_CUENTA_AHO"),
                                                  col("FTC_CONCEPTO_NEGOCIO").alias("FTC_CONCEPTO_NEGOCIO_AHO"),
@@ -374,7 +375,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
                         ORDER BY  "FCN_NUMERO_CUENTA", "FTC_SECCION", "FTN_ORDEN"
                                         """
         read_table_insert_temp_view(
-            configure_postgres_spark,
+            configure_postgres_oci_spark,
             query_reverso,
             "reverso"
         )

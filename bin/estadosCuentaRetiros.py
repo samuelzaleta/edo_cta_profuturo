@@ -1,5 +1,5 @@
 from profuturo.common import define_extraction, register_time, truncate_table, notify
-from profuturo.database import get_postgres_pool, configure_postgres_spark, configure_bigquery_spark, get_bigquery_pool
+from profuturo.database import get_postgres_pool, get_postgres_oci_pool, configure_postgres_spark, configure_bigquery_spark, get_bigquery_pool, configure_postgres_oci_spark
 from profuturo.extraction import _write_spark_dataframe, extract_terms,  _get_spark_session, read_table_insert_temp_view
 from pyspark.sql.functions import udf, concat, col, current_date , row_number,lit, current_timestamp
 from profuturo.env import load_env
@@ -11,6 +11,7 @@ import os
 
 load_env()
 postgres_pool = get_postgres_pool()
+postgres_oci_pool = get_postgres_oci_pool()
 bigquery_pool = get_bigquery_pool()
 phase = int(sys.argv[1])
 user = int(sys.argv[3])
@@ -18,7 +19,7 @@ area = int(sys.argv[4])
 url = os.getenv("URL_DEFINITIVO_RET")
 print(url)
 
-with define_extraction(phase, area, postgres_pool,bigquery_pool) as (postgres, bigquery):
+with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgres, postgres_oci):
     term = extract_terms(postgres, phase)
     term_id = term["id"]
     start_month = term["start_month"]
@@ -115,8 +116,8 @@ with define_extraction(phase, area, postgres_pool,bigquery_pool) as (postgres, b
         ).cast("bigint"))
 
 
-        _write_spark_dataframe(general_df, configure_postgres_spark, '"ESTADO_CUENTA"."TTEDOCTA_RETIRO_GENERAL"')
-        _write_spark_dataframe(anverso_df, configure_postgres_spark, '"ESTADO_CUENTA"."TTEDOCTA_RETIRO"')
+        _write_spark_dataframe(general_df, configure_postgres_oci_spark, '"ESTADO_CUENTA"."TTEDOCTA_RETIRO_GENERAL"')
+        _write_spark_dataframe(anverso_df, configure_postgres_oci_spark, '"ESTADO_CUENTA"."TTEDOCTA_RETIRO"')
 
         response = requests.get(url)
 

@@ -1,5 +1,5 @@
 from profuturo.common import define_extraction, register_time, notify
-from profuturo.database import get_postgres_pool, get_bigquery_pool
+from profuturo.database import get_postgres_pool, get_bigquery_pool, get_postgres_oci_pool
 from profuturo.extraction import extract_terms, _get_spark_session
 from profuturo.env import load_env
 import requests
@@ -11,13 +11,14 @@ import os
 
 load_env()
 postgres_pool = get_postgres_pool()
+postgres_oci_pool = get_postgres_oci_pool()
 phase = int(sys.argv[1])
 user = int(sys.argv[3])
 area = int(sys.argv[4])
 url = os.getenv("URL_RESPONSYS")
 print(url)
 
-with define_extraction(phase, area, postgres_pool) as (postgres):
+with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgres,postgres_oci):
     term = extract_terms(postgres, phase)
     term_id = term["id"]
     start_month = term["start_month"]

@@ -1,5 +1,5 @@
 from profuturo.common import register_time, define_extraction, notify
-from profuturo.database import get_postgres_pool, get_integrity_pool
+from profuturo.database import get_postgres_pool, get_postgres_oci_pool, get_integrity_pool
 from profuturo.movements import extract_movements_integrity, extract_movements_mit
 from profuturo.extraction import extract_terms
 from profuturo.reporters import HtmlReporter
@@ -8,13 +8,14 @@ import sys
 
 html_reporter = HtmlReporter()
 postgres_pool = get_postgres_pool()
+postgres_oci_pool = get_postgres_oci_pool()
 integrity_pool = get_integrity_pool("cierren")
 
 phase = int(sys.argv[1])
 user = int(sys.argv[3])
 area = int(sys.argv[4])
 
-with define_extraction(phase, area, postgres_pool, integrity_pool) as (postgres, integrity):
+with define_extraction(phase, area, postgres_pool, integrity_pool,postgres_oci_pool) as (postgres, integrity,postgres_oci):
     term = extract_terms(postgres, phase)
     term_id = term["id"]
     time_period = term["time_period"]

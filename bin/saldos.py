@@ -1,5 +1,5 @@
 from profuturo.common import truncate_table, notify, register_time, define_extraction
-from profuturo.database import get_postgres_pool, configure_mit_spark, configure_postgres_spark
+from profuturo.database import get_postgres_pool,get_postgres_oci_pool, configure_mit_spark, configure_postgres_spark, configure_postgres_oci_spark
 from profuturo.extraction import extract_terms, _get_spark_session, read_table_insert_temp_view, _write_spark_dataframe, extract_dataset_spark
 from profuturo.reporters import HtmlReporter
 from pyspark.sql.functions import col, lit
@@ -9,6 +9,7 @@ from datetime import datetime
 
 html_reporter = HtmlReporter()
 postgres_pool = get_postgres_pool()
+postgres_oci_pool = get_postgres_oci_pool()
 
 phase = int(sys.argv[1])
 user = int(sys.argv[3])
@@ -45,7 +46,7 @@ cuentas = (10000851,10000861,10000868,10000872,1330029515,1350011161,1530002222,
            3200976872,	3201368726,	3070006370,	6449009395,	6442128265,	3201096947 )
 
 
-with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, _):
+with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgres, postgres_oci):
     term = extract_terms(postgres, phase)
     term_id = term["id"]
     time_period = term["time_period"]
@@ -234,7 +235,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
 
         df = df.withColumn("FCN_ID_PERIODO", lit(term_id))
 
-        _write_spark_dataframe(df, configure_postgres_spark, '"HECHOS"."TTCALCUL_BONO"')
+        _write_spark_dataframe(df, configure_postgres_oci_spark, '"HECHOS"."TTCALCUL_BONO"')
 
         # Cifras de control
         report1 = html_reporter.generate(

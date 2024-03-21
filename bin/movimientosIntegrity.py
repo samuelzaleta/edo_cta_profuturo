@@ -1,5 +1,5 @@
 from profuturo.common import notify, register_time, define_extraction, truncate_table
-from profuturo.database import get_postgres_pool, get_integrity_pool
+from profuturo.database import get_postgres_pool, get_integrity_pool, get_postgres_oci_pool
 from profuturo.extraction import extract_terms, extract_dataset
 from profuturo.reporters import HtmlReporter
 from dotenv import load_dotenv
@@ -62,13 +62,14 @@ def transform(df: DataFrame) -> DataFrame:
 
 html_reporter = HtmlReporter()
 postgres_pool = get_postgres_pool()
+postgres_oci_pool = get_postgres_oci_pool()
 integrity_pool = get_integrity_pool("cierren")
 
 phase = int(sys.argv[1])
 user = int(sys.argv[3])
 area = int(sys.argv[4])
 
-with define_extraction(phase, area, postgres_pool, integrity_pool) as (postgres, integrity):
+with define_extraction(phase, area, postgres_pool, integrity_pool,postgres_oci_pool) as (postgres, integrity, postgres_oci):
     term = extract_terms(postgres, phase)
     term_id = term["id"]
     start_month = term["start_month"]
@@ -83,8 +84,8 @@ with define_extraction(phase, area, postgres_pool, integrity_pool) as (postgres,
           AND "FTC_ORIGEN" = 'INTEGRITY'
         """)).fetchall()
 
-        truncate_table(postgres, 'TTHECHOS_MOVIMIENTOS_INTEGRITY', term=term_id)
-        extract_dataset(integrity, postgres, """
+        truncate_table(postgres_oci, 'TTHECHOS_MOVIMIENTOS_INTEGRITY', term=term_id)
+        extract_dataset(integrity, postgres_oci, """
         SELECT CSIE1_NUMCUE, 
                CSIE1_CODMOV,
                CSIE1_FECCON,
@@ -106,7 +107,7 @@ with define_extraction(phase, area, postgres_pool, integrity_pool) as (postgres,
             "start": start_month.strftime("%Y%m%d"),
             "end": end_month.strftime("%Y%m%d"),
         }, transform=transform)
-        extract_dataset(integrity, postgres, """
+        extract_dataset(integrity, postgres_oci, """
         SELECT CSIE1_NUMCUE, CSIE1_CODMOV, CSIE1_FECCON, CVE_SIEFORE,
                CVE_SERVICIO, CSIE1_MONPES_1,
                CSIE1_MONPES_2, CSIE1_MONPES_3, CSIE1_MONPES_4,
@@ -126,7 +127,7 @@ with define_extraction(phase, area, postgres_pool, integrity_pool) as (postgres,
             "start": start_month.strftime("%Y%m%d"),
             "end": end_month.strftime("%Y%m%d"),
         }, transform=transform_rcv)
-        extract_dataset(integrity, postgres, """
+        extract_dataset(integrity, postgres_oci, """
         SELECT CSIE1_NUMCUE, CSIE1_CODMOV, CSIE1_FECCON, 
                CVE_SIEFORE, CVE_SERVICIO, CSIE1_MONPES_1,
                CSIE1_NSSEMP, CSIE1_FECHA_2,
@@ -144,7 +145,7 @@ with define_extraction(phase, area, postgres_pool, integrity_pool) as (postgres,
             "start": start_month.strftime("%Y%m%d"),
             "end": end_month.strftime("%Y%m%d"),
         }, transform=transform)
-        extract_dataset(integrity, postgres, """
+        extract_dataset(integrity, postgres_oci, """
         SELECT CSIE1_NUMCUE, CSIE1_CODMOV, CSIE1_FECCON, CVE_SIEFORE,
                CVE_SERVICIO, CSIE1_MONPES_1, CSIE1_MONPES_3, CSIE1_NSSEMP, 
                CSIE1_FECHA_2, CSIE1_FECTRA, CSIE1_CORREL,
@@ -161,7 +162,7 @@ with define_extraction(phase, area, postgres_pool, integrity_pool) as (postgres,
             "start": start_month.strftime("%Y%m%d"),
             "end": end_month.strftime("%Y%m%d"),
         }, transform=transform)
-        extract_dataset(integrity, postgres, """
+        extract_dataset(integrity, postgres_oci, """
         SELECT CSIE1_NUMCUE, CSIE1_CODMOV, CSIE1_FECCON, CVE_SIEFORE,
                CVE_SERVICIO, CSIE1_MONPES_1, CSIE1_MONPES_2, CSIE1_NSSEMP, 
                CSIE1_FECHA_2, CSIE1_FECTRA, CSIE1_SECLOT, CSIE1_CORREL,
@@ -178,7 +179,7 @@ with define_extraction(phase, area, postgres_pool, integrity_pool) as (postgres,
             "start": start_month.strftime("%Y%m%d"),
             "end": end_month.strftime("%Y%m%d"),
         }, transform=transform)
-        extract_dataset(integrity, postgres, """
+        extract_dataset(integrity, postgres_oci, """
         SELECT CSIE1_NUMCUE, CSIE1_CODMOV, CSIE1_FECCON, CVE_SIEFORE,
                CVE_SERVICIO, CSIE1_MONPES_3, CSIE1_NSSEMP, CSIE1_FECHA_2,
                CSIE1_FECTRA, CSIE1_SECLOT, CSIE1_CORREL, CSIE1_PERPAG,
@@ -195,7 +196,7 @@ with define_extraction(phase, area, postgres_pool, integrity_pool) as (postgres,
             "start": start_month.strftime("%Y%m%d"),
             "end": end_month.strftime("%Y%m%d"),
         }, transform=transform)
-        extract_dataset(integrity, postgres, """
+        extract_dataset(integrity, postgres_oci, """
         SELECT CSIE1_NUMCUE, CSIE1_CODMOV, CSIE1_FECCON, CVE_SIEFORE,
                CVE_SERVICIO, CSIE1_MONPES_1, CSIE1_MONPES_3, CSIE1_NSSEMP, 
                CSIE1_FECHA_2, CSIE1_FECTRA, CSIE1_SECLOT, CSIE1_CORREL, 

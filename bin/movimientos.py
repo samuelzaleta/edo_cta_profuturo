@@ -1,5 +1,5 @@
 from profuturo.common import truncate_table, notify, register_time, define_extraction
-from profuturo.database import get_postgres_pool, configure_mit_spark, configure_postgres_spark
+from profuturo.database import get_postgres_pool,get_postgres_oci_pool, configure_mit_spark, configure_postgres_oci_spark
 from profuturo.extraction import extract_terms, extract_dataset_spark
 from profuturo.reporters import HtmlReporter
 from datetime import datetime
@@ -7,6 +7,7 @@ import sys
 
 html_reporter = HtmlReporter()
 postgres_pool = get_postgres_pool()
+postgres_oci_pool = get_postgres_oci_pool()
 
 phase = int(sys.argv[1])
 user = int(sys.argv[3])
@@ -14,7 +15,7 @@ area = int(sys.argv[4])
 
 table = '"HECHOS"."TTHECHOS_MOVIMIENTO"'
 
-with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, _):
+with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgres, postgres_oci):
     term = extract_terms(postgres, phase)
     term_id = term["id"]
     time_period = term["time_period"]
@@ -24,7 +25,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
     with register_time(postgres_pool, phase, term_id, user, area):
         # Extracción
         truncate_table(postgres, 'TTHECHOS_MOVIMIENTO', term=term_id)
-        extract_dataset_spark(configure_mit_spark, configure_postgres_spark, """
+        extract_dataset_spark(configure_mit_spark, configure_postgres_oci_spark, """
         SELECT DISTINCT 
                DT.FTN_NUM_CTA_INVDUAL AS FCN_CUENTA,
                DT.FCN_ID_TIPO_MOV AS FCN_ID_TIPO_MOVIMIENTO,
@@ -53,7 +54,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
         AND SUA.FTN_NUM_CTA_INVDUAL = DT.FTN_NUM_CTA_INVDUAL
         WHERE FTD_FEH_LIQUIDACION BETWEEN :start AND :end
         """, table, term=term_id, params={"start": start_month, "end": end_month})
-        extract_dataset_spark(configure_mit_spark, configure_postgres_spark, """
+        extract_dataset_spark(configure_mit_spark, configure_postgres_oci_spark, """
         SELECT DISTINCT 
                FTN_NUM_CTA_INVDUAL AS FCN_CUENTA,
                FCN_ID_TIPO_MOV AS FCN_ID_TIPO_MOVIMIENTO,
@@ -68,7 +69,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
         FROM TTAFOGRAL_MOV_BONO
         WHERE FTD_FEH_LIQUIDACION BETWEEN :start AND :end
         """, table, term=term_id, params={"start": start_month, "end": end_month})
-        extract_dataset_spark(configure_mit_spark, configure_postgres_spark, """
+        extract_dataset_spark(configure_mit_spark, configure_postgres_oci_spark, """
         SELECT DISTINCT 
                DT.FTN_NUM_CTA_INVDUAL AS FCN_CUENTA,
                DT.FCN_ID_TIPO_MOV AS FCN_ID_TIPO_MOVIMIENTO,
@@ -96,7 +97,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
         AND SUA.FTN_NUM_CTA_INVDUAL = DT.FTN_NUM_CTA_INVDUAL
         WHERE FTD_FEH_LIQUIDACION BETWEEN :start AND :end
         """, table, term=term_id, params={"start": start_month, "end": end_month})
-        extract_dataset_spark(configure_mit_spark, configure_postgres_spark, """
+        extract_dataset_spark(configure_mit_spark, configure_postgres_oci_spark, """
         SELECT DISTINCT 
                FTN_NUM_CTA_INVDUAL AS FCN_CUENTA,
                FCN_ID_TIPO_MOV AS FCN_ID_TIPO_MOVIMIENTO,
@@ -111,7 +112,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
         FROM TTAFOGRAL_MOV_GOB
         WHERE FTD_FEH_LIQUIDACION BETWEEN :start AND :end
         """, table, term=term_id, params={"start": start_month, "end": end_month})
-        extract_dataset_spark(configure_mit_spark, configure_postgres_spark, """
+        extract_dataset_spark(configure_mit_spark, configure_postgres_oci_spark, """
         SELECT DISTINCT 
                DT.FTN_NUM_CTA_INVDUAL AS FCN_CUENTA,
                DT.FCN_ID_TIPO_MOV AS FCN_ID_TIPO_MOVIMIENTO,
@@ -139,7 +140,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
         AND SUA.FTN_NUM_CTA_INVDUAL = DT.FTN_NUM_CTA_INVDUAL
         WHERE FTD_FEH_LIQUIDACION BETWEEN :start AND :end
         """, table, term=term_id, params={"start": start_month, "end": end_month})
-        extract_dataset_spark(configure_mit_spark, configure_postgres_spark, """
+        extract_dataset_spark(configure_mit_spark, configure_postgres_oci_spark, """
         SELECT DISTINCT 
                FTN_NUM_CTA_INVDUAL AS FCN_CUENTA,
                FCN_ID_TIPO_MOV AS FCN_ID_TIPO_MOVIMIENTO,
@@ -154,7 +155,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
         FROM TTAFOGRAL_MOV_SAR
         WHERE FTD_FEH_LIQUIDACION BETWEEN :start AND :end
         """, table, term=term_id, params={"start": start_month, "end": end_month})
-        extract_dataset_spark(configure_mit_spark, configure_postgres_spark, """
+        extract_dataset_spark(configure_mit_spark, configure_postgres_oci_spark, """
         SELECT DISTINCT 
                FTN_NUM_CTA_INVDUAL AS FCN_CUENTA,
                FCN_ID_TIPO_MOV AS FCN_ID_TIPO_MOVIMIENTO,

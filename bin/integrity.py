@@ -1,5 +1,5 @@
 from profuturo.common import notify, register_time, define_extraction, truncate_table
-from profuturo.database import get_postgres_pool, get_integrity_pool,  configure_postgres_spark
+from profuturo.database import get_postgres_pool, get_postgres_oci_pool, get_integrity_pool,  configure_postgres_spark
 from profuturo.extraction import _get_spark_session,extract_terms, extract_dataset, extract_dataset_return, _write_spark_dataframe
 from profuturo.reporters import HtmlReporter
 from pandas import DataFrame
@@ -10,13 +10,14 @@ import sys
 
 html_reporter = HtmlReporter()
 postgres_pool = get_postgres_pool()
+postgres_oci_pool = get_postgres_oci_pool()
 integrity_pool = get_integrity_pool("cierren")
 
 phase = int(sys.argv[1])
 user = int(sys.argv[3])
 area = int(sys.argv[4])
 
-with define_extraction(phase, area, postgres_pool, integrity_pool) as (postgres, integrity):
+with define_extraction(phase, area, postgres_pool, integrity_pool,postgres_oci_pool) as (postgres, integrity, postgres_oci):
     term = extract_terms(postgres, phase)
     term_id = term["id"]
     start_month = term["start_month"]

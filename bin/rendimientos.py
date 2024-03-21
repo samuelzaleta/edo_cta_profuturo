@@ -1,5 +1,5 @@
 from profuturo.common import register_time, define_extraction, notify, truncate_table
-from profuturo.database import get_postgres_pool, get_buc_pool, configure_postgres_spark, configure_mit_spark
+from profuturo.database import get_postgres_pool,get_postgres_oci_pool, get_buc_pool, configure_postgres_oci_spark, configure_mit_spark
 from profuturo.extraction import _get_spark_session, _write_spark_dataframe, read_table_insert_temp_view, _create_spark_dataframe
 from profuturo.reporters import HtmlReporter
 from profuturo.extraction import extract_terms
@@ -9,13 +9,14 @@ import os
 
 html_reporter = HtmlReporter()
 postgres_pool = get_postgres_pool()
+postgres_oci_pool = get_postgres_oci_pool()
 bucket_name = os.getenv("BUCKET_DEFINITIVO")
 
 phase = int(sys.argv[1])
 user = int(sys.argv[3])
 area = int(sys.argv[4])
 
-with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, _):
+with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgres, postgres_oci):
     term = extract_terms(postgres, phase)
     term_id = term["id"]
     start_month = term["start_month"]
@@ -189,20 +190,20 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
         truncate_table(postgres, "TTCALCUL_RENDIMIENTO", term=term_id)
 
         read_table_insert_temp_view(
-            configure_postgres_spark,
+            configure_postgres_oci_spark,
             query=all_user,
             view="clientes",
             params={"date": end_month_anterior,"term": term_id ,"type": "F", "accion": valor_accion_anterior}
         )
 
         read_table_insert_temp_view(
-            configure_postgres_spark,
+            configure_postgres_oci_spark,
             query=saldo_inicial_query,
             view="saldoinicial",
             params={"date": valor_accion_anterior, "type": "F", "accion": valor_accion_anterior}
         )
         read_table_insert_temp_view(
-            configure_postgres_spark,
+            configure_postgres_oci_spark,
             query=saldo_final_query,
             view="saldofinal",
             params={
@@ -211,19 +212,19 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
         )
 
         read_table_insert_temp_view(
-            configure_postgres_spark,
+            configure_postgres_oci_spark,
             query=cargo_query,
             view="cargo",
             params={"term_id": term_id}
         )
         read_table_insert_temp_view(
-            configure_postgres_spark,
+            configure_postgres_oci_spark,
             abono_query,
             "abono",
             params={"term_id": term_id}
         )
         read_table_insert_temp_view(
-            configure_postgres_spark,
+            configure_postgres_oci_spark,
             query=comision_query,
             view="comision",
             params={"term_id": term_id}
@@ -273,7 +274,7 @@ with define_extraction(phase, area, postgres_pool, postgres_pool) as (postgres, 
         WHERE 1=1 and (ta.FTF_SALDO_FINAL - (ta.FTF_ABONO + ta.FTF_SALDO_INICIAL - ta.FTF_COMISION - ta.FTF_CARGO)) <> 0
         """)
         df.show(30)
-        _write_spark_dataframe(df, configure_postgres_spark, '"HECHOS"."TTCALCUL_RENDIMIENTO"')
+        _write_spark_dataframe(df, configure_postgres_oci_spark, '"HECHOS"."TTCALCUL_RENDIMIENTO"')
 
 
         # Cifras de control
