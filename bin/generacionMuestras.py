@@ -4,24 +4,30 @@ from profuturo.database import get_postgres_pool, configure_postgres_spark, conf
 from profuturo.extraction import _write_spark_dataframe, extract_terms, _get_spark_session, _create_spark_dataframe
 from pyspark.sql.functions import concat, col, row_number, lit, lpad
 from pyspark.sql.types import StringType, StructType, StructField, IntegerType
-from pyspark.sql.window import Window
-from sqlalchemy import text
-from google.cloud import storage, bigquery
 from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime, timedelta
+from pyspark.sql.window import Window
+from google.cloud import storage, bigquery
+
 from io import BytesIO
 from PIL import Image
+from sqlalchemy import text
 from profuturo.env import load_env
+
 import pandas as pd
 import requests
-import sys
 import random
 import string
 import time
-import os
 import json
+import sys
+import jwt
+import os
+
 
 load_env()
 postgres_pool = get_postgres_pool()
+postgres_oci_pool = get_postgres_oci_pool()
 bigquery_pool = get_bigquery_pool()
 storage_client = storage.Client()
 phase = int(sys.argv[1])
@@ -37,6 +43,36 @@ print(url)
 
 
 ################### OBTENCIÓN DE MUESTRAS #######################################
+
+def get_token():
+    try:
+        payload = {"isNonRepudiation": True}
+        secret = os.environ.get("JWT_SECRET")  # Ensure you have set the JWT_SECRET environment variable
+
+        if secret is None:
+            raise ValueError("JWT_SECRET environment variable is not set")
+
+        # Set expiration time 10 seconds from now
+        expiration_time = datetime.utcnow() + timedelta(seconds=10)
+        payload['exp'] = expiration_time
+
+        # Create the token
+        non_repudiation_token = jwt.encode(payload, secret, algorithm='HS256', expires_at=expiration_time)
+
+        return non_repudiation_token
+    except Exception as error:
+        print("ERROR:", error)
+        return -1
+
+
+def get_headers():
+    non_repudiation_token = get_token()
+    if non_repudiation_token != -1:
+        return {"Authorization": f"Bearer {non_repudiation_token}"}
+    else:
+        return {}
+
+
 def find_samples(samples_cursor: CursorResult):
     samples = set()
     i = 0
@@ -1117,21 +1153,22 @@ with define_extraction(phase, area, postgres_pool, bigquery_pool) as (postgres, 
               AND "FCN_ID_AREA" = :area
             """), {"term": term_id, "area": area})
 
+        headers = get_headers()  # Get the headers using the get_headers() function
+
         for i in range(1000):
-            response = requests.get(url)
+            response = requests.get(url, headers=headers)  # Pass headers with the request
             print(response)
-            # Verifica si la petición fue exitosa
+
             if response.status_code == 200:
-                # Si la petición fue exitosa, puedes acceder al contenido de la respuesta de la siguiente manera:
                 content = response.content.decode('utf-8')
                 data = json.loads(content)
                 if data['data']['statusText'] == 'finalizado':
                     break
                 time.sleep(8)
             else:
-                # Si la petición no fue exitosa, puedes imprimir el código de estado para obtener más información
                 print(f"La solicitud no fue exitosa. Código de estado: {response.status_code}")
                 break
+
 
         notify(
             postgres,
