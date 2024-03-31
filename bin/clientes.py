@@ -1,5 +1,5 @@
 from profuturo.common import register_time, define_extraction, notify, truncate_table
-from profuturo.database import get_postgres_pool, get_postgres_oci_pool, configure_buc_spark, configure_mit_spark, configure_postgres_spark, configure_postgres_oci_spark
+from profuturo.database import get_postgres_pool, get_postgres_oci_pool, configure_buc_spark, configure_mit_spark, configure_postgres_spark, configure_postgres_oci_spark, configure_postgres_spark
 from profuturo.extraction import _get_spark_session, _write_spark_dataframe, read_table_insert_temp_view, extract_dataset_spark
 from profuturo.reporters import HtmlReporter
 from profuturo.extraction import extract_terms
@@ -15,7 +15,7 @@ phase = int(sys.argv[1])
 user = int(sys.argv[3])
 area = int(sys.argv[4])
 
-with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgres, postgres_oci):
+with define_extraction(phase, area, postgres_pool,postgres_oci_pool,) as (postgres,postgres_oci):
     term = extract_terms(postgres, phase)
     term_id = term["id"]
     time_period = term["time_period"]
@@ -216,7 +216,7 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
         )
 
         read_table_insert_temp_view(
-            configure_postgres_oci_spark,
+            configure_postgres_spark,
             query=queryCliente,
             view='clientePostgres',
         )
@@ -257,7 +257,7 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
         LEFT JOIN  correoTelefono ct ON  c.FTN_CUENTA = ct.FCN_CUENTA 
          """).cache()
 
-        truncate_table(postgres, "TCDATMAE_CLIENTE")
+        truncate_table(postgres_oci, "TCDATMAE_CLIENTE")
         _write_spark_dataframe(df, configure_postgres_oci_spark, '"MAESTROS"."TCDATMAE_CLIENTE"')
 
         df.unpersist()
