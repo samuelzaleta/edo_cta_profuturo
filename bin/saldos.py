@@ -64,6 +64,34 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
     parallelims = 18000)
 
     with register_time(postgres_pool, phase, term_id, user, area):
+        # Extracción de tablas temporales
+        query_temp = """
+                SELECT
+                "FTN_ID_TIPO_SUBCTA", "FCN_ID_REGIMEN", "FCN_ID_CAT_SUBCTA", "FCC_VALOR", "FTC_TIPO_CLIENTE"
+                FROM "MAESTROS"."TCDATMAE_TIPO_SUBCUENTA"
+                """
+        extract_dataset_spark(
+            configure_postgres_spark,
+            configure_postgres_oci_spark,
+            query_temp,
+            '"MAESTROS"."TCDATMAE_TIPO_SUBCUENTA"',
+            term=term_id
+        )
+
+        # Extracción de tablas temporales
+        query_temp = """
+                SELECT
+                "FTN_ID_SIEFORE", "FTC_DESCRIPCION", "FTC_DESCRIPCION_CORTA", "FTC_SIEFORE"
+                FROM "MAESTROS"."TCDATMAE_SIEFORE"
+                """
+        extract_dataset_spark(
+            configure_postgres_spark,
+            configure_postgres_oci_spark,
+            query_temp,
+            '"MAESTROS"."TCDATMAE_SIEFORE"',
+            term=term_id
+        )
+
         # Extracción
         query = f"""
         SELECT SH.FTN_NUM_CTA_INVDUAL AS FCN_CUENTA,
@@ -105,11 +133,11 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
         GROUP BY SH.FTN_NUM_CTA_INVDUAL, SH.FCN_ID_SIEFORE, SH.FCN_ID_TIPO_SUBCTA, SH.FTD_FEH_LIQUIDACION
         """
 
-        truncate_table(postgres, "THHECHOS_SALDO_HISTORICO", term=term_id)
+        truncate_table(postgres_oci, "THHECHOS_SALDO_HISTORICO", term=term_id)
 
         extract_dataset_spark(
             configure_mit_spark,
-            configure_postgres_spark,
+            configure_postgres_oci_spark,
             query,
             '"HECHOS"."THHECHOS_SALDO_HISTORICO"',
             term=term_id,
@@ -159,13 +187,13 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
 
         extract_dataset_spark(
             configure_mit_spark,
-            configure_postgres_spark,
+            configure_postgres_oci_spark,
             query,
             '"HECHOS"."THHECHOS_SALDO_HISTORICO"',
             term=term_id,
             params={"date": start_next_mes, "type": "F"},
         )
-        truncate_table(postgres, 'TTCALCUL_BONO', term=term_id)
+        truncate_table(postgres_oci, 'TTCALCUL_BONO', term=term_id)
 
         query_dias_rend_bono = """
                 SELECT RB.FTN_NUM_CTA_INVDUAL, RB.FTD_FEH_VALOR AS FTD_FECHA_REDENCION_BONO,
@@ -204,7 +232,7 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
         )
 
         read_table_insert_temp_view(
-            configure_postgres_spark,
+            configure_postgres_oci_spark,
             query_saldos,
             "SALDOS",
             params={"term": term_id}
@@ -265,7 +293,7 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
         )
 
         report2 = html_reporter.generate(
-            postgres,
+            postgres_oci,
             """
             SELECT TS."FCC_VALOR" AS TIPO_SUBCUENTA,
                    S."FTC_DESCRIPCION_CORTA" AS SIEFORE,
@@ -302,3 +330,12 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
             message=f"Se han generado las cifras de control para saldos exitosamente para el periodo",
             details=report2,
         )
+
+        #Elimina tablas temporales
+        postgres_oci.execute(text("""
+        DROP TABLE IF EXISTS "MAESTROS"."TCDATMAE_TIPO_SUBCUENTA"
+        """))
+
+        postgres_oci.execute(text("""
+        DROP TABLE IF EXISTS "MAESTROS"."TCDATMAE_SIEFORE"
+        """))

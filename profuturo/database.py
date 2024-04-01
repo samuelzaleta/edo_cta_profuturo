@@ -76,6 +76,8 @@ def get_postgres_oci_conn():
         database=os.getenv("POSTGRES_DATABASE_OCI"),
         user=os.getenv("POSTGRES_USER_OCI"),
         password=os.getenv("POSTGRES_PASSWORD_OCI"),
+        sslmode="verify-full",
+        sslrootcert ="/opt/profuturo/bin/CaCertificate-DB_QRO_P_DETA1.pub",
         options='-c search_path="MAESTROS","GESTOR","HECHOS","RESULTADOS","ESTADO_CUENTA"',
     )
 

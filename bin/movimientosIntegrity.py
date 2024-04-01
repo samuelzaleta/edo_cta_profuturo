@@ -237,12 +237,12 @@ with define_extraction(phase, area, postgres_pool, integrity_pool,postgres_oci_p
             ["MONTO_PESOS"],
             params={"term": term_id},
         )
-        notify(
-            postgres,
-            f"Movimientos Integrity",
-            phase,
-            area,
-            term=term_id,
-            message="Se han generado las cifras de control para movimientos integrity exitosamente",
-            details=report,
-        )
+        #notify(
+        #    postgres,
+        #    f"Movimientos Integrity",
+        #    phase,
+        #    area,
+        #    term=term_id,
+        #    message="Se han generado las cifras de control para movimientos integrity exitosamente",
+        #    details=report,
+        #)

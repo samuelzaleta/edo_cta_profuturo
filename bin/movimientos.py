@@ -1,8 +1,9 @@
 from profuturo.common import truncate_table, notify, register_time, define_extraction
-from profuturo.database import get_postgres_pool,get_postgres_oci_pool, configure_mit_spark, configure_postgres_oci_spark
+from profuturo.database import get_postgres_pool,get_postgres_oci_pool, configure_mit_spark, configure_postgres_oci_spark, configure_postgres_spark
 from profuturo.extraction import extract_terms, extract_dataset_spark
 from profuturo.reporters import HtmlReporter
 from datetime import datetime
+from sqlalchemy import text
 import sys
 
 html_reporter = HtmlReporter()
@@ -23,8 +24,78 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
     end_month = term["end_month"]
 
     with register_time(postgres_pool, phase, term_id, user, area):
+        # Extracción de tablas temporales
+        query_temp = """
+        SELECT
+        "FTN_ID_TIPO_SUBCTA", "FCN_ID_REGIMEN", "FCN_ID_CAT_SUBCTA", "FCC_VALOR", "FTC_TIPO_CLIENTE"
+        FROM "MAESTROS"."TCDATMAE_TIPO_SUBCUENTA"
+        """
+        extract_dataset_spark(
+            configure_postgres_spark,
+            configure_postgres_oci_spark,
+            query_temp,
+            '"MAESTROS"."TCDATMAE_TIPO_SUBCUENTA"',
+            term=term_id
+        )
+
+        # Extracción de tablas temporales
+        query_temp = """
+        SELECT
+        "FTN_ID_SIEFORE", "FTC_DESCRIPCION", "FTC_DESCRIPCION_CORTA", "FTC_SIEFORE"
+        FROM "MAESTROS"."TCDATMAE_SIEFORE"
+        """
+        extract_dataset_spark(
+            configure_postgres_spark,
+            configure_postgres_oci_spark,
+            query_temp,
+            '"MAESTROS"."TCDATMAE_SIEFORE"',
+            term=term_id
+        )
+
+        # Extracción de tablas temporales
+        query_temp = """
+        SELECT
+        "FTN_ID_MOV_PROFUTURO_CONSAR", "FCN_ID_MOVIMIENTO_CONSAR","FCN_ID_MOVIMIENTO_PROFUTURO", "FCN_MONPES"
+        FROM "GESTOR"."TTGESPRO_MOV_PROFUTURO_CONSAR"
+        """
+        extract_dataset_spark(
+            configure_postgres_spark,
+            configure_postgres_oci_spark,
+            query_temp,
+            '"GESTOR"."TTGESPRO_MOV_PROFUTURO_CONSAR"',
+            term=term_id
+        )
+
+        # Extracción de tablas temporales
+        query_temp = """
+        SELECT
+        "FTN_ID_MOV_PROFUTURO_CONSAR", "FCN_ID_MOVIMIENTO_CONSAR","FCN_ID_MOVIMIENTO_PROFUTURO", "FCN_MONPES"
+        FROM "MAESTROS"."TCDATMAE_MOVIMIENTO_CONSAR"
+        """
+        extract_dataset_spark(
+            configure_postgres_spark,
+            configure_postgres_oci_spark,
+            query_temp,
+            '"MAESTROS"."TCDATMAE_MOVIMIENTO_CONSAR"',
+            term=term_id
+        )
+
+        # Extracción de tablas temporales
+        query_temp = """
+        SELECT
+        "FTN_ID_PERIODO", "FTC_PERIODO"
+        FROM "GESTOR"."TCGESPRO_PERIODO"
+        """
+        extract_dataset_spark(
+            configure_postgres_spark,
+            configure_postgres_oci_spark,
+            query_temp,
+            '"GESTOR"."TCGESPRO_PERIODO"',
+            term=term_id
+        )
+
         # Extracción
-        truncate_table(postgres, 'TTHECHOS_MOVIMIENTO', term=term_id)
+        truncate_table(postgres_oci, 'TTHECHOS_MOVIMIENTO', term=term_id)
         extract_dataset_spark(configure_mit_spark, configure_postgres_oci_spark, """
         SELECT DISTINCT 
                DT.FTN_NUM_CTA_INVDUAL AS FCN_CUENTA,
@@ -182,10 +253,10 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
                    MC."FTC_DESCRIPCION" AS CONSAR,
                    COUNT(DISTINCT M."FCN_CUENTA") AS CLIENTES,
                    SUM(M."FTF_MONTO_PESOS") AS IMPORTE
-            FROM "TTHECHOS_MOVIMIENTO" M
-                INNER JOIN "TCHECHOS_CLIENTE" I ON M."FCN_CUENTA" = i."FCN_CUENTA" AND i."FCN_ID_PERIODO" = :term
-                INNER JOIN "TTGESPRO_MOV_PROFUTURO_CONSAR" PC ON M."FCN_ID_CONCEPTO_MOVIMIENTO" = PC."FCN_ID_MOVIMIENTO_PROFUTURO"
-                INNER JOIN "TCDATMAE_MOVIMIENTO_CONSAR" MC ON PC."FCN_ID_MOVIMIENTO_CONSAR" = MC."FTN_ID_MOVIMIENTO_CONSAR"
+            FROM "HECHOS"."TTHECHOS_MOVIMIENTO" M
+                INNER JOIN "HECHOS"."TCHECHOS_CLIENTE" I ON M."FCN_CUENTA" = i."FCN_CUENTA" AND i."FCN_ID_PERIODO" = :term
+                INNER JOIN "GESTOR"."TTGESPRO_MOV_PROFUTURO_CONSAR" PC ON M."FCN_ID_CONCEPTO_MOVIMIENTO" = PC."FCN_ID_MOVIMIENTO_PROFUTURO"
+                INNER JOIN "MAESTROS"."TCDATMAE_MOVIMIENTO_CONSAR" MC ON PC."FCN_ID_MOVIMIENTO_CONSAR" = MC."FTN_ID_MOVIMIENTO_CONSAR"
             GROUP BY I."FTC_GENERACION", I."FTC_VIGENCIA", I."FTC_TIPO_CLIENTE", I."FTC_ORIGEN", MC."FTC_DESCRIPCION"
             """,
             ["Tipo Generación", "Vigencia", "Tipo Cliente", "Indicador Afiliación", "CONSAR"],
@@ -232,6 +303,7 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
             message=f"Se han generado las cifras de control para movimientos exitosamente para el periodo",
             details=report1,
         )
+
         notify(
             postgres,
             f"Movimientos",
@@ -241,3 +313,24 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
             message=f"Se han generado las cifras de control para movimientos exitosamente para el periodo",
             details=report2,
         )
+
+        # Elimina tablas temporales
+        postgres_oci.execute(text("""
+                DROP TABLE IF EXISTS "MAESTROS"."TCDATMAE_TIPO_SUBCUENTA"
+                """))
+
+        postgres_oci.execute(text("""
+                DROP TABLE IF EXISTS "MAESTROS"."TCDATMAE_SIEFORE"
+                """))
+
+        postgres_oci.execute(text("""
+                DROP TABLE IF EXISTS "GESTOR"."TTGESPRO_MOV_PROFUTURO_CONSAR"
+                """))
+
+        postgres_oci.execute(text("""
+                DROP TABLE IF EXISTS "MAESTROS"."TCDATMAE_MOVIMIENTO_CONSAR"
+                """))
+
+        postgres_oci.execute(text("""
+                DROP TABLE IF EXISTS "GESTOR"."TCGESPRO_PERIODO"
+                """))
