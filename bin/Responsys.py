@@ -21,11 +21,7 @@ print(url)
 with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgres,postgres_oci):
     term = extract_terms(postgres, phase)
     term_id = term["id"]
-    start_month = term["start_month"]
-    end_month = term["end_month"]
-    spark = _get_spark_session()
-    spark.conf.set("spark.sql.shuffle.partitions", 100)
-    spark.conf.set("spark.default.parallelism", 100)
+
 
     with register_time(postgres_pool, phase, term_id, user, area):
         for i in range(1000):
