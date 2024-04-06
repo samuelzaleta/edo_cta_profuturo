@@ -178,7 +178,7 @@ with define_extraction(phase, area, postgres_pool,postgres_oci_pool,) as (postgr
               AND D.IDSTATUSDOM = 761 -- ACTIVO
               -- AND D.PREFERENTE = 1 Domicilio preferente
         ) where id = 1
-        and FTN_CUENTA in {users}
+        --and FTN_CUENTA in {users}
         """
         queryCorreo = f"""
         SELECT 
@@ -226,7 +226,7 @@ with define_extraction(phase, area, postgres_pool,postgres_oci_pool,) as (postgr
             )
           ) 
           
-        WHERE FCN_CUENTA IN {user}
+        --WHERE FTN_CUENTA IN {user}
         """
         queryCliente = f"""
         SELECT C."FTN_CUENTA", C."FTC_CORREO", C."FTC_TELEFONO", X."INDICADOR"
@@ -273,7 +273,7 @@ with define_extraction(phase, area, postgres_pool,postgres_oci_pool,) as (postgr
         clientePostgres CP ON CT.FCN_CUENTA = CP.FTN_CUENTA
         ) X
         WHERE FTB_EVALUACION = 'FALSE'
-        and FCN_CUENTA in {users}
+        --and FCN_CUENTA in {users}
         """)
 
         rows = df.collect()
@@ -313,7 +313,7 @@ with define_extraction(phase, area, postgres_pool,postgres_oci_pool,) as (postgr
                 AND PG.FCN_ID_SUBPROCESO IN (309, 310, 330,331)
                 AND PGS.FCN_ID_TIPO_SUBCTA NOT IN (15,16,17,18)
                 AND TRUNC(PG.FTD_FEH_LIQUIDACION) <= :end
-                AND PG.FTN_NUM_CTA_INVDUAL IN {users}
+                --AND PG.FTN_NUM_CTA_INVDUAL IN {users}
         """, view="indicador_pension", params={'end': end_month})
 
         read_table_insert_temp_view(configure_mit_spark, query=f"""
@@ -328,7 +328,7 @@ with define_extraction(phase, area, postgres_pool,postgres_oci_pool,) as (postgr
         INNER JOIN tfafogral_config_indi CONF ON IND.FFN_ID_CONFIG_INDI = CONF.FFN_ID_CONFIG_INDI
         WHERE CONF.FFN_ID_CONFIG_INDI = 1
           AND FTC_VIGENCIA= 1
-          AND IND.FTN_NUM_CTA_INVDUAL IN {users}
+          --AND IND.FTN_NUM_CTA_INVDUAL IN {users}
         """, view="indicador_origen")
         spark.sql("select count(*) as count_indicador_origen from indicador_origen").show()
 
@@ -342,7 +342,7 @@ with define_extraction(phase, area, postgres_pool,postgres_oci_pool,) as (postgr
         INNER JOIN tfafogral_config_indi CONF ON IND.FFN_ID_CONFIG_INDI = CONF.FFN_ID_CONFIG_INDI
         WHERE CONF.FFN_ID_CONFIG_INDI = 12
           AND FTC_VIGENCIA= 1
-          AND IND.FTN_NUM_CTA_INVDUAL IN {users}
+          --AND IND.FTN_NUM_CTA_INVDUAL IN {users}
         """, view="indicador_tipo_cliente")
 
         read_table_insert_temp_view(configure_mit_spark, query=f"""
@@ -355,7 +355,7 @@ with define_extraction(phase, area, postgres_pool,postgres_oci_pool,) as (postgr
         INNER JOIN tfafogral_config_indi CONF ON IND.FFN_ID_CONFIG_INDI = CONF.FFN_ID_CONFIG_INDI
         WHERE CONF.FFN_ID_CONFIG_INDI = 2
           AND FTC_VIGENCIA= 1
-          AND IND.FTN_NUM_CTA_INVDUAL IN {users}
+          --AND IND.FTN_NUM_CTA_INVDUAL IN {users}
         """, view="indicador_vigencia")
 
         read_table_insert_temp_view(configure_mit_spark, query=f"""
@@ -382,7 +382,7 @@ with define_extraction(phase, area, postgres_pool,postgres_oci_pool,) as (postgr
                 AND PG.FCN_ID_SUBPROCESO IN (309, 310, 330,331)
                 AND PGS.FCN_ID_TIPO_SUBCTA NOT IN (15,16,17,18)
                 AND TRUNC(PG.FTD_FEH_LIQUIDACION) <= :end
-                AND PG.FTN_NUM_CTA_INVDUAL IN {users}
+                --AND PG.FTN_NUM_CTA_INVDUAL IN {users}
         """, view="indicador_tipo_pension", params={'start': start_month, 'end': end_month})
 
         read_table_insert_temp_view(configure_mit_spark, query=f"""
@@ -395,7 +395,7 @@ with define_extraction(phase, area, postgres_pool,postgres_oci_pool,) as (postgr
         FROM TTAFOGRAL_OSS P
         INNER JOIN CIERREN.TCCRXGRAL_CAT_CATALOGO C ON P.FCN_ID_SIEFORE= C.FCN_ID_CAT_CATALOGO
         WHERE P.FTC_ESTATUS = 1 AND FTN_PRIORIDAD = 1 and P.FCN_ID_GRUPO = 141
-        AND P.FTN_NUM_CTA_INVDUAL IN {users}
+        --AND P.FTN_NUM_CTA_INVDUAL IN {users}
         """, view="indicador_perfil_inversion")
 
         read_table_insert_temp_view(configure_mit_spark, query=f"""
@@ -409,7 +409,7 @@ with define_extraction(phase, area, postgres_pool,postgres_oci_pool,) as (postgr
             INNER JOIN tfafogral_config_indi CONF ON IND.FFN_ID_CONFIG_INDI = CONF.FFN_ID_CONFIG_INDI
             WHERE CONF.FFN_ID_CONFIG_INDI = 34
             AND FTC_VIGENCIA= 1 
-            AND IND.FTN_NUM_CTA_INVDUAL IN {users}
+            --AND IND.FTN_NUM_CTA_INVDUAL IN {users}
         """, view="indicador_generacion")
 
         df = spark.sql(f"""

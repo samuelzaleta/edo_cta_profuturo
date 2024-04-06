@@ -80,8 +80,7 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
             configure_postgres_spark,
             configure_postgres_oci_spark,
             query_temp,
-            '"MAESTROS"."TCDATMAE_TIPO_SUBCUENTA"',
-            term=term_id
+            '"MAESTROS"."TCDATMAE_TIPO_SUBCUENTA"'
         )
 
         # Extracción de tablas temporales
@@ -94,8 +93,7 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
             configure_postgres_spark,
             configure_postgres_oci_spark,
             query_temp,
-            '"MAESTROS"."TCDATMAE_SIEFORE"',
-            term=term_id
+            '"MAESTROS"."TCDATMAE_SIEFORE"'
         )
 
         # Extracción
@@ -121,7 +119,7 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
                   FROM cierren.thafogral_saldo_historico_v2 SHMIN
                   WHERE SHMIN.FTD_FEH_LIQUIDACION > :date
               )
-              AND SHMAX.FTN_NUM_CTA_INVDUAL in {users}
+              -- AND SHMAX.FTN_NUM_CTA_INVDUAL in {users}
               -- AND SHMAX.FCN_ID_TIPO_SUBCTA = 14
                AND SHMAX.FCN_ID_SIEFORE NOT IN (81)
             GROUP BY SHMAX.FTN_NUM_CTA_INVDUAL, SHMAX.FCN_ID_SIEFORE, SHMAX.FCN_ID_TIPO_SUBCTA
@@ -173,7 +171,7 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
                   FROM cierren.thafogral_saldo_historico_v2 SHMIN
                   WHERE SHMIN.FTD_FEH_LIQUIDACION > :date
               )
-              AND SHMAX.FTN_NUM_CTA_INVDUAL in {users}
+              --AND SHMAX.FTN_NUM_CTA_INVDUAL in {users}
               -- AND SHMAX.FCN_ID_TIPO_SUBCTA = 14
                AND SHMAX.FCN_ID_SIEFORE IN (81)
             GROUP BY SHMAX.FTN_NUM_CTA_INVDUAL, SHMAX.FCN_ID_SIEFORE, SHMAX.FCN_ID_TIPO_SUBCTA

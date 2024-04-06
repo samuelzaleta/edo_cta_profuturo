@@ -113,8 +113,7 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
             configure_postgres_spark,
             configure_postgres_oci_spark,
             query_temp,
-            '"MAESTROS"."TCDATMAE_TIPO_SUBCUENTA"',
-            term=term_id
+            '"MAESTROS"."TCDATMAE_TIPO_SUBCUENTA"'
         )
 
         # Extracción
