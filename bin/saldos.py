@@ -70,32 +70,6 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
     parallelims = 18000)
 
     with register_time(postgres_pool, phase, term_id, user, area):
-        # Extracción de tablas temporales
-        query_temp = """
-                SELECT
-                "FTN_ID_TIPO_SUBCTA", "FCN_ID_REGIMEN", "FCN_ID_CAT_SUBCTA", "FCC_VALOR", "FTC_TIPO_CLIENTE"
-                FROM "MAESTROS"."TCDATMAE_TIPO_SUBCUENTA"
-                """
-        extract_dataset_spark(
-            configure_postgres_spark,
-            configure_postgres_oci_spark,
-            query_temp,
-            '"MAESTROS"."TCDATMAE_TIPO_SUBCUENTA"'
-        )
-
-        # Extracción de tablas temporales
-        query_temp = """
-                SELECT
-                "FTN_ID_SIEFORE", "FTC_DESCRIPCION", "FTC_DESCRIPCION_CORTA", "FTC_SIEFORE"
-                FROM "MAESTROS"."TCDATMAE_SIEFORE"
-                """
-        extract_dataset_spark(
-            configure_postgres_spark,
-            configure_postgres_oci_spark,
-            query_temp,
-            '"MAESTROS"."TCDATMAE_SIEFORE"'
-        )
-
         # Extracción
         query = f"""
         SELECT SH.FTN_NUM_CTA_INVDUAL AS FCN_CUENTA,
@@ -119,7 +93,7 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
                   FROM cierren.thafogral_saldo_historico_v2 SHMIN
                   WHERE SHMIN.FTD_FEH_LIQUIDACION > :date
               )
-              -- AND SHMAX.FTN_NUM_CTA_INVDUAL in {users}
+               AND SHMAX.FTN_NUM_CTA_INVDUAL in {users}
               -- AND SHMAX.FCN_ID_TIPO_SUBCTA = 14
                AND SHMAX.FCN_ID_SIEFORE NOT IN (81)
             GROUP BY SHMAX.FTN_NUM_CTA_INVDUAL, SHMAX.FCN_ID_SIEFORE, SHMAX.FCN_ID_TIPO_SUBCTA
@@ -171,7 +145,7 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
                   FROM cierren.thafogral_saldo_historico_v2 SHMIN
                   WHERE SHMIN.FTD_FEH_LIQUIDACION > :date
               )
-              --AND SHMAX.FTN_NUM_CTA_INVDUAL in {users}
+              AND SHMAX.FTN_NUM_CTA_INVDUAL in {users}
               -- AND SHMAX.FCN_ID_TIPO_SUBCTA = 14
                AND SHMAX.FCN_ID_SIEFORE IN (81)
             GROUP BY SHMAX.FTN_NUM_CTA_INVDUAL, SHMAX.FCN_ID_SIEFORE, SHMAX.FCN_ID_TIPO_SUBCTA
@@ -294,6 +268,41 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
             ["Generación", "Vigencia", "tipo_cliente", "Origen", "Sub cuenta", "SIEFORE"],
             ["Saldo final en pesos", "Saldo final en acciones"],
             params={"term": term_id},
+        )
+
+        # Elimina tablas temporales
+        postgres_oci.execute(text("""
+                        DROP TABLE IF EXISTS "MAESTROS"."TCDATMAE_TIPO_SUBCUENTA"
+                        """))
+
+        postgres_oci.execute(text("""
+                        DROP TABLE IF EXISTS "MAESTROS"."TCDATMAE_SIEFORE"
+                        """))
+
+        # Extracción de tablas temporales
+        query_temp = """
+                        SELECT
+                        "FTN_ID_TIPO_SUBCTA", "FCN_ID_REGIMEN", "FCN_ID_CAT_SUBCTA", "FCC_VALOR", "FTC_TIPO_CLIENTE"
+                        FROM "MAESTROS"."TCDATMAE_TIPO_SUBCUENTA"
+                        """
+        extract_dataset_spark(
+            configure_postgres_spark,
+            configure_postgres_oci_spark,
+            query_temp,
+            '"MAESTROS"."TCDATMAE_TIPO_SUBCUENTA"'
+        )
+
+        # Extracción de tablas temporales
+        query_temp = """
+                        SELECT
+                        "FTN_ID_SIEFORE", "FTC_DESCRIPCION", "FTC_DESCRIPCION_CORTA", "FTC_SIEFORE"
+                        FROM "MAESTROS"."TCDATMAE_SIEFORE"
+                        """
+        extract_dataset_spark(
+            configure_postgres_spark,
+            configure_postgres_oci_spark,
+            query_temp,
+            '"MAESTROS"."TCDATMAE_SIEFORE"'
         )
 
         report2 = html_reporter.generate(

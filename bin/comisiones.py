@@ -103,19 +103,6 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
     end_month = term["end_month"]
 
     with register_time(postgres_pool, phase, term_id, user, area):
-        # Extracción de tablas temporales
-        query_temp = """
-        SELECT
-        "FTN_ID_TIPO_SUBCTA", "FCN_ID_REGIMEN", "FCN_ID_CAT_SUBCTA", "FCC_VALOR", "FTC_TIPO_CLIENTE"
-        FROM "MAESTROS"."TCDATMAE_TIPO_SUBCUENTA"
-        """
-        extract_dataset_spark(
-            configure_postgres_spark,
-            configure_postgres_oci_spark,
-            query_temp,
-            '"MAESTROS"."TCDATMAE_TIPO_SUBCUENTA"'
-        )
-
         # Extracción
         query = f"""
         SELECT FTN_NUM_CTA_INVDUAL AS FCN_CUENTA,
@@ -144,7 +131,25 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
             term=term_id,
             params={"start": start_month, "end": end_month}
         )
-        
+
+        # Elimina tablas temporales
+        postgres_oci.execute(text("""
+                        DROP TABLE IF EXISTS "MAESTROS"."TCDATMAE_TIPO_SUBCUENTA"
+                        """))
+
+        # Extracción de tablas temporales
+        query_temp = """
+                SELECT
+                "FTN_ID_TIPO_SUBCTA", "FCN_ID_REGIMEN", "FCN_ID_CAT_SUBCTA", "FCC_VALOR", "FTC_TIPO_CLIENTE"
+                FROM "MAESTROS"."TCDATMAE_TIPO_SUBCUENTA"
+                """
+        extract_dataset_spark(
+            configure_postgres_spark,
+            configure_postgres_oci_spark,
+            query_temp,
+            '"MAESTROS"."TCDATMAE_TIPO_SUBCUENTA"'
+        )
+
         # Cifras de control
         report = html_reporter.generate(
             postgres_oci,
@@ -165,8 +170,6 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
             ["Monto_Comisiones"],
             params={"term": term_id},
         )
-
-
 
         notify(
             postgres,

@@ -1,5 +1,5 @@
 from profuturo.common import register_time, define_extraction, notify, truncate_table
-from profuturo.database import get_postgres_pool, get_buc_pool, configure_postgres_spark, configure_mit_spark,configure_bigquery_spark,get_bigquery_pool
+from profuturo.database import get_postgres_pool, get_buc_pool, configure_postgres_oci_spark, configure_mit_spark,configure_bigquery_spark,get_bigquery_pool
 from profuturo.extraction import _get_spark_session, _write_spark_dataframe, read_table_insert_temp_view, upsert_dataset,extract_dataset_spark, _create_spark_dataframe
 from profuturo.reporters import HtmlReporter
 from profuturo.extraction import extract_terms
@@ -58,7 +58,7 @@ with define_extraction(phase, area, postgres_pool, bigquery_pool) as (postgres, 
                 """, lambda i: [f":fcn_cuenta_{i}",f":fcn_id_area_{i}", f"{term_id}",f":fcn_id_indicador_{i}", f":fta_evalua_inidcador_{i}"],
                        "TCHECHOS_CLIENTE_INDICADOR", select_params ={'term':term_id, 'area':area})
 
-        extract_dataset_spark(configure_postgres_spark, configure_bigquery_spark, """
+        extract_dataset_spark(configure_postgres_oci_spark, configure_bigquery_spark, """
                 SELECT
                 "FCN_CUENTA",
                 "FCN_ID_PERIODO",
@@ -95,7 +95,7 @@ with define_extraction(phase, area, postgres_pool, bigquery_pool) as (postgres, 
                 """
 
         read_table_insert_temp_view(
-            configure_postgres_spark,
+            configure_postgres_oci_spark,
             query,
             "INDICADOR",
             params={"term": term_id}

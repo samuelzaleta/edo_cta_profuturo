@@ -1,6 +1,6 @@
 from profuturo.common import register_time, define_extraction, notify, truncate_table
-from profuturo.database import get_postgres_pool,get_postgres_oci_pool, get_buc_pool, configure_postgres_oci_spark, configure_mit_spark
-from profuturo.extraction import _get_spark_session, _write_spark_dataframe, read_table_insert_temp_view, _create_spark_dataframe
+from profuturo.database import configure_postgres_spark, get_postgres_pool,get_postgres_oci_pool, get_buc_pool, configure_postgres_oci_spark, configure_mit_spark
+from profuturo.extraction import extract_dataset_spark,_get_spark_session, _write_spark_dataframe, read_table_insert_temp_view, _create_spark_dataframe
 from profuturo.reporters import HtmlReporter
 from profuturo.extraction import extract_terms
 import sys
@@ -33,11 +33,25 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
         parallelims=8000)
 
     with register_time(postgres_pool, phase, term_id, user, area):
+        # Extracción de tablas temporales
+        query_temp = """
+                SELECT
+                "FTN_ID_TIPO_SUBCTA", "FCN_ID_REGIMEN", "FCN_ID_CAT_SUBCTA", "FCC_VALOR", "FTC_TIPO_CLIENTE"
+                FROM "MAESTROS"."TCDATMAE_TIPO_SUBCUENTA"
+                """
+        extract_dataset_spark(
+            configure_postgres_spark,
+            configure_postgres_oci_spark,
+            query_temp,
+            '"MAESTROS"."TCDATMAE_TIPO_SUBCUENTA"'
+        )
+
+
         all_user = """
         SELECT distinct C."FCN_CUENTA" AS "FCN_CUENTA", TS."FTN_ID_TIPO_SUBCTA" AS "FCN_ID_TIPO_SUBCTA"
         FROM "HECHOS"."TCHECHOS_CLIENTE" C,
         "MAESTROS"."TCDATMAE_TIPO_SUBCUENTA" TS
-        WHERE 1=1 and "FCN_ID_PERIODO" = :term
+        WHERE 1=1 --and C."FCN_ID_PERIODO" = :term
         --and C."FCN_CUENTA" in (3200089837,	3201423324,	3201693866,	3202486462,	3300118473,	3300780661,	3300809724,	3300835243,	3400764001,	6120000991,	6130000050,	6442107959,	6449015130,	6449061689,	6449083099,	8051533577,	8052970237,	1700004823,	3500058618,	3200231348,	3300576485,	3500053269,	1530002222,	3200840759,	3201292580,	3202135111,	8052710429,	3202077144,	3200474366,	3200767640,	3300797020,	3300797221,	3400958595,	3201900769,	3201895226,	3200534369,	1350011161,	3200996343,	1330029515,	3200976872,	3201368726,	3070006370,	6449009395,	6442128265,	3201096947 )
         """
         saldo_inicial_query = f"""
@@ -341,4 +355,10 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
             message="Se han generado las cifras de control para Rendimientos exitosamente",
             details=report2,
         )
+
+        # Elimina tablas temporales
+        postgres_oci.execute(text("""
+                        DROP TABLE IF EXISTS "MAESTROS"."TCDATMAE_TIPO_SUBCUENTA"
+                        """))
+
 

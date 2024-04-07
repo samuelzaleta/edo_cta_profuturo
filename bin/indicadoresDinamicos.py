@@ -29,16 +29,33 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
     parallelims = 8000)
 
     with register_time(postgres_pool, phase, term_id, user, area):
+        # Extracción de tablas temporales
+        query_temp = """
+        SELECT
+        "FTN_ID_CARGA", "FCN_CUENTA", "FCN_ID_PERIODO", "FCN_ID_AREA", "FTC_TRAMITE",
+         "FTB_REGISTRO_VALIDO", "FTD_FECHA_CARGA", "FTC_USUARIO_CARGA", "FTB_DISPONIBLE",
+         "FTB_IMPRESION", "FTB_ENVIO", "FTB_GENERACION", "FCN_ID_INDICADOR"
+        FROM "HECHOS"."TTHECHOS_CARGA_ARCHIVO"
+        """
+        extract_dataset_spark(
+            configure_postgres_spark,
+            configure_postgres_oci_spark,
+            query_temp,
+            '"HECHOS"."TTHECHOS_CARGA_ARCHIVO"',
+            term=term_id
+        )
+
         # Indicadores dinámicos
         truncate_table(postgres, "TCHECHOS_CLIENTE_INDICADOR", term=term_id, area=area)
 
-        postgres.execute(text("""
+
+        postgres_oci.execute(text("""
         UPDATE "HECHOS"."TCHECHOS_CLIENTE"
         SET "FTC_GENERACION" = 'DECIMO TRANSITORIO'
         WHERE "FCN_CUENTA" IN (SELECT "FCN_CUENTA" FROM "HECHOS"."TTHECHOS_CARGA_ARCHIVO" WHERE "FCN_ID_INDICADOR" = 28)
                     """), {"term": term_id, "area": area})
 
-        postgres.execute(text("""
+        postgres_oci.execute(text("""
         UPDATE "HECHOS"."TCHECHOS_CLIENTE"
         SET "FTB_PENSION" = 'true'
         WHERE "FCN_CUENTA" IN (SELECT "FCN_CUENTA" FROM "HECHOS"."TTHECHOS_CARGA_ARCHIVO" WHERE "FCN_ID_INDICADOR" = 73)
@@ -169,4 +186,8 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
             details=html_table,
             visualiza=False
         )
+
+        postgres_oci.execute(text("""
+        DROP TABLE IF EXISTS "HECHOS"."TTHECHOS_CARGA_ARCHIVO"
+        """))
 
