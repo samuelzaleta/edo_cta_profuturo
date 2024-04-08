@@ -6,19 +6,17 @@ from pyspark.sql.functions import concat, col, row_number, lit, lpad
 from pyspark.sql.types import StringType, StructType, StructField, IntegerType
 from pyspark.sql.window import Window
 from sqlalchemy import text
+from datetime import datetime, timedelta
 from google.cloud import storage, bigquery
 from io import BytesIO
 from PIL import Image
 from profuturo.env import load_env
-import pandas as pd
 import requests
-import sys
-import random
-import string
 import time
-import os
 import json
-
+import sys
+import jwt
+import os
 
 load_env()
 postgres_pool = get_postgres_pool()
@@ -38,6 +36,35 @@ url_ret = os.getenv("URL_DUMMY_RET")
 print(url_reca)
 print(url_ret)
 
+
+
+def get_token():
+    try:
+        payload = {"isNonRepudiation": True}
+        secret = os.environ.get("JWT_SECRET")  # Ensure you have set the JWT_SECRET environment variable
+
+        if secret is None:
+            raise ValueError("JWT_SECRET environment variable is not set")
+
+        # Set expiration time 10 seconds from now
+        expiration_time = datetime.utcnow() + timedelta(seconds=10)
+        payload['exp'] = expiration_time.timestamp()  # Setting expiration time directly in payload
+
+        # Create the token
+        non_repudiation_token = jwt.encode(payload, secret, algorithm='HS256')
+
+        return non_repudiation_token
+    except Exception as error:
+        print("ERROR:", error)
+        return -1
+
+
+def get_headers():
+    non_repudiation_token = get_token()
+    if non_repudiation_token != -1:
+        return {"Authorization": f"Bearer {non_repudiation_token}"}
+    else:
+        return {}
 
 def upload_to_gcs(row):
     id_value = row["id"]
@@ -173,8 +200,10 @@ with define_extraction(phase, area, postgres_pool, bigquery_pool) as (postgres, 
 
         _write_spark_dataframe(df, configure_postgres_spark, '"ESTADO_CUENTA"."TTEDOCTA_IMAGEN_DUMMY"')
 
+        headers = get_headers()  # Get the headers using the get_headers() function
+
         for i in range(10):
-            response = requests.get(url_reca)
+            response = requests.get(url_reca, headers= headers)
             print(response)
             # Verifica si la petición fue exitosa
             if response.status_code == 200:
@@ -190,7 +219,7 @@ with define_extraction(phase, area, postgres_pool, bigquery_pool) as (postgres, 
                 break
 
         for i in range(10):
-            response = requests.get(url_ret)
+            response = requests.get(url_ret, headers= headers)
             print(response)
             # Verifica si la petición fue exitosa
             if response.status_code == 200:

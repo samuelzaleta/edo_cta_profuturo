@@ -1,4 +1,4 @@
-from profuturo.common import define_extraction, register_time
+from profuturo.common import define_extraction, register_time, notify
 from profuturo.database import get_postgres_pool,get_postgres_oci_pool, configure_postgres_spark, get_bigquery_pool, configure_postgres_oci_spark
 from profuturo.extraction import read_table_insert_temp_view, extract_terms, _get_spark_session, _create_spark_dataframe
 from pyspark.sql.functions import concat, col, row_number, lit, lpad, udf,date_format
@@ -7,7 +7,10 @@ from pyspark.sql.types import DecimalType
 from google.cloud import storage, bigquery
 from profuturo.env import load_env
 from sqlalchemy import text
+from datetime import datetime, timedelta
 import requests
+import time
+import json
 import sys
 import math
 import os
@@ -28,8 +31,11 @@ bucket_name = os.getenv("BUCKET_ID")
 print(bucket_name)
 prefix =f"{os.getenv('PREFIX_BLOB')}"
 print(prefix)
-url = os.getenv("URL_MUESTRAS_RECA")
+url = os.getenv("URL_CORRESPONDENSIA_RECA")
 print(url)
+
+correo = os.getenv("CORREO_CORRESPONDENCIA")
+print(correo)
 
 decimal_pesos = DecimalType(16, 2)
 decimal_udi = DecimalType(16, 6)
@@ -61,6 +67,36 @@ cuentas = (10000851,10000861,10000868,10000872,1330029515,1350011161,1530002222,
            )
 
 cuentas = (3200089837,	3201423324,	3201693866,	3202486462,	3300118473,	3300780661,	3300809724,	3300835243,	3400764001,	6120000991,	6130000050,	6442107959,	6449015130,	6449061689,	6449083099,	8051533577,	8052970237,	1700004823,	3500058618,	3200231348,	3300576485,	3500053269,	1530002222,	3200840759,	3201292580,	3202135111,	8052710429,	3202077144,	3200474366,	3200767640,	3300797020,	3300797221,	3400958595,	3201900769,	3201895226,	3200534369,	1350011161,	3200996343,	1330029515,	3200976872,	3201368726,	3070006370,	6449009395,	6442128265,	3201096947 )
+
+
+def get_token():
+    try:
+        payload = {"isNonRepudiation": True}
+        secret = os.environ.get("JWT_SECRET")  # Ensure you have set the JWT_SECRET environment variable
+
+        if secret is None:
+            raise ValueError("JWT_SECRET environment variable is not set")
+
+        # Set expiration time 10 seconds from now
+        expiration_time = datetime.utcnow() + timedelta(seconds=10)
+        payload['exp'] = expiration_time.timestamp()  # Setting expiration time directly in payload
+
+        # Create the token
+        non_repudiation_token = jwt.encode(payload, secret, algorithm='HS256')
+
+        return non_repudiation_token
+    except Exception as error:
+        print("ERROR:", error)
+        return -1
+
+
+def get_headers():
+    non_repudiation_token = get_token()
+    if non_repudiation_token != -1:
+        return {"Authorization": f"Bearer {non_repudiation_token}"}
+    else:
+        return {}
+
 
 def get_buckets():
     buckets = storage_client.list_buckets()
@@ -426,10 +462,34 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
             # upload_file_to_sftp(sftp_host, sftp_user, sftp_pass, name_reverso, "", res)
             body_message += f"Se generó el archivo de {name_reverso} con un total de {conteo_reverso} registros\n"
 
+        headers = get_headers()  # Get the headers using the get_headers() function
+        response = requests.get(url, headers=headers)  # Pass headers with the request
+        print(response)
+
+        if response.status_code == 200:
+            content = response.content.decode('utf-8')
+            data = json.loads(content)
+            print('Solicitud fue exitosa')
+
+        else:
+            print(f"La solicitud no fue exitosa. Código de estado: {response.status_code}")
+
         send_email(
-            to_address="zaletadev@gmail.com",
+            to_address=correo,
             subject="Generacion de los archivos de recaudacion",
             body=body_message
+        )
+
+
+        notify(
+            postgres,
+            "Generacion layout correspondencia",
+            phase,
+            area,
+            term=term_id,
+            message="Se terminaron de generar las muestras de los estados de cuenta con éxito",
+            aprobar=False,
+            descarga=False,
         )
 
 
