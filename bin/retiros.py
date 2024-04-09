@@ -1,5 +1,5 @@
 from profuturo.common import truncate_table, register_time, define_extraction, notify
-from profuturo.database import get_postgres_pool, get_postgres_oci_pool, get_mit_pool, configure_postgres_spark, configure_mit_spark
+from profuturo.database import get_postgres_pool, get_postgres_oci_pool, get_mit_pool,configure_postgres_oci_spark ,configure_postgres_spark, configure_mit_spark
 from profuturo.extraction import extract_terms, _get_spark_session, read_table_insert_temp_view, _write_spark_dataframe
 from profuturo.reporters import HtmlReporter
 from pyspark.sql.functions import col, lit
@@ -600,7 +600,7 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
         AND SL.FTD_FEH_CRE = RL.FTD_FEH_CRE
         """)
 
-        _write_spark_dataframe(df, configure_postgres_spark, '"HECHOS"."TTHECHOS_RETIRO"')
+        _write_spark_dataframe(df, configure_postgres_oci_spark, '"HECHOS"."TTHECHOS_RETIRO"')
 
         query = """
                 select
@@ -638,7 +638,7 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
                 where R."FCN_ID_PERIODO" = :term
                 """
 
-        read_table_insert_temp_view(configure_postgres_spark, query=query, view="retiros",
+        read_table_insert_temp_view(configure_postgres_oci_spark, query=query, view="retiros",
                                     params={"term": term_id, "user": str(user), "area": area})
         df = spark.sql(""" select * from retiros""")
         # Convert PySpark DataFrame to pandas DataFrame
