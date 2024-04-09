@@ -291,15 +291,15 @@ with define_extraction(phase, area, postgres_pool,postgres_oci_pool,) as (postgr
         LEFT JOIN  correoTelefono ct ON  c.FTN_CUENTA = ct.FCN_CUENTA 
          """).cache()
 
-        #truncate_table(postgres_oci, "TCDATMAE_CLIENTE")
-        #_write_spark_dataframe(df, configure_postgres_oci_spark, '"MAESTROS"."TCDATMAE_CLIENTE"')
+        truncate_table(postgres_oci, "TCDATMAE_CLIENTE")
+        _write_spark_dataframe(df, configure_postgres_oci_spark, '"MAESTROS"."TCDATMAE_CLIENTE"')
 
         df.unpersist()
 
         # Extracción
-        #truncate_table(postgres, "TCHECHOS_CLIENTE_INDICADOR", term=term_id)
-        #truncate_table(postgres, "TCGESPRO_MUESTRA", term=term_id, area=area)
-        #truncate_table(postgres, "TCHECHOS_CLIENTE", term=term_id)
+        truncate_table(postgres, "TCHECHOS_CLIENTE_INDICADOR", term=term_id)
+        truncate_table(postgres, "TCGESPRO_MUESTRA", term=term_id, area=area)
+        truncate_table(postgres, "TCHECHOS_CLIENTE", term=term_id)
         read_table_insert_temp_view(configure_mit_spark, query=f"""
         SELECT
         PG.FTN_NUM_CTA_INVDUAL AS FCN_CUENTA,
@@ -328,7 +328,7 @@ with define_extraction(phase, area, postgres_pool,postgres_oci_pool,) as (postgr
         INNER JOIN tfafogral_config_indi CONF ON IND.FFN_ID_CONFIG_INDI = CONF.FFN_ID_CONFIG_INDI
         WHERE CONF.FFN_ID_CONFIG_INDI = 1
           AND FTC_VIGENCIA= 1
-          AND IND.FTN_NUM_CTA_INVDUAL IN {users}
+          --AND IND.FTN_NUM_CTA_INVDUAL IN {users}
         """, view="indicador_origen")
         spark.sql("select count(*) as count_indicador_origen from indicador_origen").show()
 
@@ -342,7 +342,7 @@ with define_extraction(phase, area, postgres_pool,postgres_oci_pool,) as (postgr
         INNER JOIN tfafogral_config_indi CONF ON IND.FFN_ID_CONFIG_INDI = CONF.FFN_ID_CONFIG_INDI
         WHERE CONF.FFN_ID_CONFIG_INDI = 12
           AND FTC_VIGENCIA= 1
-          AND IND.FTN_NUM_CTA_INVDUAL IN {users}
+          --AND IND.FTN_NUM_CTA_INVDUAL IN {users}
         """, view="indicador_tipo_cliente")
 
         read_table_insert_temp_view(configure_mit_spark, query=f"""
@@ -355,7 +355,7 @@ with define_extraction(phase, area, postgres_pool,postgres_oci_pool,) as (postgr
         INNER JOIN tfafogral_config_indi CONF ON IND.FFN_ID_CONFIG_INDI = CONF.FFN_ID_CONFIG_INDI
         WHERE CONF.FFN_ID_CONFIG_INDI = 2
           AND FTC_VIGENCIA= 1
-          AND IND.FTN_NUM_CTA_INVDUAL IN {users}
+          --AND IND.FTN_NUM_CTA_INVDUAL IN {users}
         """, view="indicador_vigencia")
 
         read_table_insert_temp_view(configure_mit_spark, query=f"""
@@ -395,7 +395,7 @@ with define_extraction(phase, area, postgres_pool,postgres_oci_pool,) as (postgr
         FROM TTAFOGRAL_OSS P
         INNER JOIN CIERREN.TCCRXGRAL_CAT_CATALOGO C ON P.FCN_ID_SIEFORE= C.FCN_ID_CAT_CATALOGO
         WHERE P.FTC_ESTATUS = 1 AND FTN_PRIORIDAD = 1 and P.FCN_ID_GRUPO = 141
-        AND P.FTN_NUM_CTA_INVDUAL IN {users}
+        --AND P.FTN_NUM_CTA_INVDUAL IN {users}
         """, view="indicador_perfil_inversion")
 
         read_table_insert_temp_view(configure_mit_spark, query=f"""
@@ -409,7 +409,7 @@ with define_extraction(phase, area, postgres_pool,postgres_oci_pool,) as (postgr
             INNER JOIN tfafogral_config_indi CONF ON IND.FFN_ID_CONFIG_INDI = CONF.FFN_ID_CONFIG_INDI
             WHERE CONF.FFN_ID_CONFIG_INDI = 34
             AND FTC_VIGENCIA= 1 
-            AND IND.FTN_NUM_CTA_INVDUAL IN {users}
+            --AND IND.FTN_NUM_CTA_INVDUAL IN {users}
         """, view="indicador_generacion")
 
         df = spark.sql(f"""
@@ -436,13 +436,12 @@ with define_extraction(phase, area, postgres_pool,postgres_oci_pool,) as (postgr
             LEFT JOIN indicador_tipo_pension tp ON c.FTN_CUENTA = p.FCN_CUENTA
             LEFT JOIN indicador_perfil_inversion i ON c.FTN_CUENTA = i.FCN_CUENTA
         """)
-        # df = df.withColumn("FTO_INDICADORES", to_json(struct(lit('{}'))))
 
-        #df = df.dropDuplicates(["FCN_CUENTA"])
+        df = df.dropDuplicates(["FCN_CUENTA"])
 
-        #df = df.repartition(60)
+        df = df.repartition(60)
 
-        #_write_spark_dataframe(df, configure_postgres_oci_spark, '"HECHOS"."TCHECHOS_CLIENTE"')
+        _write_spark_dataframe(df, configure_postgres_oci_spark, '"HECHOS"."TCHECHOS_CLIENTE"')
 
         postgres.execute(text("""
                 UPDATE "HECHOS"."TCHECHOS_CLIENTE"
@@ -479,15 +478,15 @@ with define_extraction(phase, area, postgres_pool,postgres_oci_pool,) as (postgr
                 PG.FTN_NUM_CTA_INVDUAL,PG.FCN_ID_SUBPROCESO
                 """
 
-        #truncate_table(postgres, "TCDATMAE_PENSION")
+        truncate_table(postgres, "TCDATMAE_PENSION")
 
-        #extract_dataset_spark(
-        #    configure_mit_spark,
-        #    configure_postgres_spark,
-        #    query_pension,
-        #    '"MAESTROS"."TCDATMAE_PENSION"',
-        #    params={"end": end_month, "type": "F"},
-        #)
+        extract_dataset_spark(
+            configure_mit_spark,
+            configure_postgres_spark,
+            query_pension,
+            '"MAESTROS"."TCDATMAE_PENSION"',
+            params={"end": end_month, "type": "F"},
+        )
 
         # Cifras de control
         report = html_reporter.generate(

@@ -12,6 +12,7 @@ import requests
 import time
 import json
 import sys
+import jwt
 import math
 import os
 
@@ -40,33 +41,8 @@ print(correo)
 decimal_pesos = DecimalType(16, 2)
 decimal_udi = DecimalType(16, 6)
 
-cuentas = (10000851,10000861,10000868,10000872,1330029515,1350011161,1530002222,1700004823,3070006370,3200089837,
-           3200231348,3200534369,3201895226,3201900769,3202077144,3202135111,3300118473,3300576485,3300797221,3300809724,
-           3400764001,3500053269,3500058618,6120000991,6442107959,6442128265,6449009395,6449015130,10000884,10000885,
-           10000887,10000888,10000889,10000890,10000891,10000892,10000893,10000894,10000895,10000896,10001041,10001042,
-           10000898,10000899,10000900,10000901,10000902,10000903,10000904,10000905,10000906,10000907,10000908,10000909,
-           10000910,10000911,10000912,10000913,10000914,10000915,10000916,10000917,10000918,10000919,10000920,10000921,
-           10000922,10000923,10000924,10000925,10000927,10000928,10000929,10000930,10000931,10000932,10000933,10000934,
-           10000935,10000936,10001263,10001264,10001265,10001266,10001267,10001268,10001269,10001270,10001271,10001272,
-           10001274,10001275,10001277,10001278,10001279,10001280,10001281,10001282,10001283,10001284,10001285,10001286,
-           10001288,10001289,10001290,10001292,10001293,10001294,10001296,10001297,10001298,10001299,10001300,10001301,
-           10001305,10001306,10001307,10001308,10001309,10001311,10001312,10001314,10001315,10001316,10001317,10001318,
-           10001319,10001320,10001321,10001322,10000896,10000898,10000790,10000791,10000792,10000793,10000794,10000795,
-           10000797,10000798,10000799,10000800,10000801,10000802,10000803,10000804,10000805,10000806,10000807,10000808,
-           10000809,10000810,10000811,10000812,10000813,10000814,10000815,10000816,10000817,10000818,10000819,10000820,
-           10000821,10000822,10000823,10000824,10000825,10000826,10000827,10000828,10000830,10000832,10000833,10000834,
-           10000835,10000836,10000837,10000838,10000839,10000840,10001098,10001099,10001100,10001101,10001102,10001103,
-           10001104,10001105,10001106,10001107,10001108,10001109,10001110,10001111,10001112,10001113,10001114,10001115,
-           10001116,10001117,10001118,10001119,10001120,10001121,10001122,10001123,10001124,10001125,10001126,10001127,
-           10001128,10001129,10001130,10001131,10001132,10001133,10001134,10001135,10001136,10001137,10001138,10001139,
-           10001140,10001141,10001142,10001143,10001145,10001146,10001147,10001148,10000991,10000992,10000993,10000994,
-           10000995,10000996,10000997,10000998,10000999,10001000,10001001,10001002,10001003,10001004,10001005,10001006,
-           10001007,10001008,10001009,10001010,10001011,10001012,10001013,10001014,10001015,10001016,10001017,10001018,
-           10001019,10001020,10001021,10001023,10001024,10001025,10001026,10001027,10001029,10001030,10001031,10001032,
-           10001033,10001034,10001035,10001036,10001037,10001038,10001039,10001040
-           )
 
-cuentas = (3200089837,	3201423324,	3201693866,	3202486462,	3300118473,	3300780661,	3300809724,	3300835243,	3400764001,	6120000991,	6130000050,	6442107959,	6449015130,	6449061689,	6449083099,	8051533577,	8052970237,	1700004823,	3500058618,	3200231348,	3300576485,	3500053269,	1530002222,	3200840759,	3201292580,	3202135111,	8052710429,	3202077144,	3200474366,	3200767640,	3300797020,	3300797221,	3400958595,	3201900769,	3201895226,	3200534369,	1350011161,	3200996343,	1330029515,	3200976872,	3201368726,	3070006370,	6449009395,	6442128265,	3201096947 )
+cuentas = (1330029515,1330029515)
 
 
 def get_token():
@@ -194,11 +170,10 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
         "FTN_PENSION_MENSUAL",
         "FTC_TIPO_TRABAJADOR",
         "FTC_FORMATO" --TO_DO CAMBIAR POR PERIODICIDAD DE FOMRATO
-        FROM "ESTADO_CUENTA"."TTMUESTR_GENERAL" G
+        FROM "ESTADO_CUENTA"."TTEDOCTA_GENERAL" G
         LEFT JOIN "ESTADO_CUENTA"."TTEDOCTA_CLIENTE_INDICADOR" I
         ON "FCN_NUMERO_CUENTA" = "FCN_CUENTA"
-        WHERE 
-        "FCN_NUMERO_CUENTA" IN {cuentas}
+        --WHERE "FCN_NUMERO_CUENTA" IN {cuentas}
         """
         general_df = _create_spark_dataframe(spark, configure_postgres_oci_spark, query,
         params={"term": term_id, "start": start_month, "end": end_month, "user": str(user)})
@@ -206,6 +181,8 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
         general_df = general_df.withColumn("FCN_NUMERO_CUENTA", lpad(col("FCN_NUMERO_CUENTA").cast("string"), 10, "0"))
 
         general_df = general_df.repartition("FTC_GENERACION","FTC_ENTIDAD_FEDERATIVA")
+
+        general_df.show()
 
 
         query_anverso = f"""
@@ -242,15 +219,14 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
         WHEN "FTC_SECCION" = 'SDO' AND "FTC_CONCEPTO_NEGOCIO" LIKE '%VEJEZ%' THEN 'IMSSCE'
         WHEN "FTC_SECCION" = 'SDO' AND "FTC_CONCEPTO_NEGOCIO" LIKE '%ISSSTE 2008%' THEN 'ISSSTE08'
         END "GRUPO_CONCEPTO"
-        FROM "ESTADO_CUENTA"."TTMUESTR_ANVERSO" A
+        FROM "ESTADO_CUENTA"."TTEDOCTA_ANVERSO" A
         LEFT JOIN "ESTADO_CUENTA"."TTEDOCTA_CLIENTE_INDICADOR" I
         ON "FCN_NUMERO_CUENTA" = "FCN_CUENTA"
-        WHERE --"FTB_IMPRESION" = TRUE
+        --WHERE --"FTB_IMPRESION" = TRUE
         --AND "FTB_GENERACION" = TRUE
         --AND "FTB_ENVIO" = FALSE
         --AND I."FCN_ID_PERIODO" = :term
-        --AND 
-        "FCN_NUMERO_CUENTA" IN {cuentas}
+        --AND "FCN_NUMERO_CUENTA" IN {cuentas}
         ) X
         ORDER BY "FCN_NUMERO_CUENTA","NUMERO_SECCION","FTC_SECCION", "FTN_ORDEN_SDO"
         """
@@ -266,14 +242,14 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
 
         anverso_seccion_ahor = anverso_seccion_ahor.repartition("FTC_CONCEPTO_NEGOCIO")
 
-        anverso_seccion_ahor.show()
+        anverso_seccion_ahor.show(50)
 
         anverso_seccion_bono = anverso_df.select(col("NUMERO_SECCION").alias("NUMERO_SECCION_BON"),lpad(col("FCN_NUMERO_CUENTA").cast("string"), 10, "0").alias("FCN_NUMERO_CUENTA_BON"),
                                                  col("FTC_CONCEPTO_NEGOCIO").alias("FTC_CONCEPTO_NEGOCIO_BON"), col("FTN_VALOR_ACTUAL_UDI"),
                                                 col("FTN_VALOR_NOMINAL_UDI"), col("FTN_VALOR_ACTUAL_PESO"),
                                                 col("FTN_VALOR_NOMINAL_PESO")).filter(col("NUMERO_SECCION") == 3)
 
-        anverso_seccion_bono.show()
+        anverso_seccion_bono.show(50)
 
         anverso_seccion_sdo = anverso_df.select(col("NUMERO_SECCION").alias("NUMERO_SECCION_SDO"),lpad(col("FCN_NUMERO_CUENTA").cast("string"), 10, "0").alias("FCN_NUMERO_CUENTA_SDO"),
                                                 col("FTC_CONCEPTO_NEGOCIO").alias("FTC_CONCEPTO_NEGOCIO_SDO"),col("GRUPO_CONCEPTO"),
@@ -282,7 +258,7 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
 
         anverso_seccion_sdo = anverso_seccion_sdo.repartition("FTC_CONCEPTO_NEGOCIO","GRUPO_CONCEPTO")
 
-        anverso_seccion_sdo.show()
+        anverso_seccion_sdo.show(50)
 
         joined_anverso = (
             general_df
@@ -336,7 +312,7 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
 
             general_df = general_df.dropDuplicates()
 
-            general_df.show()
+            general_df.show(50)
 
             anverso_seccion_ahor = joined_anverso.select(
                                                      col("FCN_NUMERO_CUENTA_AHO"),
@@ -352,7 +328,7 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
             anverso_seccion_ahor = anverso_seccion_ahor.dropDuplicates()
             anverso_seccion_ahor = anverso_seccion_ahor.filter(col("FCN_NUMERO_CUENTA_AHO").isNotNull())
 
-            anverso_seccion_ahor.show()
+            anverso_seccion_ahor.show(50)
 
             anverso_seccion_bono = joined_anverso.select(
                                                      col("FCN_NUMERO_CUENTA_BON"),
@@ -407,7 +383,8 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
             part += 1
 
         query_reverso = f"""
-                        SELECT * FROM (SELECT DISTINCT * FROM "ESTADO_CUENTA"."TTMUESTR_REVERSO"  WHERE "FCN_NUMERO_CUENTA" IN {cuentas}) X
+                        SELECT * FROM (SELECT DISTINCT * FROM "ESTADO_CUENTA"."TTEDOCTA_REVERSO"  --WHERE "FCN_NUMERO_CUENTA" IN {cuentas}
+                        ) X
                         ORDER BY  "FCN_NUMERO_CUENTA", "FTC_SECCION", "FTN_ORDEN"
                                         """
         read_table_insert_temp_view(
