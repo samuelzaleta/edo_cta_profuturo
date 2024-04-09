@@ -42,7 +42,7 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
                 where C."FTN_CUENTA" is not null
                 """, "user", params={"term": term_id, "start": start_month, "end": end_month, "user": str(user)})
 
-        read_table_insert_temp_view(configure_postgres_spark, """
+        read_table_insert_temp_view(configure_postgres_oci_spark, """
         SELECT
         DISTINCT
         CAST(CONCAT(C."FTN_CUENTA", cast(:term as varchar)) AS BIGINT)  as "FCN_ID_EDOCTA",
@@ -68,7 +68,7 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
         select * from edoCtaGenerales
         """)
 
-        read_table_insert_temp_view(configure_postgres_spark,
+        read_table_insert_temp_view(configure_postgres_oci_spark,
           """
                 SELECT
                 R."FCN_CUENTA" AS "FCN_NUMERO_CUENTA",
