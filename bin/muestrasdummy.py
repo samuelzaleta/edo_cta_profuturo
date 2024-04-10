@@ -200,34 +200,31 @@ with define_extraction(phase, area, postgres_pool, bigquery_pool) as (postgres, 
 
         headers = get_headers()  # Get the headers using the get_headers() function
 
-        for i in range(10):
-            response = requests.get(url_reca, headers= headers)
-            print(response)
-            # Verifica si la petición fue exitosa
-            if response.status_code == 200:
-                # Si la petición fue exitosa, puedes acceder al contenido de la respuesta de la siguiente manera:
-                content = response.content.decode('utf-8')
-                data = json.loads(content)
-                if data['data']['statusText'] == 'finalizado':
-                    break
+        response = requests.get(url_reca, headers= headers)
+        print(response)
+        # Verifica si la petición fue exitosa
+        if response.status_code == 200:
+            # Si la petición fue exitosa, puedes acceder al contenido de la respuesta de la siguiente manera:
+            content = response.content.decode('utf-8')
+            data = json.loads(content)
+            if data['data']['statusText'] == 'finalizado':
                 time.sleep(8)
-            else:
-                # Si la petición no fue exitosa, puedes imprimir el código de estado para obtener más información
-                print(f"La solicitud no fue exitosa. Código de estado: {response.status_code}")
-                break
+        else:
+            # Si la petición no fue exitosa, puedes imprimir el código de estado para obtener más información
+            print(f"La solicitud no fue exitosa. Código de estado: {response.status_code}")
 
-        for i in range(10):
-            response = requests.get(url_ret, headers= headers)
-            print(response)
-            # Verifica si la petición fue exitosa
-            if response.status_code == 200:
-                # Si la petición fue exitosa, puedes acceder al contenido de la respuesta de la siguiente manera:
-                content = response.content.decode('utf-8')
-                data = json.loads(content)
-                if data['data']['statusText'] == 'finalizado':
-                    break
+
+        response = requests.get(url_ret, headers= headers)
+        print(response)
+        # Verifica si la petición fue exitosa
+        if response.status_code == 200:
+            # Si la petición fue exitosa, puedes acceder al contenido de la respuesta de la siguiente manera:
+            content = response.content.decode('utf-8')
+            data = json.loads(content)
+            if data['data']['statusText'] == 'finalizado':
+
                 time.sleep(8)
-            else:
-                # Si la petición no fue exitosa, puedes imprimir el código de estado para obtener más información
-                print(f"La solicitud no fue exitosa. Código de estado: {response.status_code}")
-                break
+        else:
+            # Si la petición no fue exitosa, puedes imprimir el código de estado para obtener más información
+            print(f"La solicitud no fue exitosa. Código de estado: {response.status_code}")
+

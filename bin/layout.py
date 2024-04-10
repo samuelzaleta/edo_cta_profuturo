@@ -21,7 +21,6 @@ import os
 load_env()
 postgres_pool = get_postgres_pool()
 postgres_oci_pool = get_postgres_oci_pool()
-bigquery_pool = get_bigquery_pool()
 storage_client = storage.Client()
 phase = int(sys.argv[1])
 term = int(sys.argv[2])
