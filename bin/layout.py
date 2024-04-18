@@ -41,7 +41,7 @@ decimal_pesos = DecimalType(16, 2)
 decimal_udi = DecimalType(16, 6)
 
 
-cuentas = (1330029515,1330029515)
+
 
 
 def get_token():
