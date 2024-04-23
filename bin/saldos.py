@@ -56,8 +56,6 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
                   FROM cierren.thafogral_saldo_historico_v2 SHMIN
                   WHERE SHMIN.FTD_FEH_LIQUIDACION > :date
               )
-              -- AND SHMAX.FTN_NUM_CTA_INVDUAL in {users}
-              -- AND SHMAX.FCN_ID_TIPO_SUBCTA = 14
                AND SHMAX.FCN_ID_SIEFORE NOT IN (81)
             GROUP BY SHMAX.FTN_NUM_CTA_INVDUAL, SHMAX.FCN_ID_SIEFORE, SHMAX.FCN_ID_TIPO_SUBCTA
         ) SHMAXIMO ON SH.FTN_NUM_CTA_INVDUAL = SHMAXIMO.FTN_NUM_CTA_INVDUAL
@@ -108,8 +106,6 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
                   FROM cierren.thafogral_saldo_historico_v2 SHMIN
                   WHERE SHMIN.FTD_FEH_LIQUIDACION > :date
               )
-              AND SHMAX.FTN_NUM_CTA_INVDUAL in {users}
-              -- AND SHMAX.FCN_ID_TIPO_SUBCTA = 14
                AND SHMAX.FCN_ID_SIEFORE IN (81)
             GROUP BY SHMAX.FTN_NUM_CTA_INVDUAL, SHMAX.FCN_ID_SIEFORE, SHMAX.FCN_ID_TIPO_SUBCTA
         ) SHMAXIMO ON SH.FTN_NUM_CTA_INVDUAL = SHMAXIMO.FTN_NUM_CTA_INVDUAL
@@ -206,32 +202,6 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
 
         _write_spark_dataframe(df, configure_postgres_oci_spark, '"HECHOS"."TTCALCUL_BONO"')
 
-        # Cifras de control
-        report1 = html_reporter.generate(
-            postgres_oci,
-            """
-            SELECT
-                I."FTC_GENERACION" AS GENERACION,
-                I."FTC_VIGENCIA" AS VIGENCIA,
-                I."FTC_TIPO_CLIENTE" AS TIPO_CLIENTE,
-                I."FTC_ORIGEN" AS ORIGEN,
-                TS."FCC_VALOR" AS TIPO_SUBCUENTA,
-                S."FTC_DESCRIPCION_CORTA" AS SIEFORE,
-                --ROUND(SUM(CASE WHEN SH."FTC_TIPO_SALDO" = 'I' THEN SH."FTF_SALDO_DIA" ELSE 0 END)::numeric,2) AS SALDO_INICIAL_PESOS,
-                TRUNC(SUM(CASE WHEN SH."FTC_TIPO_SALDO" = 'F' THEN SH."FTF_SALDO_DIA" ELSE 0 END):: NUMERIC, 2)AS SALDO_FINAL_PESOS,
-                --ROUND(SUM(CASE WHEN SH."FTC_TIPO_SALDO" = 'I' THEN SH."FTN_DIA_ACCIONES" ELSE 0 END)::numeric,6) AS SALDO_INICIAL_ACCIONES,
-                TRUNC(SUM(CASE WHEN SH."FTC_TIPO_SALDO" = 'F' THEN SH."FTF_DIA_ACCIONES" ELSE 0 END):: NUMERIC, 6) AS SALDO_FINAL_ACCIONES
-            FROM "HECHOS"."THHECHOS_SALDO_HISTORICO" SH
-            INNER JOIN "HECHOS"."TCHECHOS_CLIENTE" I ON SH."FCN_CUENTA" = I."FCN_CUENTA"
-            INNER JOIN "MAESTROS"."TCDATMAE_TIPO_SUBCUENTA" TS ON SH."FCN_ID_TIPO_SUBCTA" = TS."FTN_ID_TIPO_SUBCTA"
-            INNER JOIN "MAESTROS"."TCDATMAE_SIEFORE" S ON SH."FCN_ID_SIEFORE" = S."FTN_ID_SIEFORE"
-            WHERE SH."FCN_ID_PERIODO" = :term and I."FCN_ID_PERIODO" = :term
-            GROUP BY TS."FCC_VALOR", S."FTC_DESCRIPCION_CORTA",I."FTC_GENERACION" , I."FTC_VIGENCIA", I."FTC_TIPO_CLIENTE", I."FTC_ORIGEN"
-            """,
-            ["Generación", "Vigencia", "tipo_cliente", "Origen", "Sub cuenta", "SIEFORE"],
-            ["Saldo final en pesos", "Saldo final en acciones"],
-            params={"term": term_id},
-        )
 
         # Elimina tablas temporales
         postgres_oci.execute(text("""
@@ -266,6 +236,33 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
             configure_postgres_oci_spark,
             query_temp,
             '"MAESTROS"."TCDATMAE_SIEFORE"'
+        )
+
+        # Cifras de control
+        report1 = html_reporter.generate(
+            postgres_oci,
+            """
+            SELECT
+                I."FTC_GENERACION" AS GENERACION,
+                I."FTC_VIGENCIA" AS VIGENCIA,
+                I."FTC_TIPO_CLIENTE" AS TIPO_CLIENTE,
+                I."FTC_ORIGEN" AS ORIGEN,
+                TS."FCC_VALOR" AS TIPO_SUBCUENTA,
+                S."FTC_DESCRIPCION_CORTA" AS SIEFORE,
+                --ROUND(SUM(CASE WHEN SH."FTC_TIPO_SALDO" = 'I' THEN SH."FTF_SALDO_DIA" ELSE 0 END)::numeric,2) AS SALDO_INICIAL_PESOS,
+                TRUNC(SUM(CASE WHEN SH."FTC_TIPO_SALDO" = 'F' THEN SH."FTF_SALDO_DIA" ELSE 0 END):: NUMERIC, 2)AS SALDO_FINAL_PESOS,
+                --ROUND(SUM(CASE WHEN SH."FTC_TIPO_SALDO" = 'I' THEN SH."FTN_DIA_ACCIONES" ELSE 0 END)::numeric,6) AS SALDO_INICIAL_ACCIONES,
+                TRUNC(SUM(CASE WHEN SH."FTC_TIPO_SALDO" = 'F' THEN SH."FTF_DIA_ACCIONES" ELSE 0 END):: NUMERIC, 6) AS SALDO_FINAL_ACCIONES
+            FROM "HECHOS"."THHECHOS_SALDO_HISTORICO" SH
+            INNER JOIN "HECHOS"."TCHECHOS_CLIENTE" I ON SH."FCN_CUENTA" = I."FCN_CUENTA"
+            INNER JOIN "MAESTROS"."TCDATMAE_TIPO_SUBCUENTA" TS ON SH."FCN_ID_TIPO_SUBCTA" = TS."FTN_ID_TIPO_SUBCTA"
+            INNER JOIN "MAESTROS"."TCDATMAE_SIEFORE" S ON SH."FCN_ID_SIEFORE" = S."FTN_ID_SIEFORE"
+            WHERE SH."FCN_ID_PERIODO" = :term and I."FCN_ID_PERIODO" = :term
+            GROUP BY TS."FCC_VALOR", S."FTC_DESCRIPCION_CORTA",I."FTC_GENERACION" , I."FTC_VIGENCIA", I."FTC_TIPO_CLIENTE", I."FTC_ORIGEN"
+            """,
+            ["Generación", "Vigencia", "tipo_cliente", "Origen", "Sub cuenta", "SIEFORE"],
+            ["Saldo final en pesos", "Saldo final en acciones"],
+            params={"term": term_id},
         )
 
         report2 = html_reporter.generate(
