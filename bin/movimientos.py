@@ -55,8 +55,7 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
             configure_postgres_spark,
             configure_postgres_oci_spark,
             query_temp,
-            '"MAESTROS"."TCDATMAE_TIPO_SUBCUENTA"',
-            term=term_id
+            '"MAESTROS"."TCDATMAE_TIPO_SUBCUENTA"'
         )
 
         # Extracción de tablas temporales
@@ -69,8 +68,7 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
             configure_postgres_spark,
             configure_postgres_oci_spark,
             query_temp,
-            '"MAESTROS"."TCDATMAE_SIEFORE"',
-            term=term_id
+            '"MAESTROS"."TCDATMAE_SIEFORE"'
         )
 
         # Extracción de tablas temporales
@@ -83,8 +81,7 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
             configure_postgres_spark,
             configure_postgres_oci_spark,
             query_temp,
-            '"MAESTROS"."TTGESPRO_MOV_PROFUTURO_CONSAR"',
-            term=term_id
+            '"MAESTROS"."TTGESPRO_MOV_PROFUTURO_CONSAR"'
         )
 
         # Extracción de tablas temporales
@@ -98,8 +95,7 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
             configure_postgres_spark,
             configure_postgres_oci_spark,
             query_temp,
-            '"MAESTROS"."TCDATMAE_MOVIMIENTO_CONSAR"',
-            term=term_id
+            '"MAESTROS"."TCDATMAE_MOVIMIENTO_CONSAR"'
         )
 
         # Extracción de tablas temporales
@@ -112,8 +108,7 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
             configure_postgres_spark,
             configure_postgres_oci_spark,
             query_temp,
-            '"MAESTROS"."TCGESPRO_PERIODO"',
-            term=term_id
+            '"MAESTROS"."TCGESPRO_PERIODO"'
         )
 
         # Extracción
