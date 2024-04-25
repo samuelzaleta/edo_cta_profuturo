@@ -39,7 +39,6 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
         ON C.FCN_ID_CONCEPTO_MOV =M.FFN_ID_CONCEPTO_MOV
         INNER JOIN TRAFOGRAL_MOV_SUBCTA S ON M.FRN_ID_MOV_SUBCTA = S.FRN_ID_MOV_SUBCTA
         WHERE C.FTD_FEH_LIQUIDACION BETWEEN :start AND :end
-        --AND FTN_NUM_CTA_INVDUAL in {users}
         """
         truncate_table(postgres_oci, "TTHECHOS_COMISION", term=term_id)
         extract_dataset_spark(

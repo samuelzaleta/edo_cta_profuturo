@@ -25,91 +25,6 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
     end_month = term["end_month"]
 
     with register_time(postgres_pool, phase, term_id, user, area):
-        # Elimina tablas temporales
-        postgres_oci.execute(text("""
-                        DROP TABLE IF EXISTS "MAESTROS"."TCDATMAE_TIPO_SUBCUENTA"
-                        """))
-
-        postgres_oci.execute(text("""
-                        DROP TABLE IF EXISTS "MAESTROS"."TCDATMAE_SIEFORE"
-                        """))
-
-        postgres_oci.execute(text("""
-                        DROP TABLE IF EXISTS "MAESTROS"."TTGESPRO_MOV_PROFUTURO_CONSAR"
-                        """))
-
-        postgres_oci.execute(text("""
-                        DROP TABLE IF EXISTS "MAESTROS"."TCDATMAE_MOVIMIENTO_CONSAR"
-                        """))
-
-        postgres_oci.execute(text("""
-                        DROP TABLE IF EXISTS "MAESTROS"."TCGESPRO_PERIODO"
-                        """))
-        # Extracción de tablas temporales
-        query_temp = """
-        SELECT
-        "FTN_ID_TIPO_SUBCTA", "FCN_ID_REGIMEN", "FCN_ID_CAT_SUBCTA", "FCC_VALOR", "FTC_TIPO_CLIENTE"
-        FROM "MAESTROS"."TCDATMAE_TIPO_SUBCUENTA"
-        """
-        extract_dataset_spark(
-            configure_postgres_spark,
-            configure_postgres_oci_spark,
-            query_temp,
-            '"MAESTROS"."TCDATMAE_TIPO_SUBCUENTA"'
-        )
-
-        # Extracción de tablas temporales
-        query_temp = """
-        SELECT
-        "FTN_ID_SIEFORE", "FTC_DESCRIPCION", "FTC_DESCRIPCION_CORTA", "FTC_SIEFORE"
-        FROM "MAESTROS"."TCDATMAE_SIEFORE"
-        """
-        extract_dataset_spark(
-            configure_postgres_spark,
-            configure_postgres_oci_spark,
-            query_temp,
-            '"MAESTROS"."TCDATMAE_SIEFORE"'
-        )
-
-        # Extracción de tablas temporales
-        query_temp = """
-        SELECT
-        "FTN_ID_MOV_PROFUTURO_CONSAR", "FCN_ID_MOVIMIENTO_CONSAR","FCN_ID_MOVIMIENTO_PROFUTURO", "FCN_MONPES"
-        FROM "GESTOR"."TTGESPRO_MOV_PROFUTURO_CONSAR"
-        """
-        extract_dataset_spark(
-            configure_postgres_spark,
-            configure_postgres_oci_spark,
-            query_temp,
-            '"MAESTROS"."TTGESPRO_MOV_PROFUTURO_CONSAR"'
-        )
-
-        # Extracción de tablas temporales
-        query_temp = """
-        SELECT
-        "FTN_ID_MOVIMIENTO_CONSAR", "FTC_DESCRIPCION", "FTC_MOV_TIPO_AHORRO",
-        "FTB_INTEGRACION_DIAS_COTIZADOS_SALARIO_BASE", "FCN_ID_REFERENCIA"
-        FROM "MAESTROS"."TCDATMAE_MOVIMIENTO_CONSAR"
-        """
-        extract_dataset_spark(
-            configure_postgres_spark,
-            configure_postgres_oci_spark,
-            query_temp,
-            '"MAESTROS"."TCDATMAE_MOVIMIENTO_CONSAR"'
-        )
-
-        # Extracción de tablas temporales
-        query_temp = """
-        SELECT
-        "FTN_ID_PERIODO", "FTC_PERIODO"
-        FROM "GESTOR"."TCGESPRO_PERIODO"
-        """
-        extract_dataset_spark(
-            configure_postgres_spark,
-            configure_postgres_oci_spark,
-            query_temp,
-            '"MAESTROS"."TCGESPRO_PERIODO"'
-        )
 
         # Extracción
         truncate_table(postgres_oci, 'TTHECHOS_MOVIMIENTO', term=term_id)
@@ -259,6 +174,92 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
         WHERE FTD_FEH_LIQUIDACION BETWEEN :start AND :end
         """, table, term=term_id, params={"start": start_month, "end": end_month})
 
+        # Elimina tablas temporales
+        postgres_oci.execute(text("""
+                                DROP TABLE IF EXISTS "MAESTROS"."TCDATMAE_TIPO_SUBCUENTA"
+                                """))
+
+        postgres_oci.execute(text("""
+                                DROP TABLE IF EXISTS "MAESTROS"."TCDATMAE_SIEFORE"
+                                """))
+
+        postgres_oci.execute(text("""
+                                DROP TABLE IF EXISTS "MAESTROS"."TTGESPRO_MOV_PROFUTURO_CONSAR"
+                                """))
+
+        postgres_oci.execute(text("""
+                                DROP TABLE IF EXISTS "MAESTROS"."TCDATMAE_MOVIMIENTO_CONSAR"
+                                """))
+
+        postgres_oci.execute(text("""
+                                DROP TABLE IF EXISTS "MAESTROS"."TCGESPRO_PERIODO"
+                                """))
+        # Extracción de tablas temporales
+        query_temp = """
+                SELECT
+                "FTN_ID_TIPO_SUBCTA", "FCN_ID_REGIMEN", "FCN_ID_CAT_SUBCTA", "FCC_VALOR", "FTC_TIPO_CLIENTE"
+                FROM "MAESTROS"."TCDATMAE_TIPO_SUBCUENTA"
+                """
+        extract_dataset_spark(
+            configure_postgres_spark,
+            configure_postgres_oci_spark,
+            query_temp,
+            '"MAESTROS"."TCDATMAE_TIPO_SUBCUENTA"'
+        )
+
+        # Extracción de tablas temporales
+        query_temp = """
+                SELECT
+                "FTN_ID_SIEFORE", "FTC_DESCRIPCION", "FTC_DESCRIPCION_CORTA", "FTC_SIEFORE"
+                FROM "MAESTROS"."TCDATMAE_SIEFORE"
+                """
+        extract_dataset_spark(
+            configure_postgres_spark,
+            configure_postgres_oci_spark,
+            query_temp,
+            '"MAESTROS"."TCDATMAE_SIEFORE"'
+        )
+
+        # Extracción de tablas temporales
+        query_temp = """
+                SELECT
+                "FTN_ID_MOV_PROFUTURO_CONSAR", "FCN_ID_MOVIMIENTO_CONSAR","FCN_ID_MOVIMIENTO_PROFUTURO", "FCN_MONPES"
+                FROM "GESTOR"."TTGESPRO_MOV_PROFUTURO_CONSAR"
+                """
+        extract_dataset_spark(
+            configure_postgres_spark,
+            configure_postgres_oci_spark,
+            query_temp,
+            '"MAESTROS"."TTGESPRO_MOV_PROFUTURO_CONSAR"'
+        )
+
+        # Extracción de tablas temporales
+        query_temp = """
+                SELECT
+                "FTN_ID_MOVIMIENTO_CONSAR", "FTC_DESCRIPCION", "FTC_MOV_TIPO_AHORRO",
+                "FTB_INTEGRACION_DIAS_COTIZADOS_SALARIO_BASE", "FCN_ID_REFERENCIA"
+                FROM "MAESTROS"."TCDATMAE_MOVIMIENTO_CONSAR"
+                """
+        extract_dataset_spark(
+            configure_postgres_spark,
+            configure_postgres_oci_spark,
+            query_temp,
+            '"MAESTROS"."TCDATMAE_MOVIMIENTO_CONSAR"'
+        )
+
+        # Extracción de tablas temporales
+        query_temp = """
+                SELECT
+                "FTN_ID_PERIODO", "FTC_PERIODO"
+                FROM "GESTOR"."TCGESPRO_PERIODO"
+                """
+        extract_dataset_spark(
+            configure_postgres_spark,
+            configure_postgres_oci_spark,
+            query_temp,
+            '"MAESTROS"."TCGESPRO_PERIODO"'
+        )
+
         # Cifras de control
         report1 = html_reporter.generate(
             postgres_oci,
@@ -297,7 +298,6 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
             ROUND(cast(SUM (m."FTF_MONTO_PESOS") as numeric(16,2)),2) as MONTO_PESOS
             FROM "HECHOS"."TTHECHOS_MOVIMIENTO" m
             INNER JOIN "MAESTROS"."TCDATMAE_SIEFORE" s ON m."FCN_ID_SIEFORE" = s."FTN_ID_SIEFORE"
-            --INNER JOIN "GESTOR"."TCGESPRO_MOVIMIENTO_PROFUTURO" mp ON mp."FTN_ID_MOVIMIENTO_PROFUTURO" = m."FCN_ID_CONCEPTO_MOVIMIENTO"
             INNER JOIN "MAESTROS"."TCDATMAE_TIPO_SUBCUENTA" sb ON m."FCN_ID_TIPO_SUBCTA" = sb."FTN_ID_TIPO_SUBCTA"
             INNER JOIN "MAESTROS"."TCGESPRO_PERIODO" g ON g."FTN_ID_PERIODO" = m."FCN_ID_PERIODO"
             WHERE "FCN_ID_PERIODO" = :term
