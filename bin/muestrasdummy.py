@@ -198,6 +198,7 @@ with define_extraction(phase, area, postgres_pool, bigquery_pool) as (postgres, 
 
         _write_spark_dataframe(df, configure_postgres_spark, '"ESTADO_CUENTA"."TTEDOCTA_IMAGEN_DUMMY"')
 
+
         headers = get_headers()  # Get the headers using the get_headers() function
 
         response = requests.get(url_reca, headers= headers)
@@ -207,13 +208,12 @@ with define_extraction(phase, area, postgres_pool, bigquery_pool) as (postgres, 
             # Si la petición fue exitosa, puedes acceder al contenido de la respuesta de la siguiente manera:
             content = response.content.decode('utf-8')
             data = json.loads(content)
-            if data['data']['statusText'] == 'finalizado':
-                time.sleep(8)
         else:
             # Si la petición no fue exitosa, puedes imprimir el código de estado para obtener más información
             print(f"La solicitud no fue exitosa. Código de estado: {response.status_code}")
 
 
+        headers = get_headers()
         response = requests.get(url_ret, headers= headers)
         print(response)
         # Verifica si la petición fue exitosa
@@ -221,9 +221,6 @@ with define_extraction(phase, area, postgres_pool, bigquery_pool) as (postgres, 
             # Si la petición fue exitosa, puedes acceder al contenido de la respuesta de la siguiente manera:
             content = response.content.decode('utf-8')
             data = json.loads(content)
-            if data['data']['statusText'] == 'finalizado':
-
-                time.sleep(8)
         else:
             # Si la petición no fue exitosa, puedes imprimir el código de estado para obtener más información
             print(f"La solicitud no fue exitosa. Código de estado: {response.status_code}")

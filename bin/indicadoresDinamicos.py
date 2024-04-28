@@ -9,7 +9,6 @@ import sys
 html_reporter = HtmlReporter()
 postgres_pool = get_postgres_pool()
 postgres_oci_pool = get_postgres_oci_pool()
-bigquery_pool = get_bigquery_pool()
 
 phase = int(sys.argv[1])
 user = int(sys.argv[3])
@@ -46,7 +45,7 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
         )
 
         # Indicadores dinámicos
-        truncate_table(postgres, "TCHECHOS_CLIENTE_INDICADOR", term=term_id, area=area)
+        truncate_table(postgres_oci, "TCHECHOS_CLIENTE_INDICADOR", term=term_id, area=area)
 
 
         postgres_oci.execute(text("""
@@ -93,9 +92,9 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
                 elif origin == "INTGY":
                     origin_configurator = configure_integrity_spark('cierren')
                 else:
-                    origin_configurator = configure_postgres_spark
+                    origin_configurator = configure_postgres_oci_spark
 
-                update_indicator_spark(origin_configurator=origin_configurator, destination_configurator=configure_postgres_spark, query=query,
+                update_indicator_spark(origin_configurator=origin_configurator, destination_configurator=configure_postgres_oci_spark, query=query,
                                        indicator= indicator._mapping,term=term_id,area= area,
                                        params={'term': term_id, 'end': end_month, 'start': start_month})
 

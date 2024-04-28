@@ -1,23 +1,53 @@
 from profuturo.common import define_extraction, register_time, truncate_table, notify
-from profuturo.database import get_postgres_pool, get_postgres_oci_pool, configure_postgres_spark, configure_bigquery_spark, get_bigquery_pool, configure_postgres_oci_spark
+from profuturo.database import get_postgres_pool, get_postgres_oci_pool, configure_postgres_spark, configure_postgres_oci_spark
 from profuturo.extraction import _write_spark_dataframe, extract_terms,  _get_spark_session, read_table_insert_temp_view
 from pyspark.sql.functions import udf, concat, col, current_date , row_number,lit, current_timestamp
 from profuturo.env import load_env
-import sys
+from datetime import datetime, timedelta
 import requests
 import time
+import json
+import sys
+import jwt
 import os
 
 
 load_env()
 postgres_pool = get_postgres_pool()
 postgres_oci_pool = get_postgres_oci_pool()
-bigquery_pool = get_bigquery_pool()
 phase = int(sys.argv[1])
 user = int(sys.argv[3])
 area = int(sys.argv[4])
 url = os.getenv("URL_DEFINITIVO_RET")
 print(url)
+
+def get_token():
+    try:
+        payload = {"isNonRepudiation": True}
+        secret = os.environ.get("JWT_SECRET")  # Ensure you have set the JWT_SECRET environment variable
+
+        if secret is None:
+            raise ValueError("JWT_SECRET environment variable is not set")
+
+        # Set expiration time 10 seconds from now
+        expiration_time = datetime.utcnow() + timedelta(seconds=10)
+        payload['exp'] = expiration_time.timestamp()  # Setting expiration time directly in payload
+
+        # Create the token
+        non_repudiation_token = jwt.encode(payload, secret, algorithm='HS256')
+
+        return non_repudiation_token
+    except Exception as error:
+        print("ERROR:", error)
+        return -1
+
+
+def get_headers():
+    non_repudiation_token = get_token()
+    if non_repudiation_token != -1:
+        return {"Authorization": f"Bearer {non_repudiation_token}"}
+    else:
+        return {}
 
 with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgres, postgres_oci):
     term = extract_terms(postgres, phase)
@@ -30,7 +60,7 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
         truncate_table(postgres, 'TTEDOCTA_RETIRO_GENERAL')
         truncate_table(postgres, 'TTEDOCTA_RETIRO')
 
-        read_table_insert_temp_view(configure_postgres_spark, """
+        read_table_insert_temp_view(configure_postgres_oci_spark, """
         SELECT
         DISTINCT
         C."FTN_CUENTA" AS "FCN_NUMERO_CUENTA",
@@ -40,7 +70,7 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
         C."FTC_CALLE" AS "FTC_CALLE_NUMERO",
         C."FTC_COLONIA",
         C."FTC_DELEGACION" AS "FTC_MUNICIPIO",
-        Cast(C."FTN_CODIGO_POSTAL" as varchar ) AS "FTC_CP",
+        Cast(C."FTC_CODIGO_POSTAL" as varchar ) AS "FTC_CP",
         C."FTC_ENTIDAD_FEDERATIVA" AS "FTC_ENTIDAD",
         C."FTC_CURP",
         C."FTC_RFC",
@@ -61,7 +91,7 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
 
         general_df = general_df.drop(col("FTC_ARCHIVO"))
 
-        read_table_insert_temp_view(configure_postgres_spark,
+        read_table_insert_temp_view(configure_postgres_oci_spark,
           """
                 SELECT
                 R."FCN_CUENTA" AS "FCN_NUMERO_CUENTA",
@@ -84,7 +114,7 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
                 WHEN "FTC_FON_ENTIDAD" is not null then "FTN_SDO_TRA_VIVIENDA" + "FTN_SDO_TRA_AHORRORET"
                 ELSE 0
                 END "FTN_FON_MONTO_TRANSF",
-                0.0 AS "TFN_FON_RETENCION_ISR",
+                0.0 AS "FTN_FON_RETENCION_ISR",
                 "FTC_ENT_REC_TRAN" AS "FTC_AFO_ENTIDAD",
                 "FCC_MEDIO_PAGO" AS "FTC_AFO_MEDIO_PAGO",
                 CASE
@@ -119,17 +149,25 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
         _write_spark_dataframe(general_df, configure_postgres_oci_spark, '"ESTADO_CUENTA"."TTEDOCTA_RETIRO_GENERAL"')
         _write_spark_dataframe(anverso_df, configure_postgres_oci_spark, '"ESTADO_CUENTA"."TTEDOCTA_RETIRO"')
 
+
+
         response = requests.get(url)
 
+        headers = get_headers()  # Get the headers using the get_headers() function
 
-        # Verifica si la petición fue exitosa
-        if response.status_code == 200:
-            # Si la petición fue exitosa, puedes acceder al contenido de la respuesta de la siguiente manera:
-            content = response.content
-            print(content)
-        else:
-            # Si la petición no fue exitosa, puedes imprimir el código de estado para obtener más información
-            print(f"La solicitud no fue exitosa. Código de estado: {response.status_code}")
+        for i in range(1000):
+            response = requests.get(url, headers=headers)  # Pass headers with the request
+            print(response)
+
+            if response.status_code == 200:
+                content = response.content.decode('utf-8')
+                data = json.loads(content)
+                if data['data']['statusText'] == 'finalizado':
+                    break
+                time.sleep(8)
+            else:
+                print(f"La solicitud no fue exitosa. Código de estado: {response.status_code}")
+                break
 
         time.sleep(400)
 

@@ -1,6 +1,6 @@
 from sqlalchemy.engine import CursorResult
 from profuturo.common import define_extraction, register_time, notify, truncate_table
-from profuturo.database import get_postgres_pool, get_postgres_oci_pool,configure_postgres_oci_spark ,configure_postgres_spark, configure_bigquery_spark, get_bigquery_pool,configure_mitedocta_spark
+from profuturo.database import get_postgres_pool, get_postgres_oci_pool,configure_postgres_oci_spark ,configure_postgres_spark,configure_mitedocta_spark
 from profuturo.extraction import _write_spark_dataframe, extract_terms, _get_spark_session, _create_spark_dataframe, extract_dataset_spark
 from pyspark.sql.functions import concat, col, row_number, lit, lpad
 from pyspark.sql.types import StringType, StructType, StructField, IntegerType
@@ -27,7 +27,6 @@ import os
 load_env()
 postgres_pool = get_postgres_pool()
 postgres_oci_pool = get_postgres_oci_pool()
-bigquery_pool = get_bigquery_pool()
 storage_client = storage.Client()
 phase = int(sys.argv[1])
 user = int(sys.argv[3])
@@ -287,6 +286,7 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
         truncate_table(postgres_oci, "TTMUESTR_GENERAL")
         truncate_table(postgres_oci, "TTMUESTR_REVERSO")
 
+
         time.sleep(100)
 
         # Extracción de tablas temporales
@@ -342,11 +342,11 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
         print("muestra manuales")
 
         ###########################  IMAGENES   #################################################
-        truncate_table(postgres, 'TTEDOCTA_IMAGEN')
+        #truncate_table(postgres, 'TTEDOCTA_IMAGEN')
 
-        delete_all_objects(bucket_name, prefix)
+        #delete_all_objects(bucket_name, prefix)
 
-        delete_all_objects(bucket_name, 'profuturo-archivos')
+        #delete_all_objects(bucket_name, 'profuturo-archivos')
 
         query = """
         SELECT
@@ -375,10 +375,35 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
 
         df = spark.createDataFrame(blob_info_list, schema=schema)
 
-        _write_spark_dataframe(df, configure_postgres_spark, '"ESTADO_CUENTA"."TTEDOCTA_IMAGEN"')
+        #_write_spark_dataframe(df, configure_postgres_spark, '"ESTADO_CUENTA"."TTEDOCTA_IMAGEN"')
 
-        time.sleep(100)
+        time.sleep(400)
 
+        general_df = _create_spark_dataframe(spark, configure_postgres_spark, f"""
+                        SELECT
+                        "FCN_FOLIO",
+                        "FCN_NUMERO_CUENTA",
+                        "FCN_ID_PERIODO",
+                        4 as "FTN_PERIODICIDAD_MESES",
+                        now() as "FTD_FECHA_ALTA",
+                        CASE
+                        WHEN "FCN_ID_PERIODO" IN (202301,202302,202303,202304) THEN 83
+                        WHEN "FCN_ID_PERIODO" IN (202305,202306,202307,202308) THEN 84
+                        WHEN "FCN_ID_PERIODO" IN (202309,202310,202311,202312) THEN 85
+                        WHEN "FCN_ID_PERIODO" IN (202201,202202,202203,202204) THEN 74
+                        WHEN "FCN_ID_PERIODO" IN (202205,202206,202207,202208) THEN 75
+                        WHEN "FCN_ID_PERIODO" IN (202209,202210,202211,202212) THEN 76
+                        END "FCN_ID_PERIODO_EDOCTA"
+                        FROM "ESTADO_CUENTA"."TTEDOCTA_GENERAL" G
+                        """, {"term": term_id, "start": start_month, "end": end_month, "user": str(user)})
+
+        general_df = general_df.withColumn("FTC_URL_EDOCTA", concat(
+            lit('https://storage.cloud.google.com/'),
+            lit(f"{bucket_name}/"),
+            lit(f"{term_id}/"),
+            col("FCN_FOLIO"),
+            lit(".pdf")
+        ))
 
         headers = get_headers()  # Get the headers using the get_headers() function
 
@@ -395,11 +420,12 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
                 print('Solicitud fue exitosa')
             else:
                 print(f"La solicitud no fue exitosa. Código de estado: {response.status_code}")
+                break
 
 
         notify(
             postgres,
-            "Generacion muestras",
+            "Generacion Muestra",
             phase,
             area,
             term=term_id,
@@ -407,11 +433,6 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
             aprobar=False,
             descarga=False,
         )
-
-
-
-
-
 
 
 

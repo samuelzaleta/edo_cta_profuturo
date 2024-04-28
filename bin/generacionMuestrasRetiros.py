@@ -1,13 +1,17 @@
 from profuturo.common import define_extraction, register_time, truncate_table, notify
 from profuturo.database import get_postgres_pool, get_postgres_oci_pool, configure_postgres_oci_spark,configure_postgres_spark, configure_bigquery_spark, get_bigquery_pool
-from profuturo.extraction import _write_spark_dataframe, extract_terms,  _get_spark_session, read_table_insert_temp_view
+from profuturo.extraction import _write_spark_dataframe, extract_terms,  _get_spark_session, read_table_insert_temp_view, extract_dataset_spark
 from pyspark.sql.functions import udf, concat, col, current_date , row_number,lit, current_timestamp
+from datetime import datetime, timedelta
 from profuturo.env import load_env
+from sqlalchemy import text
 import sys
 import requests
 import time
 import os
-
+import json
+import sys
+import jwt
 
 load_env()
 postgres_pool = get_postgres_pool()
@@ -19,6 +23,35 @@ area = int(sys.argv[4])
 url = os.getenv("URL_MUESTRAS_RET")
 
 
+def get_token():
+    try:
+        payload = {"isNonRepudiation": True}
+        secret = os.environ.get("JWT_SECRET")  # Ensure you have set the JWT_SECRET environment variable
+
+        if secret is None:
+            raise ValueError("JWT_SECRET environment variable is not set")
+
+        # Set expiration time 10 seconds from now
+        expiration_time = datetime.utcnow() + timedelta(seconds=10)
+        payload['exp'] = expiration_time.timestamp()  # Setting expiration time directly in payload
+
+        # Create the token
+        non_repudiation_token = jwt.encode(payload, secret, algorithm='HS256')
+
+        return non_repudiation_token
+    except Exception as error:
+        print("ERROR:", error)
+        return -1
+
+
+def get_headers():
+    non_repudiation_token = get_token()
+    if non_repudiation_token != -1:
+        return {"Authorization": f"Bearer {non_repudiation_token}"}
+    else:
+        return {}
+
+
 with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgres, postgres_oci):
     term = extract_terms(postgres, phase)
     term_id = term["id"]
@@ -27,9 +60,36 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
     spark = _get_spark_session()
 
     with register_time(postgres_pool, phase, term_id, user, area):
+
+        def insertar_tablas():
+            # Extracción de tablas temporales
+
+            extract_dataset_spark(configure_postgres_spark, configure_postgres_oci_spark,
+                                  """ SELECT * FROM "HECHOS"."TTHECHOS_CARGA_ARCHIVO" """,
+                                  '"HECHOS"."TTHECHOS_CARGA_ARCHIVO"'
+                                  )
+
+            extract_dataset_spark(configure_postgres_spark, configure_postgres_oci_spark,
+                                  """ SELECT * FROM "HECHOS"."TTHECHOS_CARGA_ARCHIVO" """,
+                                  '"HECHOS"."TTHECHOS_CARGA_ARCHIVO"'
+                                  )
+
+
+        def eliminar_tablas():
+            # Elimina tablas temporales
+            postgres_oci.execute(
+                text(""" DROP TABLE IF EXISTS "HECHOS"."TTHECHOS_CARGA_ARCHIVO" """))
+
+            extract_dataset_spark(configure_postgres_spark, configure_postgres_oci_spark,
+                                  """ SELECT * FROM "HECHOS"."TTHECHOS_CARGA_ARCHIVO" """,
+                                  '"HECHOS"."TTHECHOS_CARGA_ARCHIVO"'
+                                  )
+
         truncate_table(postgres, 'TCGESPRO_MUESTRA', term=term_id, area=area)
         truncate_table(postgres, 'TTMUESTR_RETIRO_GENERAL')
         truncate_table(postgres, 'TTMUESTR_RETIRO')
+        eliminar_tablas()
+        insertar_tablas()
 
         read_table_insert_temp_view(configure_postgres_spark, """
                 SELECT
@@ -52,7 +112,7 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
         C."FTC_CALLE" AS "FTC_CALLE_NUMERO",
         C."FTC_COLONIA",
         C."FTC_DELEGACION" AS "FTC_MUNICIPIO",
-        Cast(C."FTN_CODIGO_POSTAL" as varchar ) AS "FTC_CP",
+        Cast(C."FTC_CODIGO_POSTAL" as varchar ) AS "FTC_CP",
         C."FTC_ENTIDAD_FEDERATIVA" AS "FTC_ENTIDAD",
         C."FTC_CURP",
         C."FTC_RFC",
@@ -91,7 +151,7 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
                 WHEN "FTC_FON_ENTIDAD" is not null then "FTN_SDO_TRA_VIVIENDA" + "FTN_SDO_TRA_AHORRORET"
                 ELSE 0
                 END "FTN_FON_MONTO_TRANSF",
-                0.0 AS "TFN_FON_RETENCION_ISR",
+                0.0 AS "FTN_FON_RETENCION_ISR",
                 "FTC_ENT_REC_TRAN" AS "FTC_AFO_ENTIDAD",
                 "FCC_MEDIO_PAGO" AS "FTC_AFO_MEDIO_PAGO",
                 CASE
@@ -148,19 +208,24 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
             lit(".pdf"),
         ))
 
-        _write_spark_dataframe(df, configure_postgres_oci_spark, '"GESTOR"."TCGESPRO_MUESTRA"')
+        _write_spark_dataframe(df, configure_postgres_spark, '"GESTOR"."TCGESPRO_MUESTRA"')
+        eliminar_tablas()
 
-        response = requests.get(url)
-        print(url)
-        # Verifica si la petición fue exitosa
-        if response.status_code == 200:
-            # Si la petición fue exitosa, puedes acceder al contenido de la respuesta de la siguiente manera:
-            content = response.content
-            print(url)
-            print(content)
-        else:
-            # Si la petición no fue exitosa, puedes imprimir el código de estado para obtener más información
-            print(f"La solicitud no fue exitosa. Código de estado: {response.status_code}")
+        headers = get_headers()  # Get the headers using the get_headers() function
+
+        for i in range(1000):
+            response = requests.get(url, headers=headers)  # Pass headers with the request
+            print(response)
+
+            if response.status_code == 200:
+                content = response.content.decode('utf-8')
+                data = json.loads(content)
+                if data['data']['statusText'] == 'finalizado':
+                    break
+                time.sleep(8)
+            else:
+                print(f"La solicitud no fue exitosa. Código de estado: {response.status_code}")
+                break
 
         time.sleep(40)
 
