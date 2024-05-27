@@ -1,10 +1,15 @@
 from profuturo.common import define_extraction, register_time, truncate_table, notify
 from profuturo.database import get_postgres_pool, get_postgres_oci_pool, configure_postgres_oci_spark,configure_postgres_spark, configure_bigquery_spark, get_bigquery_pool
-from profuturo.extraction import _write_spark_dataframe, extract_terms,  _get_spark_session, read_table_insert_temp_view, extract_dataset_spark
+from profuturo.extraction import _write_spark_dataframe, extract_terms,  _get_spark_session, read_table_insert_temp_view, extract_dataset_spark, _create_spark_dataframe
 from pyspark.sql.functions import udf, concat, col, current_date , row_number,lit, current_timestamp
+from pyspark.sql.types import StringType, StructType, StructField, IntegerType
 from datetime import datetime, timedelta
 from profuturo.env import load_env
 from sqlalchemy import text
+from google.cloud import storage
+
+from io import BytesIO
+from PIL import Image
 import sys
 import requests
 import time
@@ -16,12 +21,110 @@ import jwt
 load_env()
 postgres_pool = get_postgres_pool()
 postgres_oci_pool = get_postgres_oci_pool()
-bigquery_pool = get_bigquery_pool()
+storage_client = storage.Client()
 phase = int(sys.argv[1])
 user = int(sys.argv[3])
 area = int(sys.argv[4])
 url = os.getenv("URL_MUESTRAS_RET")
+bucket_name = os.getenv("BUCKET_ID")
+print(bucket_name)
+prefix =f"{os.getenv('PREFIX_BLOB')}"
+print(prefix)
 
+
+
+def upload_to_gcs(row):
+    id_value = row["id"]
+    bytea_data = row["fto_imagen"]
+
+    # Convertir bytes a imagen
+    image = Image.open(BytesIO(bytea_data))
+
+    # Guardar imagen localmente (opcional)
+    # image.save(f"local/{id_value}.png")
+
+    # Subir imagen a GCS
+    blob_name = f"{prefix}/{id_value}.png"
+
+    storage_client = storage.Client()
+    bucket = storage_client.bucket(bucket_name)
+    blob = bucket.blob(blob_name)
+
+    # Convertir imagen a bytes antes de subirla
+    byte_stream = BytesIO()
+    image.save(byte_stream, format="PNG")
+    byte_stream.seek(0)
+
+    blob.upload_from_file(byte_stream, content_type="image/png")
+
+def delete_all_objects(bucket_name, prefix):
+    # Crea una instancia del cliente de Cloud Storage
+    storage_client = storage.Client()
+
+    # Obtiene el bucket
+    bucket = storage_client.bucket(bucket_name)
+
+    # Lista todos los objetos en el bucket con el prefijo especificado
+    blobs = bucket.list_blobs(prefix=prefix)
+
+    # Elimina cada objeto
+    for blob in blobs:
+        #print(f"Eliminando objeto: {blob.name}")
+        blob.delete()
+
+def get_blob_info(bucket_name, prefix):
+    # Crea una instancia del cliente de Cloud Storage
+    storage_client = storage.Client()
+
+    # Obtiene el bucket
+    bucket = storage_client.bucket(bucket_name)
+
+    # Lista todos los objetos en el bucket con el prefijo especificado
+    blobs = bucket.list_blobs(prefix=prefix)
+
+    # Lista para almacenar información de blobs
+    blob_info_list = []
+
+    # Recorre todos los blobs y obtiene información
+    for blob in blobs:
+        # Divide el nombre del blob en partes usando '-'
+        parts = blob.name.split('-')
+
+        # Asegúrate de que haya al menos tres partes en el nombre
+        if len(parts) == 4:
+            # Obtiene la información de id, formato y área
+            blob_info = {
+                "FTC_POSICION_PDF": parts[0].split('/')[1],
+                "FCN_ID_FORMATO_EDOCTA": int(parts[1]),
+                "FCN_ID_AREA": int(parts[2].split('.')[0]),
+                "FTC_URL_IMAGEN": f"https://storage.cloud.google.com/{bucket_name}/{blob.name}",
+                "FTC_IMAGEN": f"{blob.name}",
+                "FTC_SIEFORE": parts[3].split('.')[0] if parts[3].split('.')[0] != 'sinsiefore' else None
+            }
+
+            blob_info_list.append(blob_info)
+
+        if len(parts) > 4:
+            # Obtiene la información de id, formato y área
+            blob_info = {
+                "FTC_POSICION_PDF": parts[0].split('/')[1],
+                "FCN_ID_FORMATO_EDOCTA": int(parts[1]),
+                "FCN_ID_AREA": int(parts[2].split('.')[0]),
+                "FTC_URL_IMAGEN": f"https://storage.cloud.google.com/{bucket_name}/{blob.name}",
+                "FTC_IMAGEN": f"{blob.name}",
+                "FTC_SIEFORE": f"{parts[3]}-{parts[4].split('.')[0]}"
+            }
+
+            blob_info_list.append(blob_info)
+
+    return blob_info_list
+
+def move_blob(source_bucket, destination_bucket, source_blob_name, destination_blob_name):
+    source_blob = source_bucket.blob(source_blob_name)
+    destination_blob = destination_bucket.blob(destination_blob_name)
+
+    # Copiar el blob del bucket fuente al bucket de destino
+    destination_blob.rewrite(source_blob)
 
 def get_token():
     try:
@@ -69,43 +172,27 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
                                   '"HECHOS"."TTHECHOS_CARGA_ARCHIVO"'
                                   )
 
-            extract_dataset_spark(configure_postgres_spark, configure_postgres_oci_spark,
-                                  """ SELECT * FROM "HECHOS"."TTHECHOS_CARGA_ARCHIVO" """,
-                                  '"HECHOS"."TTHECHOS_CARGA_ARCHIVO"'
-                                  )
-
 
         def eliminar_tablas():
             # Elimina tablas temporales
             postgres_oci.execute(
                 text(""" DROP TABLE IF EXISTS "HECHOS"."TTHECHOS_CARGA_ARCHIVO" """))
 
-            extract_dataset_spark(configure_postgres_spark, configure_postgres_oci_spark,
-                                  """ SELECT * FROM "HECHOS"."TTHECHOS_CARGA_ARCHIVO" """,
-                                  '"HECHOS"."TTHECHOS_CARGA_ARCHIVO"'
-                                  )
 
-        truncate_table(postgres, 'TCGESPRO_MUESTRA', term=term_id, area=area)
-        truncate_table(postgres, 'TTMUESTR_RETIRO_GENERAL')
-        truncate_table(postgres, 'TTMUESTR_RETIRO')
+        #truncate_table(postgres, 'TCGESPRO_MUESTRA', term=term_id, area=area)
+        postgres.execute(
+            text(f""" DELETE FROM "GESTOR"."TCGESPRO_MUESTRA"
+            WHERE "FCN_ID_USUARIO" = {user}
+            """))
+        truncate_table(postgres_oci, 'TTMUESTR_RETIRO_GENERAL')
+        truncate_table(postgres_oci, 'TTMUESTR_RETIRO')
         eliminar_tablas()
         insertar_tablas()
-
-        read_table_insert_temp_view(configure_postgres_spark, """
-                SELECT
-                DISTINCT
-                CA."FTC_USUARIO_CARGA",
-                C."FTN_CUENTA" AS "FCN_NUMERO_CUENTA"
-                FROM "HECHOS"."TTHECHOS_RETIRO" F
-                INNER JOIN "MAESTROS"."TCDATMAE_CLIENTE" C ON F."FCN_CUENTA" = C."FTN_CUENTA"
-                INNER JOIN "HECHOS"."TTHECHOS_CARGA_ARCHIVO" CA ON CA."FCN_CUENTA" = C."FTN_CUENTA" AND CA."FCN_ID_INDICADOR" = 32
-                where C."FTN_CUENTA" is not null
-                """, "user", params={"term": term_id, "start": start_month, "end": end_month, "user": str(user)})
 
         read_table_insert_temp_view(configure_postgres_oci_spark, """
         SELECT
         DISTINCT
-        CAST(CONCAT(C."FTN_CUENTA", cast(:term as varchar)) AS BIGINT)  as "FCN_ID_EDOCTA",
+        CAST(CONCAT(C."FTN_CUENTA", CAST(to_char(F."FTD_FECHA_EMISION", 'YYYYMMDD') AS BIGINT)) AS BIGINT) AS "FCN_ID_EDOCTA",
         cast(C."FTN_CUENTA" as BIGINT) AS "FCN_NUMERO_CUENTA",
         :term AS "FCN_ID_PERIODO",
         concat_ws(' ', C."FTC_NOMBRE", C."FTC_AP_PATERNO", C."FTC_AP_MATERNO") AS "FTC_NOMBRE",
@@ -116,7 +203,8 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
         C."FTC_ENTIDAD_FEDERATIVA" AS "FTC_ENTIDAD",
         C."FTC_CURP",
         C."FTC_RFC",
-        C."FTC_NSS"
+        C."FTC_NSS",
+        :user AS "FTC_USUARIO_ALTA"
         FROM "HECHOS"."TTHECHOS_RETIRO" F
         INNER JOIN "MAESTROS"."TCDATMAE_CLIENTE" C ON F."FCN_CUENTA" = C."FTN_CUENTA"
         INNER JOIN "HECHOS"."TTHECHOS_CARGA_ARCHIVO" CA ON CA."FCN_CUENTA" = C."FTN_CUENTA" AND CA."FCN_ID_INDICADOR" = 32
@@ -131,7 +219,9 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
         read_table_insert_temp_view(configure_postgres_oci_spark,
           """
                 SELECT
+                DISTINCT
                 R."FCN_CUENTA" AS "FCN_NUMERO_CUENTA",
+                CAST(CONCAT(R."FCN_CUENTA", CAST(to_char(R."FTD_FECHA_EMISION", 'YYYYMMDD') AS BIGINT)) AS BIGINT) AS "FCN_ID_EDOCTA",
                 :term AS "FCN_ID_PERIODO",
                 "FTN_SDO_INI_AHORRORET" AS "FTN_SDO_INI_AHO_RET",
                 "FTN_SDO_INI_VIVIENDA" AS "FTN_SDO_INI_AHO_VIV",
@@ -179,22 +269,19 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
 
         anverso_df = spark.sql("select * from edoCtaAnverso")
 
-        anverso_df = anverso_df.withColumn("FCN_ID_EDOCTA", concat(
-            col("FCN_NUMERO_CUENTA"),
-            lit(term_id)
-        ).cast("bigint"))
+
 
 
         _write_spark_dataframe(general_df, configure_postgres_oci_spark, '"ESTADO_CUENTA"."TTMUESTR_RETIRO_GENERAL"')
         _write_spark_dataframe(anverso_df, configure_postgres_oci_spark, '"ESTADO_CUENTA"."TTMUESTR_RETIRO"')
 
-        df = spark.sql("""
+        df = spark.sql(f"""
         SELECT 
          FCN_NUMERO_CUENTA AS FCN_CUENTA,
-         CAST(FTC_USUARIO_CARGA as int)  FTC_USUARIO_CARGA
-        FROM user
+         CAST({user} as int)  FTC_USUARIO_CARGA
+        FROM edoCtaGenerales
         """)
-
+        print("muestras")
         df.show()
 
         df = df.withColumn("FCN_ID_PERIODO", lit(term_id))
@@ -202,18 +289,56 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
         df = df.drop("FTC_USUARIO_CARGA")
         df = df.withColumn("FCN_ID_AREA", lit(area))
         df = df.withColumn("FTD_FECHAHORA_ALTA", lit(current_timestamp()))
-        df = df.withColumn("FTC_URL_PDF_ORIGEN", concat(
-            lit("https://storage.googleapis.com/edo_cuenta_profuturo_dev_b/profuturo-archivos/"),
-            col("FCN_CUENTA"),
-            lit(".pdf"),
-        ))
 
         _write_spark_dataframe(df, configure_postgres_spark, '"GESTOR"."TCGESPRO_MUESTRA"')
         eliminar_tablas()
 
-        headers = get_headers()  # Get the headers using the get_headers() function
+        ###########################  IMAGENES   #################################################
+        truncate_table(postgres_oci, 'TTEDOCTA_IMAGEN')
+
+        delete_all_objects(bucket_name, prefix)
+
+        delete_all_objects(bucket_name, 'profuturo-archivos')
+
+        query = """
+        SELECT
+        DISTINCT
+        concat("FTC_CODIGO_POSICION_PDF",'-',tcie."FCN_ID_FORMATO_ESTADO_CUENTA",'-', ra."FCN_ID_AREA",'-',COALESCE(tcie."FTC_DESCRIPCION_SIEFORE",'sinsiefore')) AS ID,"FTO_IMAGEN" AS FTO_IMAGEN
+        FROM "GESTOR"."TTGESPRO_CONFIG_IMAGEN_EDOCTA" tcie
+        INNER JOIN "GESTOR"."TTGESPRO_ROL_USUARIO" ru ON CAST(tcie."FTC_USUARIO" AS INT) = ru."FCN_ID_USUARIO"
+        INNER JOIN "GESTOR"."TCGESPRO_ROL_AREA" ra ON ru."FCN_ID_ROL" =  ra."FCN_ID_ROL"
+        """
+
+        imagenes_df = _create_spark_dataframe(spark, configure_postgres_spark, query,
+                                              params={"term": term_id, "start": start_month, "end": end_month,
+                                                      "user": str(user)})
+
+        imagenes_df.show()
+
+        imagenes_df.foreach(upload_to_gcs)
+
+        # Obtiene la información del blob
+        blob_info_list = get_blob_info(bucket_name, prefix)
+
+        schema = StructType([
+            StructField("FTC_POSICION_PDF", StringType(), True),
+            StructField("FCN_ID_FORMATO_EDOCTA", IntegerType(), True),
+            StructField("FCN_ID_AREA", IntegerType(), True),
+            StructField("FTC_URL_IMAGEN", StringType(), True),
+            StructField("FTC_IMAGEN", StringType(), True),
+            StructField("FTC_SIEFORE", StringType(), True)
+        ])
+
+        df = spark.createDataFrame(blob_info_list, schema=schema)
+
+        _write_spark_dataframe(df, configure_postgres_oci_spark, '"ESTADO_CUENTA"."TTEDOCTA_IMAGEN"')
+
+        ####################### FIN MUESTRAS
+
+
 
         for i in range(1000):
+            headers = get_headers()  # Get the headers using the get_headers() function
             response = requests.get(url, headers=headers)  # Pass headers with the request
             print(response)
 
@@ -222,7 +347,7 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
                 data = json.loads(content)
                 if data['data']['statusText'] == 'finalizado':
                     break
-                time.sleep(8)
+                time.sleep(20)
             else:
                 print(f"La solicitud no fue exitosa. Código de estado: {response.status_code}")
                 break
