@@ -106,8 +106,8 @@ def extract_dataset(
     table: str,
     term: int = None,
     params: Dict[str, Any] = None,
-    limit: int = None,
-    transform: Callable[[PandasDataFrame], PandasDataFrame] = None,
+    limit: int = 1000,
+    transform: Callable[[pd.DataFrame], pd.DataFrame] = None,
 ):
     if isinstance(query, Compiled):
         params = query.params
@@ -443,6 +443,7 @@ def _get_spark_session(
     memory_offhead: str ='1g',
     driver_memory: str ='1g',
     intances: int = 2,
+    cores: int =4,
     parallelims :int = 6000
 ) -> SparkSession:
     return SparkSession.builder \
@@ -453,6 +454,7 @@ def _get_spark_session(
         .config("spark.driver.memory", f"{driver_memory}") \
         .config("spark.executor.instances", f"{intances}") \
         .config("spark.default.parallelism", f"{parallelims}") \
+        .config("spark.executor.cores", f"{cores}") \
         .getOrCreate()
 
 
