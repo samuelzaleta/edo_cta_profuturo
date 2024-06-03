@@ -71,8 +71,11 @@ with define_extraction(phase, area, postgres_pool,postgres_oci_pool,) as (postgr
                 END NUMEROINTERIOR,
                ASE.NOMBRE AS FTC_COLONIA,
                CD.NOMBRE AS FTC_DELEGACION,
-               M.NOMBRE AS FTC_MUNICIPIO,
-               concat('C.P. ',CP.CODIGOPOSTAL) AS FTC_CODIGO_POSTAL,
+               coalesce(M.NOMBRE, DI.MUNICIPIO, DI.CIUDAD) AS FTC_MUNICIPIO,
+               CASE
+               WHEN CP.CODIGOPOSTAL !='' THEN concat('C.P. ',CP.CODIGOPOSTAL)
+               WHEN CP.CODIGOPOSTAL ='' THEN concat('C.P. ',DI.CODIGOPOSTAL)
+               END FTC_CODIGO_POSTAL,
                E.NOMBRE AS FTC_ENTIDAD_FEDERATIVA,
                NSS.VALOR_IDENTIFICADOR AS FTC_NSS,
                CURP.VALOR_IDENTIFICADOR AS FTC_CURP,
@@ -217,7 +220,7 @@ with define_extraction(phase, area, postgres_pool,postgres_oci_pool,) as (postgr
         # Extracción
         truncate_table(postgres, "TCHECHOS_CLIENTE_INDICADOR", term=term_id)
         truncate_table(postgres, "TCGESPRO_MUESTRA", term=term_id, area=area)
-        truncate_table(postgres, "TCHECHOS_CLIENTE", term=term_id)
+        truncate_table(postgres_oci, "TCHECHOS_CLIENTE", term=term_id)
         read_table_insert_temp_view(configure_mit_spark, query=f"""
         SELECT
         PG.FTN_NUM_CTA_INVDUAL AS FCN_CUENTA,
