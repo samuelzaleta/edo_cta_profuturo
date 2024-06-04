@@ -148,7 +148,7 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool ) as (postg
         where R."FCN_ID_PERIODO" = :term
         """
 
-        read_table_insert_temp_view(configure_postgres_spark, query, "retiros", params={"term": term_id, "user": str(user), "area": area})
+        read_table_insert_temp_view(configure_postgres_oci_spark, query, "retiros", params={"term": term_id, "user": str(user), "area": area})
         df = spark.sql(""" select * from retiros""")
         # Convert PySpark DataFrame to pandas DataFrame
         pandas_df = df.toPandas()

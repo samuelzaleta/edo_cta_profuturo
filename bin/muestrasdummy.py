@@ -198,30 +198,50 @@ with define_extraction(phase, area, postgres_pool, bigquery_pool) as (postgres, 
 
         _write_spark_dataframe(df, configure_postgres_spark, '"ESTADO_CUENTA"."TTEDOCTA_IMAGEN_DUMMY"')
 
+        for i in range(1000):
+            headers = get_headers()  # Get the headers using the get_headers() function
+            response = requests.get(url_reca, headers=headers)  # Pass headers with the request
+            print(response)
 
-        headers = get_headers()  # Get the headers using the get_headers() function
-
-        response = requests.get(url_reca, headers= headers)
-        print(response)
-        # Verifica si la petición fue exitosa
-        if response.status_code == 200:
-            # Si la petición fue exitosa, puedes acceder al contenido de la respuesta de la siguiente manera:
-            content = response.content.decode('utf-8')
-            data = json.loads(content)
-        else:
-            # Si la petición no fue exitosa, puedes imprimir el código de estado para obtener más información
-            print(f"La solicitud no fue exitosa. Código de estado: {response.status_code}")
+            if response.status_code == 200:
+                content = response.content.decode('utf-8')
+                data = json.loads(content)
+                if data['data']['statusText'] == 'finalizado':
+                    break
+                time.sleep(20)
+            else:
+                print(f"La solicitud no fue exitosa. Código de estado: {response.status_code}")
+                break
 
 
-        headers = get_headers()
-        response = requests.get(url_ret, headers= headers)
-        print(response)
-        # Verifica si la petición fue exitosa
-        if response.status_code == 200:
-            # Si la petición fue exitosa, puedes acceder al contenido de la respuesta de la siguiente manera:
-            content = response.content.decode('utf-8')
-            data = json.loads(content)
-        else:
-            # Si la petición no fue exitosa, puedes imprimir el código de estado para obtener más información
-            print(f"La solicitud no fue exitosa. Código de estado: {response.status_code}")
+        for i in range(10):
+            headers = get_headers()  # Get the headers using the get_headers() function
+            response = requests.get(url_reca, headers=headers)  # Pass headers with the request
+            print(response)
+
+            if response.status_code == 200:
+                content = response.content.decode('utf-8')
+                data = json.loads(content)
+                if data['data']['statusText'] == 'finalizado':
+                    break
+                time.sleep(20)
+            else:
+                print(f"La solicitud no fue exitosa. Código de estado: {response.status_code}")
+                break
+
+        for i in range(10):
+            headers = get_headers()  # Get the headers using the get_headers() function
+            response = requests.get(url_ret, headers=headers)  # Pass headers with the request
+            print(response)
+
+            if response.status_code == 200:
+                content = response.content.decode('utf-8')
+                data = json.loads(content)
+                if data['data']['statusText'] == 'finalizado':
+                    break
+                time.sleep(20)
+            else:
+                print(f"La solicitud no fue exitosa. Código de estado: {response.status_code}")
+                break
+
 
