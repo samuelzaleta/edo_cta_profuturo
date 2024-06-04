@@ -72,10 +72,7 @@ with define_extraction(phase, area, postgres_pool,postgres_oci_pool,) as (postgr
                ASE.NOMBRE AS FTC_COLONIA,
                CD.NOMBRE AS FTC_DELEGACION,
                coalesce(M.NOMBRE, DI.MUNICIPIO, DI.CIUDAD) AS FTC_MUNICIPIO,
-               CASE
-               WHEN CP.CODIGOPOSTAL !='' THEN concat('C.P. ',CP.CODIGOPOSTAL)
-               WHEN CP.CODIGOPOSTAL ='' THEN concat('C.P. ',DI.CODIGOPOSTAL)
-               END FTC_CODIGO_POSTAL,
+               coalesce(CP.CODIGOPOSTAL,DI.CODIGOPOSTAL) AS FTC_CODIGO_POSTAL,
                E.NOMBRE AS FTC_ENTIDAD_FEDERATIVA,
                NSS.VALOR_IDENTIFICADOR AS FTC_NSS,
                CURP.VALOR_IDENTIFICADOR AS FTC_CURP,
