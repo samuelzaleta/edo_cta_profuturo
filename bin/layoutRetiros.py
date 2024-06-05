@@ -29,8 +29,8 @@ print(phase,term, user,area)
 bucket_name = os.getenv("BUCKET_ID")
 print(bucket_name)
 prefix =f"{os.getenv('PREFIX_BLOB')}"
-url = os.getenv("URL_CORRESPONDENSIA_RET")
-print(url)
+#url = os.getenv("URL_CORRESPONDENSIA_RET")
+#print(url)
 correo = os.getenv("CORREO_CORRESPONDENCIA")
 print(correo)
 decimal_pesos = DecimalType(16, 2)
@@ -123,8 +123,12 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
         "FTN_FON_RETENCION_ISR", "FTC_AFO_ENTIDAD",
         "FTC_AFO_MEDIO_PAGO", "FTC_AFO_RECURSOS_ENTREGA",
         to_char("FTD_AFO_FECHA_ENTREGA"::timestamp, 'yyyymmdd') as  "FTD_AFO_FECHA_ENTREGA",
-        "FTC_AFO_RETENCION_ISR", "FTC_INFNVT_ENTIDAD","FTC_INFNVT_CTA_BANCARIA",
-        "FTC_INFNVT_RECURSOS_ENTREGA", "FTC_INFNVT_FECHA_ENTREGA","FTC_INFNVT_RETENCION_ISR",
+        "FTC_AFO_RETENCION_ISR", 
+        ' ' AS "FTC_INFNVT_ENTIDAD",
+        '0' AS "FTC_INFNVT_CTA_BANCARIA",
+        '0' AS "FTC_INFNVT_RECURSOS_ENTREGA", 
+        ' ' AS "FTC_INFNVT_FECHA_ENTREGA",
+        '0' AS "FTC_INFNVT_RETENCION_ISR",
         "FTN_PENSION_INSTITUTO_SEG",
         "FTN_SALDO_FINAL", "FTN_TIPO_TRAMITE", "FTC_ARCHIVO",
         CASE
@@ -139,6 +143,7 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
         "FTD_FECHAHORA_ALTA",
         "FTC_USUARIO_ALTA"
         FROM "ESTADO_CUENTA"."TTEDOCTA_RETIRO"
+        WHERE "FCN_ID_PERIODO" = :term
         """
 
         query_general_retiro = """
@@ -148,6 +153,7 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
         "FTC_CP", "FTC_ENTIDAD", "FTC_CURP", "FTC_RFC", 
         "FTC_NSS", "FCN_ID_EDOCTA"
         FROM "ESTADO_CUENTA"."TTEDOCTA_RETIRO_GENERAL"
+        WHERE "FCN_ID_PERIODO" = :term
         """
 
         retiros_general_df = _create_spark_dataframe(spark, configure_postgres_oci_spark, query_general_retiro,
@@ -158,8 +164,10 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
 
 
         retiros_df = _create_spark_dataframe(spark, configure_postgres_oci_spark, query_retiro,
-                                                     params={"term": term_id, "start": start_month, "end": end_month,
+                                                     params={"term": term_id,
                                                              "user": str(user)})
+        retiros_df = retiros_df.fillna("").fillna(" ")
+        print(retiros_df.count())
 
         retiros_df = retiros_df.withColumn("FCN_NUMERO_CUENTA",
                                                            lpad(col("FCN_NUMERO_CUENTA").cast("string"), 10, "0"))
@@ -181,16 +189,18 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
                 col("FTC_AFO_RECURSOS_ENTREGA").cast(decimal_pesos),
                 "FTD_AFO_FECHA_ENTREGA",
                 col("FTC_AFO_RETENCION_ISR").cast(decimal_pesos), "FTC_INFNVT_ENTIDAD",
-                "FTC_INFNVT_CTA_BANCARIA", col("FTC_INFNVT_RECURSOS_ENTREGA").cast(decimal_pesos),
+                "FTC_INFNVT_CTA_BANCARIA", col("FTC_INFNVT_RECURSOS_ENTREGA"),
                 col("FTC_INFNVT_FECHA_ENTREGA").cast("string"),
-                col("FTC_INFNVT_RETENCION_ISR").cast(decimal_pesos),
+                col("FTC_INFNVT_RETENCION_ISR"),
                 "FTC_FECHA_EMISION",
                 retiros_df.FTC_FECHA_INICIO_PENSION.alias("FTC_FECHA_INICIO_PENSION"),
                 col("FTN_PENSION_INSTITUTO_SEG"),
                 col("FTN_SALDO_FINAL").cast(decimal_pesos))
         )
 
-        df = df.fillna("").fillna(0)
+        df = df.fillna("").fillna(" ")
+
+        df.dropDuplicates()
 
         df = (
             df.withColumn("FTC_FECHA_EMISION_1", rpad(col("FTC_FECHA_EMISION_1").cast("string"), 8, " "))
@@ -198,7 +208,7 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
             .withColumn("FTC_CALLE_NUMERO", rpad(col("FTC_CALLE_NUMERO"), 60, " "))
             .withColumn("FTC_COLONIA", rpad(col("FTC_COLONIA"), 30, " "))
             .withColumn("FTC_MUNICIPIO", rpad(col("FTC_MUNICIPIO"), 60, " "))
-            .withColumn("FTC_CP", lpad(translate(col("FTC_CP").cast("string"), ".", ""), 5, "0"))
+            .withColumn("FTC_CP", rpad(col("FTC_CP"), 5, " "))
             .withColumn("FTC_ENTIDAD", rpad(col("FTC_ENTIDAD"), 30, " "))
             .withColumn("FTC_CURP", rpad(col("FTC_CURP"), 18, " "))
             .withColumn("FTC_RFC", rpad(col("FTC_RFC"), 13, " "))
@@ -240,7 +250,7 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
                         lpad(translate(col("FTC_INFNVT_RECURSOS_ENTREGA").cast("string"), ".", ""), 10, "0"))
             .withColumn("FTC_INFNVT_FECHA_ENTREGA", rpad(col("FTC_INFNVT_FECHA_ENTREGA"), 8, " "))
             .withColumn("FTC_INFNVT_RETENCION_ISR",
-                        lpad(translate(col("FTC_INFNVT_RETENCION_ISR").cast("string"), ".", ""), 10, "0"))
+                        lpad(translate(col("FTC_INFNVT_RETENCION_ISR").cast("string"), ".", ""),  10, "0"))
             .withColumn("FTC_FECHA_EMISION", rpad(col("FTC_FECHA_EMISION").cast("string"), 8, " "))
             .withColumn("FTC_FECHA_INICIO_PENSION", rpad(col("FTC_FECHA_INICIO_PENSION").cast("string"), 8, " "))
             .withColumn("FTN_PENSION_INSTITUTO_SEG", rpad(col("FTN_PENSION_INSTITUTO_SEG"), 13, " "))
@@ -248,10 +258,17 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
                         lpad(translate(col("FTN_SALDO_FINAL").cast("string"), ".", ""), 10, "0"))
         )
 
+        df.show(5)
+
+        df = df.dropDuplicates()
+
+        df = df.fillna("").fillna(" ")
+
         regimenes = ["73", "97"]
         for regimen in regimenes:
-            df_regimen = df.filter(col("FTC_REGIMEN") == regimen)
+            df_regimen = df.filter(col("FTC_ARCHIVO") == regimen)
             retiros_count = df_regimen.count()
+            print(retiros_count)
             total = df_regimen.count()
             limit = 500000
             num_parts = math.ceil(total / limit)
@@ -284,11 +301,7 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
         else:
             print(f"La solicitud no fue exitosa. Código de estado: {response.status_code}")
 
-        send_email(
-            to_address=correo,
-            subject="Generacion de los archivos de recaudacion",
-            body=body_message
-        )
+        #send_email( to_address=correo, subject="Generacion de los archivos de recaudacion",body=body_message)
 
 
         notify(

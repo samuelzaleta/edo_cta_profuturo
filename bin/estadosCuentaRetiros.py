@@ -167,23 +167,28 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
 
         read_table_insert_temp_view(configure_postgres_oci_spark, """
         SELECT
-        DISTINCT
-        C."FTN_CUENTA" AS "FCN_NUMERO_CUENTA",
-        CAST(CONCAT(C."FTN_CUENTA", CAST(to_char(F."FTD_FECHA_EMISION", 'YYYYMMDD') AS BIGINT)) AS BIGINT) AS "FCN_ID_EDOCTA",
-        F."FTN_ARCHIVO" AS "FTC_ARCHIVO",
-        :term AS "FCN_ID_PERIODO",
-        concat_ws(' ', C."FTC_NOMBRE", C."FTC_AP_PATERNO", C."FTC_AP_MATERNO") AS "FTC_NOMBRE",
-        C."FTC_CALLE" AS "FTC_CALLE_NUMERO",
-        C."FTC_COLONIA",
-        C."FTC_DELEGACION" AS "FTC_MUNICIPIO",
-        Cast(C."FTC_CODIGO_POSTAL" as varchar ) AS "FTC_CP",
-        C."FTC_ENTIDAD_FEDERATIVA" AS "FTC_ENTIDAD",
-        C."FTC_CURP",
-        C."FTC_RFC",
-        C."FTC_NSS"
-        FROM "HECHOS"."TTHECHOS_RETIRO" F
-        INNER JOIN "MAESTROS"."TCDATMAE_CLIENTE" C ON F."FCN_CUENTA" = C."FTN_CUENTA"
-         WHERE F."FCN_ID_PERIODO" = :term
+            DISTINCT
+            C."FTN_CUENTA" AS "FCN_NUMERO_CUENTA",
+            CAST(CONCAT(C."FTN_CUENTA", TO_CHAR(F."FTD_FECHA_EMISION", 'YYYYMMDD')) AS BIGINT) AS "FCN_ID_EDOCTA",
+            F."FTN_ARCHIVO" AS "FTC_ARCHIVO",
+            :term AS "FCN_ID_PERIODO",
+            CONCAT_WS(' ', C."FTC_NOMBRE", C."FTC_AP_PATERNO", C."FTC_AP_MATERNO") AS "FTC_NOMBRE",
+            CONCAT_WS(' ', C."FTC_CALLE", C."FTC_NUMERO") AS "FTC_CALLE_NUMERO",
+            CASE
+                WHEN C."FTC_COLONIA" LIKE '%NO ASIGNADO%' THEN C."FTC_ASENTAMIENTO"
+                ELSE COALESCE(C."FTC_COLONIA",C."FTC_ASENTAMIENTO")
+            END AS "FTC_COLONIA",
+            COALESCE(C."FTC_MUNICIPIO", C."FTC_DELEGACION") AS "FTC_MUNICIPIO",
+            COALESCE(C."FTC_CODIGO_POSTAL", ' ') AS "FTC_CP",
+            COALESCE(C."FTC_ENTIDAD_FEDERATIVA", ' ') AS "FTC_ENTIDAD",
+            COALESCE(C."FTC_CURP", ' ') AS "FTC_CURP",
+            COALESCE(C."FTC_RFC", ' ') AS "FTC_RFC",
+            COALESCE(C."FTC_NSS", ' ') AS "FTC_NSS"
+        FROM
+            "HECHOS"."TTHECHOS_RETIRO" F
+            INNER JOIN "MAESTROS"."TCDATMAE_CLIENTE" C ON F."FCN_CUENTA" = C."FTN_CUENTA"
+        WHERE
+            F."FCN_ID_PERIODO" = :term
         """, "edoCtaGenerales", params={"term": term_id, "user": str(user), "area": area})
         general_df = spark.sql("""
         select * from edoCtaGenerales
