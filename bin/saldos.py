@@ -19,11 +19,11 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
     term = extract_terms(postgres, phase)
     term_id = term["id"]
     time_period = term["time_period"]
-    print(term_id)
+    print('time_period',term_id)
     end_month = term["end_month"]
-    print(end_month)
+    print('end_month',end_month)
     start_next_mes = term["start_next_mes"]
-    print(start_next_mes)
+    print('start_next_mes',start_next_mes)
 
     spark = _get_spark_session(excuetor_memory = '16g',
     memory_overhead ='1g',
@@ -56,19 +56,25 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
                   FROM cierren.thafogral_saldo_historico_v2 SHMIN
                   WHERE SHMIN.FTD_FEH_LIQUIDACION > :date
               )
-               AND SHMAX.FCN_ID_SIEFORE NOT IN (81)
+               AND SHMAX.FCN_ID_SIEFORE NOT IN (81,80)
+               --AND SHMAX.FCN_ID_SIEFORE IN (74) --LINEA AGREGADA
             GROUP BY SHMAX.FTN_NUM_CTA_INVDUAL, SHMAX.FCN_ID_SIEFORE, SHMAX.FCN_ID_TIPO_SUBCTA
         ) SHMAXIMO ON SH.FTN_NUM_CTA_INVDUAL = SHMAXIMO.FTN_NUM_CTA_INVDUAL
                   AND SH.FCN_ID_TIPO_SUBCTA = SHMAXIMO.FCN_ID_TIPO_SUBCTA AND SH.FCN_ID_SIEFORE = SHMAXIMO.FCN_ID_SIEFORE
                   AND SH.FTD_FEH_LIQUIDACION = SHMAXIMO.FTD_FEH_LIQUIDACION
         INNER JOIN (
+            SELECT 
+            ROW_NUM, FCN_ID_SIEFORE,  FCN_ID_REGIMEN, 
+            FCN_VALOR_ACCION, FCD_FEH_ACCION
+            FROM (
             SELECT ROW_NUMBER() OVER(PARTITION BY FCN_ID_SIEFORE, FCN_ID_REGIMEN ORDER BY FCD_FEH_ACCION DESC) AS ROW_NUM,
                    FCN_ID_SIEFORE, FCN_ID_REGIMEN, FCN_VALOR_ACCION, FCD_FEH_ACCION
             FROM cierren.TCAFOGRAL_VALOR_ACCION
-            WHERE FCD_FEH_ACCION <= :date
+            WHERE FCD_FEH_ACCION <= :end
+            )
+            WHERE ROW_NUM = 1
         ) VA ON SH.FCN_ID_SIEFORE = VA.FCN_ID_SIEFORE
             AND R.FCN_ID_REGIMEN = VA.FCN_ID_REGIMEN
-            AND VA.ROW_NUM = 1
         GROUP BY SH.FTN_NUM_CTA_INVDUAL, SH.FCN_ID_SIEFORE, SH.FCN_ID_TIPO_SUBCTA, SH.FTD_FEH_LIQUIDACION
         """
 
@@ -80,7 +86,7 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
             query,
             '"HECHOS"."THHECHOS_SALDO_HISTORICO"',
             term=term_id,
-            params={"date": end_month, "type": "F"},
+            params={"date": start_next_mes, "end" :end_month, "type": "F"},
         )
 
         # Extracción
@@ -106,19 +112,28 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
                   FROM cierren.thafogral_saldo_historico_v2 SHMIN
                   WHERE SHMIN.FTD_FEH_LIQUIDACION > :date
               )
-               AND SHMAX.FCN_ID_SIEFORE IN (81)
+               AND SHMAX.FCN_ID_SIEFORE IN (81, 80)
+               --AND SHMAX.FCN_ID_SIEFORE IN (74000) --LINEA AGREGADA
             GROUP BY SHMAX.FTN_NUM_CTA_INVDUAL, SHMAX.FCN_ID_SIEFORE, SHMAX.FCN_ID_TIPO_SUBCTA
         ) SHMAXIMO ON SH.FTN_NUM_CTA_INVDUAL = SHMAXIMO.FTN_NUM_CTA_INVDUAL
                   AND SH.FCN_ID_TIPO_SUBCTA = SHMAXIMO.FCN_ID_TIPO_SUBCTA AND SH.FCN_ID_SIEFORE = SHMAXIMO.FCN_ID_SIEFORE
                   AND SH.FTD_FEH_LIQUIDACION = SHMAXIMO.FTD_FEH_LIQUIDACION
         INNER JOIN (
+            SELECT 
+            ROW_NUM,
+            FCN_ID_SIEFORE, 
+            FCN_ID_REGIMEN, 
+            FCN_VALOR_ACCION, 
+            FCD_FEH_ACCION
+            FROM (
             SELECT ROW_NUMBER() OVER(PARTITION BY FCN_ID_SIEFORE, FCN_ID_REGIMEN ORDER BY FCD_FEH_ACCION DESC) AS ROW_NUM,
                    FCN_ID_SIEFORE, FCN_ID_REGIMEN, FCN_VALOR_ACCION, FCD_FEH_ACCION
             FROM cierren.TCAFOGRAL_VALOR_ACCION
             WHERE FCD_FEH_ACCION <= :date
+            )
+            WHERE ROW_NUM = 1
         ) VA ON SH.FCN_ID_SIEFORE = VA.FCN_ID_SIEFORE
             AND R.FCN_ID_REGIMEN = VA.FCN_ID_REGIMEN
-            AND VA.ROW_NUM = 1
         GROUP BY SH.FTN_NUM_CTA_INVDUAL, SH.FCN_ID_SIEFORE, SH.FCN_ID_TIPO_SUBCTA, SH.FTD_FEH_LIQUIDACION
         """
 
