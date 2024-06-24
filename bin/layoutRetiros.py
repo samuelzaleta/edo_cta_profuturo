@@ -15,8 +15,7 @@ import jwt
 import math
 import os
 
-
-
+spark = _get_spark_session()
 load_env()
 postgres_pool = get_postgres_pool()
 postgres_oci_pool = get_postgres_oci_pool()
@@ -29,8 +28,8 @@ print(phase,term, user,area)
 bucket_name = os.getenv("BUCKET_ID")
 print(bucket_name)
 prefix =f"{os.getenv('PREFIX_BLOB')}"
-#url = os.getenv("URL_CORRESPONDENSIA_RET")
-#print(url)
+url = 'google.com' #os.getenv("URL_CORRESPONDENSIA_RET")
+print(url)
 correo = os.getenv("CORREO_CORRESPONDENCIA")
 print(correo)
 decimal_pesos = DecimalType(16, 2)
@@ -106,7 +105,7 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
     term_id = term["id"]
     start_month = term["start_month"]
     end_month = term["end_month"]
-    spark = _get_spark_session()
+
     spark.conf.set("spark.sql.shuffle.partitions", 100)
     spark.conf.set("spark.default.parallelism", 100)
 
@@ -288,21 +287,22 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
                 body_message += f"Se generó el archivo de {name} con un total de {retiros_count} registros\n"
                 processed_data = [i for i in processed_data if i not in processed_data_part]
 
+        try:
+            headers = get_headers()  # Get the headers using the get_headers() function
+            response = requests.get(url, headers=headers)  # Pass headers with the request
+            print(response)
 
-        headers = get_headers()  # Get the headers using the get_headers() function
-        response = requests.get(url, headers=headers)  # Pass headers with the request
-        print(response)
+            if response.status_code == 200:
+                content = response.content.decode('utf-8')
+                data = json.loads(content)
+                print('Solicitud fue exitosa')
 
-        if response.status_code == 200:
-            content = response.content.decode('utf-8')
-            data = json.loads(content)
-            print('Solicitud fue exitosa')
+            else:
+                print(f"La solicitud no fue exitosa. Código de estado: {response.status_code}")
 
-        else:
-            print(f"La solicitud no fue exitosa. Código de estado: {response.status_code}")
-
-        #send_email( to_address=correo, subject="Generacion de los archivos de recaudacion",body=body_message)
-
+            #send_email( to_address=correo, subject="Generacion de los archivos de recaudacion",body=body_message)
+        except:
+            pass
 
         notify(
             postgres,

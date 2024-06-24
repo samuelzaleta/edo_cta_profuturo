@@ -18,6 +18,7 @@ import json
 import sys
 import jwt
 
+spark = _get_spark_session()
 load_env()
 postgres_pool = get_postgres_pool()
 postgres_oci_pool = get_postgres_oci_pool()
@@ -160,7 +161,6 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
     term_id = term["id"]
     start_month = term["start_month"]
     end_month = term["end_month"]
-    spark = _get_spark_session()
 
     with register_time(postgres_pool, phase, term_id, user, area):
 

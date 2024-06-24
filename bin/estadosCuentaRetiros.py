@@ -1,11 +1,12 @@
 from profuturo.common import define_extraction, register_time, truncate_table, notify
 from profuturo.database import get_postgres_pool, get_postgres_oci_pool, configure_postgres_spark, configure_postgres_oci_spark
-from profuturo.extraction import _write_spark_dataframe, extract_terms,  _get_spark_session, read_table_insert_temp_view, _create_spark_dataframe
+from profuturo.extraction import _write_spark_dataframe, extract_terms,  _get_spark_session, read_table_insert_temp_view, extract_dataset_spark
 from pyspark.sql.functions import udf, concat, col, current_date , row_number,lit, current_timestamp
 from pyspark.sql.types import StringType, StructType, StructField, IntegerType
 from profuturo.env import load_env
 from datetime import datetime, timedelta
 from google.cloud import storage
+from sqlalchemy import text
 
 from io import BytesIO
 from PIL import Image
@@ -16,6 +17,7 @@ import sys
 import jwt
 import os
 
+spark = _get_spark_session()
 
 load_env()
 postgres_pool = get_postgres_pool()
@@ -159,11 +161,23 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
     term_id = term["id"]
     start_month = term["start_month"]
     end_month = term["end_month"]
-    spark = _get_spark_session()
+
 
     with register_time(postgres_pool, phase, term_id, user, area):
         truncate_table(postgres_oci, 'TTEDOCTA_RETIRO_GENERAL')
         truncate_table(postgres_oci, 'TTEDOCTA_RETIRO')
+
+        # Elimina tablas temporales
+        postgres_oci.execute(text("""
+               DROP TABLE IF EXISTS "MAESTROS"."TTHECHOS_CARGA_ARCHIVO"
+               """))
+
+        extract_dataset_spark(
+            configure_postgres_spark,
+            configure_postgres_oci_spark,
+            """SELECT * FROM "HECHOS"."TTHECHOS_CARGA_ARCHIVO" WHERE "FCN_ID_INDICADOR" = 74  """,
+            '"MAESTROS"."TTHECHOS_CARGA_ARCHIVO"'
+        )
 
         read_table_insert_temp_view(configure_postgres_oci_spark, """
         SELECT
@@ -189,6 +203,7 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
             INNER JOIN "MAESTROS"."TCDATMAE_CLIENTE" C ON F."FCN_CUENTA" = C."FTN_CUENTA"
         WHERE
             F."FCN_ID_PERIODO" = :term
+            AND "FTN_CUENTA" IN (SELECT "FCN_CUENTA" FROM "MAESTROS"."TTHECHOS_CARGA_ARCHIVO" )
         """, "edoCtaGenerales", params={"term": term_id, "user": str(user), "area": area})
         general_df = spark.sql("""
         select * from edoCtaGenerales
@@ -241,6 +256,7 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
                 :user AS "FTC_USUARIO_ALTA"
                 FROM "HECHOS"."TTHECHOS_RETIRO" R
                 WHERE R."FCN_ID_PERIODO" = :term
+                AND "FTN_CUENTA" IN (SELECT "FCN_CUENTA" FROM "MAESTROS"."TTHECHOS_CARGA_ARCHIVO" )
                 """, "edoCtaAnverso", params={"term": term_id, "user":str(user), "area": area})
 
         anverso_df = spark.sql("select * from edoCtaAnverso")
@@ -280,3 +296,7 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
             aprobar=False,
             descarga=False,
         )
+
+        postgres_oci.execute(text("""
+                       DROP TABLE IF EXISTS "MAESTROS"."TTHECHOS_CARGA_ARCHIVO"
+                       """))

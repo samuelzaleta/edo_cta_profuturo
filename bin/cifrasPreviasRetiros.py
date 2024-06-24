@@ -6,6 +6,9 @@ from profuturo.extraction import extract_terms
 import sys
 from datetime import datetime
 
+spark = _get_spark_session()
+
+
 html_reporter = HtmlReporter()
 postgres_pool = get_postgres_pool()
 postgres_oci_pool = get_postgres_oci_pool()
@@ -22,7 +25,6 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool ) as (postg
     end_month_anterior = term["end_saldos_anterior"]
     valor_accion_anterior = term["valor_accion_anterior"]
     print(end_month_anterior, valor_accion_anterior)
-    spark = _get_spark_session()
 
     with register_time(postgres_pool, phase, term_id, user, area):
         truncate_table(postgres, "TTEDOCTA_CLIENTE_INDICADOR", term=term_id)
