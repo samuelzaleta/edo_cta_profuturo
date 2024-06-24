@@ -7,6 +7,14 @@ from warnings import filterwarnings
 import sys
 from datetime import datetime
 
+_get_spark_session(
+        excuetor_memory='8g',
+        memory_overhead='1g',
+        memory_offhead='1g',
+        driver_memory='2g',
+        intances=4,
+        parallelims=8000)
+
 filterwarnings(action='ignore', category=DeprecationWarning, message='`np.bool` is a deprecated alias')
 mit_pool = get_mit_pool()
 
@@ -47,7 +55,7 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
             WHERE FTB_IND_FOLIO_AGRUP = '1'
               AND FCN_ID_ESTATUS = 6649
               AND TRUNC(FTD_FEH_CRE) BETWEEN :start AND :end
-              --AND  FTN_NUM_CTA_INVDUAL = 3200307545
+              --AND  FTN_NUM_CTA_INVDUAL IN (10012191, 10900387)
             UNION ALL
 
             SELECT DISTINCT FTC_FOLIO, FTC_FOLIO_REL, FTN_NUM_CTA_INVDUAL,
@@ -56,7 +64,7 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
             WHERE FTB_IND_FOLIO_AGRUP = '1'
               AND FCN_ID_ESTATUS = 6649
               AND TRUNC(FTD_FEH_CRE) BETWEEN :start AND :end
-             -- AND FTN_NUM_CTA_INVDUAL = 3200307545
+             --AND  FTN_NUM_CTA_INVDUAL IN (10012191, 10900387)
         ) X
         INNER JOIN (
             SELECT distinct tms.TMC_DESC_ITGY,tms.TMC_DESC_NCI, tms.TMN_CVE_NCI, ttc.FCN_ID_SUBPROCESO
@@ -269,49 +277,57 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
             SELECT FTC_FOLIO, FTC_FOLIO_REL, FTN_NUM_CTA_INVDUAL, FCN_ID_TIPO_SUBCTA, FTF_MONTO_PESOS
             FROM CIERREN.TTAFOGRAL_MOV_RCV
             WHERE FTD_FEH_LIQUIDACION BETWEEN :start AND :end
-            and FCN_ID_TIPO_MOV not in (182)
+            and FCN_ID_TIPO_MOV not in (182, 180)
+            --AND  FTN_NUM_CTA_INVDUAL IN (10012191, 10900387)
         
             UNION ALL
         
             SELECT FTC_FOLIO, FTC_FOLIO_REL, FTN_NUM_CTA_INVDUAL, FCN_ID_TIPO_SUBCTA, FTF_MONTO_PESOS
             FROM CIERREN.TTAFOGRAL_MOV_GOB
             WHERE FTD_FEH_LIQUIDACION BETWEEN :start AND :end
-            and FCN_ID_TIPO_MOV not in (182)
+            and FCN_ID_TIPO_MOV not in (182, 180)
+            --AND  FTN_NUM_CTA_INVDUAL IN (10012191, 10900387)
         
             UNION ALL
         
             SELECT FTC_FOLIO, FTC_FOLIO_REL, FTN_NUM_CTA_INVDUAL, FCN_ID_TIPO_SUBCTA, FTF_MONTO_PESOS
             FROM CIERREN.TTAFOGRAL_MOV_VIV
             WHERE FTD_FEH_LIQUIDACION BETWEEN :start AND :end
-            and FCN_ID_TIPO_MOV not in (182)
+            and FCN_ID_TIPO_MOV not in (182, 180)
+            --AND  FTN_NUM_CTA_INVDUAL IN (10012191, 10900387)
         
             UNION ALL
         
             SELECT FTC_FOLIO, FTC_FOLIO_REL, FTN_NUM_CTA_INVDUAL, FCN_ID_TIPO_SUBCTA, FTF_MONTO_PESOS
             FROM CIERREN.TTAFOGRAL_MOV_COMP
             WHERE FTD_FEH_LIQUIDACION BETWEEN :start AND :end
-            and FCN_ID_TIPO_MOV not in (182)
+            and FCN_ID_TIPO_MOV not in (182, 180)
+            --AND  FTN_NUM_CTA_INVDUAL IN (10012191, 10900387)
         
             UNION ALL
         
             SELECT FTC_FOLIO, FTC_FOLIO_REL, FTN_NUM_CTA_INVDUAL, FCN_ID_TIPO_SUBCTA, FTF_MONTO_PESOS
             FROM CIERREN.TTAFOGRAL_MOV_SAR
             WHERE FTD_FEH_LIQUIDACION BETWEEN :start AND :end
-            and FCN_ID_TIPO_MOV not in (182)
-        
+            and FCN_ID_TIPO_MOV not in (182, 180)
+            --AND  FTN_NUM_CTA_INVDUAL IN (10012191, 10900387)
+                
             UNION ALL
         
             SELECT FTC_FOLIO, FTC_FOLIO_REL, FTN_NUM_CTA_INVDUAL, FCN_ID_TIPO_SUBCTA, FTF_MONTO_PESOS
             FROM CIERREN.TTAFOGRAL_MOV_AVOL
             WHERE FTD_FEH_LIQUIDACION BETWEEN :start AND :end
-            and FCN_ID_TIPO_MOV not in (182)
-        
+            and FCN_ID_TIPO_MOV not in (182, 180)
+            --AND  FTN_NUM_CTA_INVDUAL IN (10012191, 10900387)
+                
             UNION ALL
         
             SELECT FTC_FOLIO, FTC_FOLIO_REL, FTN_NUM_CTA_INVDUAL, FCN_ID_TIPO_SUBCTA, FTF_MONTO_PESOS
             FROM CIERREN.TTAFOGRAL_MOV_BONO
             WHERE FTD_FEH_LIQUIDACION BETWEEN :start AND :end
-            and FCN_ID_TIPO_MOV not in (182)
+            and FCN_ID_TIPO_MOV not in (182, 180)
+            --AND  FTN_NUM_CTA_INVDUAL IN (10012191, 10900387)
+            
         ) X
         GROUP BY FTC_FOLIO, FTC_FOLIO_REL, FTN_NUM_CTA_INVDUAL
         """
@@ -329,7 +345,8 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
               AND FCN_ID_ESTATUS = 6649
               -- AND tthls.FCN_ID_PROCESO IN (4045, 4046, 4047, 4048, 4049, 4050, 4051)
               AND FTD_FEH_CRE BETWEEN :start AND :end
-              --AND  FTN_NUM_CTA_INVDUAL = 3200559346
+              --AND  FTN_NUM_CTA_INVDUAL IN (10012191, 10900387)
+                
             UNION ALL
         
             SELECT DISTINCT FTC_FOLIO, FTC_FOLIO_REL, FTN_NUM_CTA_INVDUAL,
@@ -338,7 +355,7 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
             WHERE FTB_IND_FOLIO_AGRUP = '1'
               AND FCN_ID_ESTATUS = 6649
               AND FTD_FEH_CRE BETWEEN  :start AND :end
-              --AND FTN_NUM_CTA_INVDUAL = 3200559346
+              --AND FTN_NUM_CTA_INVDUAL IN (10012191, 10900387)
         ) X
         INNER JOIN (
             SELECT DISTINCT tms.TMC_DESC_ITGY,tms.TMC_DESC_NCI, tms.TMN_CVE_NCI, ttc.FCN_ID_SUBPROCESO
@@ -358,42 +375,42 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
         WHERE (PS.FTC_FOLIO, PS.FCN_ID_TIPO_SUBCTA, PS.FTN_NUM_REEXP) IN (
                             SELECT PSMAX.FTC_FOLIO, PSMAX.FCN_ID_TIPO_SUBCTA,MAX(PSMAX.FTN_NUM_REEXP)FROM BENEFICIOS.TTCRXGRAL_PAGO_SUBCTA PSMAX
                             GROUP BY PSMAX.FTC_FOLIO, PSMAX.FCN_ID_TIPO_SUBCTA)
-        --AND RET.FTN_NUM_CTA_INVDUAL = 3200559346
+        --AND RET.FTN_NUM_CTA_INVDUAL IN (10012191, 10900387)
         GROUP BY PS.FTC_FOLIO, RET.FTN_NUM_CTA_INVDUAL,RET.FTC_FOLIO_REL
          """
 
         query_saldos ="""
         WITH RETIROS AS (
-            SELECT X.FTN_NUM_CTA_INVDUAL AS FCN_CUENTA, X.FTC_FOLIO, X.FTC_FOLIO_REL,
-                   PT.TMC_DESC_ITGY AS FTC_TMC_DESC_ITGY, PT.TMC_DESC_NCI, PT.TMN_CVE_NCI,
-                   X.FCN_ID_PROCESO, X.FCN_ID_SUBPROCESO, X.FTD_FEH_CRE
-            FROM (
-                SELECT FTC_FOLIO, FTC_FOLIO_REL, FTN_NUM_CTA_INVDUAL, FCN_ID_PROCESO,
-                       FCN_ID_SUBPROCESO, FTD_FEH_CRE
-                FROM BENEFICIOS.THAFORETI_HIST_LIQ_SOLICITUDES
-                WHERE FTB_IND_FOLIO_AGRUP = '1'
-                  AND FCN_ID_ESTATUS = 6649
-                  -- AND tthls.FCN_ID_PROCESO IN (4045, 4046, 4047, 4048, 4049, 4050, 4051)
-                  AND FTD_FEH_CRE BETWEEN :start AND :end
+            SELECT DISTINCT X.FTN_NUM_CTA_INVDUAL AS FCN_CUENTA, X.FTC_FOLIO, X.FTC_FOLIO_REL, PT.TMC_DESC_ITGY AS FTC_TMC_DESC_ITGY,
+               PT.TMC_DESC_NCI, PT.TMN_CVE_NCI, X.FCN_ID_PROCESO, X.FCN_ID_SUBPROCESO,
+               X.FTD_FEH_CRE
+        FROM (
+            SELECT DISTINCT FTC_FOLIO, FTC_FOLIO_REL, FTN_NUM_CTA_INVDUAL, FCN_ID_PROCESO,
+                   FCN_ID_SUBPROCESO, FTD_FEH_CRE
+            FROM BENEFICIOS.THAFORETI_HIST_LIQ_SOLICITUDES ttls
+            WHERE FTB_IND_FOLIO_AGRUP = '1'
+              AND FCN_ID_ESTATUS = 6649
+              AND TRUNC(FTD_FEH_CRE) BETWEEN :start AND :end
+              --AND  FTN_NUM_CTA_INVDUAL IN (10012191, 10900387)
+            UNION ALL
 
-                UNION ALL
-
-                SELECT FTC_FOLIO, FTC_FOLIO_REL, FTN_NUM_CTA_INVDUAL,
-                       FCN_ID_PROCESO, FCN_ID_SUBPROCESO, FTD_FEH_CRE
-                FROM BENEFICIOS.TTAFORETI_LIQ_SOLICITUDES
-                WHERE FTB_IND_FOLIO_AGRUP = '1'
-                  AND FCN_ID_ESTATUS = 6649
-                  AND FTD_FEH_CRE BETWEEN :start AND :end
-            ) X
-            INNER JOIN (
-                SELECT distinct tms.TMC_DESC_ITGY,tms.TMC_DESC_NCI, tms.TMN_CVE_NCI, ttc.FCN_ID_SUBPROCESO
-                FROM TMSISGRAL_MAP_NCI_ITGY tms
-                    INNER JOIN TTCRXGRAL_PAGO ttc ON tms.TMN_CVE_NCI = ttc.FCN_ID_SUBPROCESO
-                WHERE tms.TMC_DESC_ITGY IN (
-                    'T73', 'TNP' ,'TPP', 'T97', 'TPR', 'TED', 'RJP', 'TRE', 'TJU', 'TEX', 'TGF', 'TPG', 'TRJ', 'TRU',
-                    'TIV', 'TIX', 'TEI', 'TPI', 'TNI', 'TJI', 'PPI', 'RCI', 'TAI'
-                )
-            ) PT ON PT.FCN_ID_SUBPROCESO = X.FCN_ID_SUBPROCESO
+            SELECT DISTINCT FTC_FOLIO, FTC_FOLIO_REL, FTN_NUM_CTA_INVDUAL,
+                   FCN_ID_PROCESO, FCN_ID_SUBPROCESO, FTD_FEH_CRE
+            FROM BENEFICIOS.TTAFORETI_LIQ_SOLICITUDES ttls
+            WHERE FTB_IND_FOLIO_AGRUP = '1'
+              AND FCN_ID_ESTATUS = 6649
+              AND TRUNC(FTD_FEH_CRE) BETWEEN :start AND :end
+             --AND  FTN_NUM_CTA_INVDUAL IN (10012191, 10900387)
+        ) X
+        INNER JOIN (
+            SELECT distinct tms.TMC_DESC_ITGY,tms.TMC_DESC_NCI, tms.TMN_CVE_NCI, ttc.FCN_ID_SUBPROCESO
+            FROM TMSISGRAL_MAP_NCI_ITGY tms
+                INNER JOIN TTCRXGRAL_PAGO ttc ON tms.TMN_CVE_NCI = ttc.FCN_ID_SUBPROCESO
+            WHERE tms.TMC_DESC_ITGY IN (
+                'T73', 'TNP' ,'TPP', 'T97', 'TPR', 'TED', 'RJP', 'TRE', 'TJU', 'TEX', 'TGF', 'TPG', 'TRJ', 'TRU',
+                'TIV', 'TIX', 'TEI', 'TPI', 'TNI', 'TJI', 'PPI', 'RCI', 'TAI'
+            )
+        ) PT ON PT.FCN_ID_SUBPROCESO = X.FCN_ID_SUBPROCESO
         ), SALDOS_AL_DIA_LIQUIDACION AS (
 
             SELECT FCN_CUENTA, FTN_TIPO_AHORRO, FTC_TMC_DESC_ITGY, FTD_FEH_CRE,
@@ -511,6 +528,8 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
             view="RETIROS",
             params={"end": end_month, 'start': start_month, 'term': term_id}
         )
+        print('RETIROS')
+        spark.sql("SELECT * FROM RETIROS").show(40)
 
         read_table_insert_temp_view(
             configure_mit_spark,
@@ -518,6 +537,8 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
             view="SALDOS_LIQUIDACIONES",
             params={"end": end_month, 'start': start_month, 'term': term_id}
         )
+        print('SALDOS LIQUIDACIONES')
+        spark.sql("SELECT * FROM SALDOS_LIQUIDACIONES").show(40)
 
         read_table_insert_temp_view(
             configure_mit_spark,
@@ -525,6 +546,8 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
             view="SALDOS_LIQUIDACIONES_TRANSFERENCIAS",
             params={"end": end_month, 'start': start_month, 'term': term_id}
         )
+        print('SALDO LIQUIDACIONES TRANSFERENCIAS')
+        spark.sql("SELECT * FROM SALDOS_LIQUIDACIONES_TRANSFERENCIAS").show(40)
 
         read_table_insert_temp_view(
             configure_mit_spark,
@@ -532,6 +555,8 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
             view="SALDOS_INICIALES",
             params={"end": end_month,'start': start_month, 'term': term_id}
         )
+        print('SALDOS INICIALES')
+        spark.sql("SELECT * FROM SALDOS_INICIALES").show(40)
 
         df = spark.sql("""
         SELECT DISTINCT RET.FCN_CUENTA, RET.FTC_FOLIO, RET.FCN_ID_PROCESO,
@@ -563,8 +588,8 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
             INNER JOIN SALDOS_LIQUIDACIONES_TRANSFERENCIAS SL ON RET.FCN_CUENTA = SL.FTN_NUM_CTA_INVDUAL
         WHERE RET.FTC_TMC_DESC_ITGY IN ('TGF', 'TPG', 'TRJ', 'TRU','TIV','TNP')
         """)
-
-        df.show()
+        print("UNION")
+        df.show(40)
 
         df = df.withColumn("FCN_ID_PERIODO", lit(term_id))
 
@@ -601,9 +626,12 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
         RL.FCN_ID_PERIODO
         FROM SALDOS_INICIALES SL
         INNER JOIN INFORMACIONRETIROS RL
-         ON RL.FCN_CUENTA = SL.FCN_CUENTA  AND RL.FTC_TMC_DESC_ITGY = SL.FTC_TMC_DESC_ITGY
-        AND SL.FTD_FEH_CRE = RL.FTD_FEH_CRE
+         ON RL.FCN_CUENTA = SL.FCN_CUENTA AND RL.FTC_TMC_DESC_ITGY = SL.FTC_TMC_DESC_ITGY
+         AND SL.FTD_FEH_CRE = RL.FTD_FEH_CRE
         """)
+
+        print('Dataframe final')
+        df.show(30)
 
         _write_spark_dataframe(df, configure_postgres_oci_spark, '"HECHOS"."TTHECHOS_RETIRO"')
 
