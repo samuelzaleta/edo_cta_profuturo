@@ -1,10 +1,18 @@
 from profuturo.common import truncate_table, notify, register_time, define_extraction
 from profuturo.database import get_postgres_pool, get_postgres_oci_pool, configure_mit_spark, configure_postgres_oci_spark, configure_postgres_spark
-from profuturo.extraction import extract_terms, extract_dataset_spark, read_table_insert_temp_view
+from profuturo.extraction import extract_terms, extract_dataset_spark, read_table_insert_temp_view, _get_spark_session
 from profuturo.reporters import HtmlReporter
 from sqlalchemy import text
 import sys
 from datetime import datetime
+
+spark = _get_spark_session(
+        excuetor_memory='8g',
+        memory_overhead='1g',
+        memory_offhead='1g',
+        driver_memory='2g',
+        intances=4,
+        parallelims=8000)
 
 html_reporter = HtmlReporter()
 postgres_pool = get_postgres_pool()

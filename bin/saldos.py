@@ -7,6 +7,14 @@ from sqlalchemy import text
 import sys
 from datetime import datetime
 
+
+spark = _get_spark_session(excuetor_memory = '16g',
+    memory_overhead ='1g',
+    memory_offhead ='1g',
+    driver_memory ='2g',
+    intances = 4,
+    parallelims = 18000)
+
 html_reporter = HtmlReporter()
 postgres_pool = get_postgres_pool()
 postgres_oci_pool = get_postgres_oci_pool()
@@ -25,12 +33,7 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
     start_next_mes = term["start_next_mes"]
     print('start_next_mes',start_next_mes)
 
-    spark = _get_spark_session(excuetor_memory = '16g',
-    memory_overhead ='1g',
-    memory_offhead ='1g',
-    driver_memory ='2g',
-    intances = 4,
-    parallelims = 18000)
+
 
     with register_time(postgres_pool, phase, term_id, user, area):
         # Extracción

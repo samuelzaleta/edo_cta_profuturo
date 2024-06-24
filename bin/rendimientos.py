@@ -8,6 +8,15 @@ import sys
 from datetime import datetime
 import os
 
+
+spark = _get_spark_session(
+        excuetor_memory='8g',
+        memory_overhead='1g',
+        memory_offhead='1g',
+        driver_memory='2g',
+        intances=4,
+        parallelims=8000)
+
 html_reporter = HtmlReporter()
 postgres_pool = get_postgres_pool()
 postgres_oci_pool = get_postgres_oci_pool()
@@ -25,13 +34,7 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
     end_month_anterior = term["end_saldos_anterior"]
     valor_accion_anterior = term["valor_accion_anterior"]
     print(end_month_anterior, valor_accion_anterior)
-    spark = _get_spark_session(
-        excuetor_memory='8g',
-        memory_overhead='1g',
-        memory_offhead='1g',
-        driver_memory='2g',
-        intances=4,
-        parallelims=8000)
+
 
     with register_time(postgres_pool, phase, term_id, user, area):
         postgres_oci.execute(text(""" DROP TABLE IF EXISTS "MAESTROS"."TCDATMAE_TIPO_SUBCUENTA" """))
