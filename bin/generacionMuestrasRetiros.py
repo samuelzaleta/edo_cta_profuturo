@@ -197,13 +197,16 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
         :term AS "FCN_ID_PERIODO",
         concat_ws(' ', C."FTC_NOMBRE", C."FTC_AP_PATERNO", C."FTC_AP_MATERNO") AS "FTC_NOMBRE",
         C."FTC_CALLE" AS "FTC_CALLE_NUMERO",
-        C."FTC_COLONIA",
-        C."FTC_DELEGACION" AS "FTC_MUNICIPIO",
-        Cast(C."FTC_CODIGO_POSTAL" as varchar ) AS "FTC_CP",
-        C."FTC_ENTIDAD_FEDERATIVA" AS "FTC_ENTIDAD",
-        C."FTC_CURP",
-        C."FTC_RFC",
-        C."FTC_NSS",
+        CASE
+            WHEN C."FTC_COLONIA" LIKE '%NO ASIGNADO%' THEN C."FTC_ASENTAMIENTO"
+            ELSE COALESCE(C."FTC_COLONIA",C."FTC_ASENTAMIENTO")
+        END AS "FTC_COLONIA",
+        COALESCE(CONCAT(C."FTC_MUNICIPIO",C."FTC_DELEGACION"), C."FTC_DELEGACION") AS "FTC_MUNICIPIO",
+        COALESCE(C."FTC_CODIGO_POSTAL", ' ') AS "FTC_CP",
+        COALESCE(C."FTC_ENTIDAD_FEDERATIVA", ' ') AS "FTC_ENTIDAD",
+        COALESCE(C."FTC_CURP", ' ') AS "FTC_CURP",
+        COALESCE(C."FTC_RFC", ' ') AS "FTC_RFC",
+        COALESCE(C."FTC_NSS", ' ') AS "FTC_NSS",
         :user AS "FTC_USUARIO_ALTA"
         FROM "HECHOS"."TTHECHOS_RETIRO" F
         INNER JOIN "MAESTROS"."TCDATMAE_CLIENTE" C ON F."FCN_CUENTA" = C."FTN_CUENTA"

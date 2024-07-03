@@ -17,7 +17,9 @@ import sys
 import jwt
 import os
 
+print("inicio")
 spark = _get_spark_session()
+print("spark sesion")
 
 load_env()
 postgres_pool = get_postgres_pool()
@@ -192,7 +194,7 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
                 WHEN C."FTC_COLONIA" LIKE '%NO ASIGNADO%' THEN C."FTC_ASENTAMIENTO"
                 ELSE COALESCE(C."FTC_COLONIA",C."FTC_ASENTAMIENTO")
             END AS "FTC_COLONIA",
-            COALESCE(C."FTC_MUNICIPIO", C."FTC_DELEGACION") AS "FTC_MUNICIPIO",
+            COALESCE(CONCAT(C."FTC_MUNICIPIO",C."FTC_DELEGACION"), C."FTC_DELEGACION") AS "FTC_MUNICIPIO",
             COALESCE(C."FTC_CODIGO_POSTAL", ' ') AS "FTC_CP",
             COALESCE(C."FTC_ENTIDAD_FEDERATIVA", ' ') AS "FTC_ENTIDAD",
             COALESCE(C."FTC_CURP", ' ') AS "FTC_CURP",
@@ -203,7 +205,7 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
             INNER JOIN "MAESTROS"."TCDATMAE_CLIENTE" C ON F."FCN_CUENTA" = C."FTN_CUENTA"
         WHERE
             F."FCN_ID_PERIODO" = :term
-            AND "FTN_CUENTA" IN (SELECT "FCN_CUENTA" FROM "MAESTROS"."TTHECHOS_CARGA_ARCHIVO" )
+            AND "FTN_CUENTA" NOT IN (SELECT "FCN_CUENTA" FROM "MAESTROS"."TTHECHOS_CARGA_ARCHIVO" )
         """, "edoCtaGenerales", params={"term": term_id, "user": str(user), "area": area})
         general_df = spark.sql("""
         select * from edoCtaGenerales
@@ -256,7 +258,7 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
                 :user AS "FTC_USUARIO_ALTA"
                 FROM "HECHOS"."TTHECHOS_RETIRO" R
                 WHERE R."FCN_ID_PERIODO" = :term
-                AND "FTN_CUENTA" IN (SELECT "FCN_CUENTA" FROM "MAESTROS"."TTHECHOS_CARGA_ARCHIVO" )
+                AND R."FCN_CUENTA" NOT IN (SELECT "FCN_CUENTA" FROM "MAESTROS"."TTHECHOS_CARGA_ARCHIVO" )
                 """, "edoCtaAnverso", params={"term": term_id, "user":str(user), "area": area})
 
         anverso_df = spark.sql("select * from edoCtaAnverso")
@@ -265,9 +267,9 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
         _write_spark_dataframe(general_df, configure_postgres_oci_spark, '"ESTADO_CUENTA"."TTEDOCTA_RETIRO_GENERAL"')
         _write_spark_dataframe(anverso_df, configure_postgres_oci_spark, '"ESTADO_CUENTA"."TTEDOCTA_RETIRO"')
 
-
-
-
+        postgres_oci.execute(text("""
+                       DROP TABLE IF EXISTS "MAESTROS"."TTHECHOS_CARGA_ARCHIVO"
+                       """))
 
         for i in range(1000):
             headers = get_headers()  # Get the headers using the get_headers() function
@@ -297,6 +299,3 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
             descarga=False,
         )
 
-        postgres_oci.execute(text("""
-                       DROP TABLE IF EXISTS "MAESTROS"."TTHECHOS_CARGA_ARCHIVO"
-                       """))
