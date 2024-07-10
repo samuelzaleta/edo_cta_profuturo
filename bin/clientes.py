@@ -8,12 +8,12 @@ from datetime import datetime
 import sys
 
 spark = _get_spark_session(
-        excuetor_memory='18g',
+        excuetor_memory='12g',
         memory_overhead='1g',
         memory_offhead='1g',
         driver_memory='2g',
-        intances=4,
-        parallelims=8000)
+        intances=2,
+        parallelims=800)
 
 html_reporter = HtmlReporter()
 postgres_pool = get_postgres_pool()
@@ -50,7 +50,25 @@ with define_extraction(phase, area, postgres_pool,postgres_oci_pool,) as (postgr
             FTC_ENTIDAD_FEDERATIVA,
             FTC_NSS,
             FTC_CURP,
-            FTC_RFC 
+            FTC_RFC,
+            CASE
+            WHEN ANIO_NACIMIENTO IN (30,31,32,33,34) THEN '30-34'
+            WHEN ANIO_NACIMIENTO IN (35,36,37,38,39) THEN '30-34'
+            WHEN ANIO_NACIMIENTO IN (40,41,42,43,44) THEN '40-44'
+            WHEN ANIO_NACIMIENTO IN (45,46,47,48,49) THEN '40-44'
+            WHEN ANIO_NACIMIENTO IN (50,51,52,53,54) THEN '50-54'
+            WHEN ANIO_NACIMIENTO IN (50,51,52,53,54) THEN '50-54'
+            WHEN ANIO_NACIMIENTO IN (55,56,57,58,59) THEN '55-59'
+            WHEN ANIO_NACIMIENTO IN (61,62,63,64,60) THEN '60-64'
+            WHEN ANIO_NACIMIENTO IN (65,66,67,68,69) THEN '65-69'
+            WHEN ANIO_NACIMIENTO IN (70,71,72,73,74) THEN '70-74'
+            WHEN ANIO_NACIMIENTO IN (75,76,77,78,79) THEN '75-79'
+            WHEN ANIO_NACIMIENTO IN (80,81,82,83,84) THEN '80-84'
+            WHEN ANIO_NACIMIENTO IN (85,86,87,88,89) THEN '85-89'
+            WHEN ANIO_NACIMIENTO IN (90,91,92,93,94) THEN '90-94'
+            WHEN ANIO_NACIMIENTO IN (95,96,97,98,99) THEN '95-99'
+            WHEN ANIO_NACIMIENTO IN (00) THEN '00-04'
+            END AS FTC_RANGO_EDAD
         FROM (
             SELECT
                ROW_NUMBER() over (partition by TO_NUMBER(REGEXP_REPLACE(TO_CHAR(C.NUMERO), '[^0-9]', '')) order by C.NUMERO) AS id,
@@ -78,7 +96,22 @@ with define_extraction(phase, area, postgres_pool,postgres_oci_pool,) as (postgr
                E.NOMBRE AS FTC_ENTIDAD_FEDERATIVA,
                NSS.VALOR_IDENTIFICADOR AS FTC_NSS,
                CURP.VALOR_IDENTIFICADOR AS FTC_CURP,
-               RFC.VALOR_IDENTIFICADOR AS FTC_RFC
+               RFC.VALOR_IDENTIFICADOR AS FTC_RFC,
+               CASE
+                 WHEN NSS.VALOR_IDENTIFICADOR IS NOT NULL
+                   AND CURP.VALOR_IDENTIFICADOR IS NULL
+                   AND RFC.VALOR_IDENTIFICADOR IS NULL THEN
+                    SUBSTR(NSS.VALOR_IDENTIFICADOR, 5, 2)
+                 --
+                 WHEN CURP.VALOR_IDENTIFICADOR IS NULL
+                    AND RFC.VALOR_IDENTIFICADOR IS NOT NULL THEN
+                     SUBSTR(RFC.VALOR_IDENTIFICADOR, 5, 2)
+                 --
+                 WHEN CURP.VALOR_IDENTIFICADOR IS NOT NULL THEN
+                   SUBSTR(CURP.VALOR_IDENTIFICADOR, 5, 2)
+                ELSE
+                 '00'
+                END as ANIO_NACIMIENTO
             FROM CONTRATO C
                 INNER JOIN PERSONA_CONT_ROL PCR ON C.IDCONTRATO = PCR.IDCONTRATO
                 INNER JOIN PERSONA_FISICA PF ON PCR.IDPERSONA = PF.IDPERSONA
@@ -305,7 +338,9 @@ with define_extraction(phase, area, postgres_pool,postgres_oci_pool,) as (postgr
         P.FTN_NUM_CTA_INVDUAL AS FCN_CUENTA,
         CASE WHEN SUBSTR(C.FCC_VALOR,6,7) = 'BI' then 'Inicial'
              WHEN SUBSTR(C.FCC_VALOR,6,7) = 'BP' then 'De Pensiones'
-             ELSE SUBSTR(C.FCC_VALOR, 6, 7) || '-' || TO_CHAR(CAST(SUBSTR(C.FCC_VALOR, 6, 7) AS INT) + 4)
+             WHEN SUBSTR(C.FCC_VALOR, 6, 7) = '50' THEN 'Inicial'
+             WHEN SUBSTR(C.FCC_VALOR, 6, 7) = '55' THEN 'Inicial'
+             WHEN SUBSTR(C.FCC_VALOR, 6, 7) != '55' or SUBSTR(C.FCC_VALOR, 6, 7) != '50'  THEN SUBSTR(C.FCC_VALOR, 6, 7) || '-' || TO_CHAR(CAST(SUBSTR(C.FCC_VALOR, 6, 7) AS INT) + 4)
              END FCC_VALOR
         FROM TTAFOGRAL_OSS P
         INNER JOIN CIERREN.TCCRXGRAL_CAT_CATALOGO C ON P.FCN_ID_SIEFORE= C.FCN_ID_CAT_CATALOGO

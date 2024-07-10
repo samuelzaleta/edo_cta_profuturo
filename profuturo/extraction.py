@@ -98,6 +98,73 @@ def update_indicator_spark(
         raise ProfuturoException("TABLE_SWITCH_ERROR", term) from e
 
 
+def extract_dataset_paginate(
+    origin: Connection,
+    destination: Connection,
+    query: str,
+    table: str,
+    term: int = None,
+    params: Dict[str, Any] = None,
+    page_size: int = 80000,
+    page_number: int = 1,
+    transform: Callable[[pd.DataFrame], pd.DataFrame] = None,
+):
+    if isinstance(query, Compiled):
+        params = query.params
+        query = str(query)
+    if params is None:
+        params = {}
+
+    offset = (page_number - 1) * page_size
+    print(offset)
+    query = f"""
+        SELECT *
+        FROM (
+            {query}
+        ) AS inner_query
+        LIMIT {page_size}
+        OFFSET {offset}
+    """
+    params["limit"] = page_size  # Optional, for clarity
+
+    print(f"Extracting {table} (page {page_number})...")
+
+    try:
+        df_pd = pd.read_sql_query(text(query), origin, params=params)
+        df_pd = df_pd.rename(columns=str.upper)
+        print("count", df_pd.count())
+        print("shape", df_pd.shape[0])
+
+        if df_pd.empty:
+            return 0
+        # Validar si el DataFrame está vacío
+        if df_pd.shape[0] == 0:
+            return 0
+
+        if len(df_pd) == 0:
+            return 0
+
+        if term:
+            df_pd = df_pd.assign(FCN_ID_PERIODO=term)
+
+        if transform is not None:
+            df_pd = transform(df_pd)
+
+        df_pd.to_sql(
+            table,
+            destination,
+            if_exists="append",
+            index=False,
+            method="multi",
+            chunksize=1_000,
+        )
+    except Exception as e:
+        raise ProfuturoException.from_exception(e, term) from e
+
+    print(f"Done extracting {table} (page {page_number})!")
+    print(df_pd.info())
+
+    return 1
 
 def extract_dataset(
     origin: Connection,
@@ -123,7 +190,6 @@ def extract_dataset(
     try:
         df_pd = pd.read_sql_query(text(query), origin, params=params)
         df_pd = df_pd.rename(columns=str.upper)
-        print("count",df_pd.count())
 
         if term:
             df_pd = df_pd.assign(FCN_ID_PERIODO=term)
@@ -168,7 +234,6 @@ def extract_dataset_return(
     try:
         df_pd = pd.read_sql_query(text(query), origin, params=params)
         df_pd = df_pd.rename(columns=str.upper)
-        print("count",df_pd.count())
 
         if term:
             df_pd = df_pd.assign(FCN_ID_PERIODO=term)
@@ -299,8 +364,6 @@ def extract_dataset_spark(
             df_sp = transform(df_sp)
             print("Done transforming dataframe!")
 
-        print("Count:", df_sp.count())
-        df_sp.show(10)
         print("Writing dataframe...")
         print("Schema", df_sp.schema)
         _write_spark_dataframe(df_sp, destination_configurator, table)
