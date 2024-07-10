@@ -1,6 +1,6 @@
 from profuturo.common import define_extraction, register_time, truncate_table, notify
 from profuturo.database import get_postgres_pool, get_postgres_oci_pool, configure_postgres_spark, configure_postgres_oci_spark
-from profuturo.extraction import _write_spark_dataframe, extract_terms,  _get_spark_session, read_table_insert_temp_view, extract_dataset_spark
+from profuturo.extraction import _write_spark_dataframe, extract_terms,  _get_spark_session, read_table_insert_temp_view, extract_dataset_spark, _create_spark_dataframe
 from pyspark.sql.functions import udf, concat, col, current_date , row_number,lit, current_timestamp
 from pyspark.sql.types import StringType, StructType, StructField, IntegerType
 from profuturo.env import load_env
@@ -92,9 +92,10 @@ def get_blob_info(bucket_name, prefix):
     for blob in blobs:
         # Divide el nombre del blob en partes usando '-'
         parts = blob.name.split('-')
+        print(parts)
 
         # Asegúrate de que haya al menos tres partes en el nombre
-        if len(parts) == 4:
+        if parts[3] =='SinRangoEdad' and parts[4] =='sinsiefore':
             # Obtiene la información de id, formato y área
             blob_info = {
                 "FTC_POSICION_PDF": parts[0].split('/')[1],
@@ -102,12 +103,13 @@ def get_blob_info(bucket_name, prefix):
                 "FCN_ID_AREA": int(parts[2].split('.')[0]),
                 "FTC_URL_IMAGEN": f"https://storage.cloud.google.com/{bucket_name}/{blob.name}",
                 "FTC_IMAGEN": f"{blob.name}",
-                "FTC_SIEFORE": parts[3].split('.')[0] if parts[3].split('.')[0] != 'sinsiefore' else None
+                "FTC_RANGO_EDAD": parts[3],
+                "FTC_SIEFORE": parts[4]
             }
-
             blob_info_list.append(blob_info)
 
-        if len(parts) > 4:
+            # Asegúrate de que haya al menos tres partes en el nombre
+        if len(parts)==6 and parts[3] !='SinRangoEdad':
             # Obtiene la información de id, formato y área
             blob_info = {
                 "FTC_POSICION_PDF": parts[0].split('/')[1],
@@ -115,10 +117,39 @@ def get_blob_info(bucket_name, prefix):
                 "FCN_ID_AREA": int(parts[2].split('.')[0]),
                 "FTC_URL_IMAGEN": f"https://storage.cloud.google.com/{bucket_name}/{blob.name}",
                 "FTC_IMAGEN": f"{blob.name}",
-                "FTC_SIEFORE": f"{parts[3]}-{parts[4].split('.')[0]}"
+                "FTC_RANGO_EDAD": f"{parts[3]}-{parts[4]}",
+                "FTC_SIEFORE": parts[5].split('.')[0] if parts[5].split('.')[0] != 'sinsiefore' else None
             }
-
             blob_info_list.append(blob_info)
+
+        # Asegúrate de que haya al menos tres partes en el nombre
+        if len(parts) == 6 and parts[3] =='SinRangoEdad':
+            # Obtiene la información de id, formato y área
+            blob_info = {
+                "FTC_POSICION_PDF": parts[0].split('/')[1],
+                "FCN_ID_FORMATO_EDOCTA": int(parts[1]),
+                "FCN_ID_AREA": int(parts[2].split('.')[0]),
+                "FTC_URL_IMAGEN": f"https://storage.cloud.google.com/{bucket_name}/{blob.name}",
+                "FTC_IMAGEN": f"{blob.name}",
+                "FTC_RANGO_EDAD": parts[3],
+                "FTC_SIEFORE": f"{parts[4]}-{parts[5].split('.')[0]}"
+            }
+            blob_info_list.append(blob_info)
+
+            # Asegúrate de que haya al menos tres partes en el nombre
+            if len(parts) == 7:
+                # Obtiene la información de id, formato y área
+                blob_info = {
+                    "FTC_POSICION_PDF": parts[0].split('/')[1],
+                    "FCN_ID_FORMATO_EDOCTA": int(parts[1]),
+                    "FCN_ID_AREA": int(parts[2].split('.')[0]),
+                    "FTC_URL_IMAGEN": f"https://storage.cloud.google.com/{bucket_name}/{blob.name}",
+                    "FTC_IMAGEN": f"{blob.name}",
+                    "FTC_RANGO_EDAD": f"{parts[3]}-{parts[4]}",
+                    "FTC_SIEFORE": f"{parts[5]}-{parts[6].split('.')[0]}"
+                }
+                blob_info_list.append(blob_info)
+
 
     return blob_info_list
 
@@ -271,6 +302,31 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
                        DROP TABLE IF EXISTS "MAESTROS"."TTHECHOS_CARGA_ARCHIVO"
                        """))
 
+        #####IMAGENES##########################
+        truncate_table(postgres_oci, 'TTEDOCTA_IMAGEN')
+
+        delete_all_objects(bucket_name, prefix)
+
+        delete_all_objects(bucket_name, 'profuturo-archivos')
+
+        query = """
+                SELECT
+                DISTINCT
+                concat("FTC_CODIGO_POSICION_PDF",'-',tcie."FCN_ID_FORMATO_ESTADO_CUENTA",'-', ra."FCN_ID_AREA",'-',coalesce("FTC_RANGO_EDAD", 'SinRangoEdad'), '-', COALESCE(tcie."FTC_DESCRIPCION_SIEFORE",'sinsiefore') ) AS ID,"FTO_IMAGEN" AS FTO_IMAGEN
+                FROM "GESTOR"."TTGESPRO_CONFIG_IMAGEN_EDOCTA" tcie
+                INNER JOIN "GESTOR"."TTGESPRO_ROL_USUARIO" ru ON CAST(tcie."FTC_USUARIO" AS INT) = ru."FCN_ID_USUARIO"
+                INNER JOIN "GESTOR"."TCGESPRO_ROL_AREA" ra ON ru."FCN_ID_ROL" =  ra."FCN_ID_ROL"
+                """
+
+        imagenes_df = _create_spark_dataframe(spark, configure_postgres_spark, query,
+                                              params={"term": term_id, "start": start_month, "end": end_month,
+                                                      "user": str(user)})
+
+        imagenes_df.foreach(upload_to_gcs)
+
+
+
+        #######################################
         for i in range(1000):
             headers = get_headers()  # Get the headers using the get_headers() function
             response = requests.get(url, headers=headers)  # Pass headers with the request
