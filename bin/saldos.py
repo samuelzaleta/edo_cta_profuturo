@@ -8,12 +8,7 @@ import sys
 from datetime import datetime
 
 
-spark = _get_spark_session(excuetor_memory = '16g',
-    memory_overhead ='1g',
-    memory_offhead ='1g',
-    driver_memory ='2g',
-    intances = 4,
-    parallelims = 18000)
+spark = _get_spark_session()
 
 html_reporter = HtmlReporter()
 postgres_pool = get_postgres_pool()
