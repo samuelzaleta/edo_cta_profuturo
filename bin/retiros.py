@@ -211,7 +211,6 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
             AND TR.FCC_TPPRESTACION = resol.FTC_TIPO_PRESTACION
         WHERE L.TMC_DESC_ITGY IN ('T73', 'TNP', 'TPP', 'T97', 'TPR', 'TED', 'RJP', 'TRE', 'TJU', 'TEX', 'TGF', 'TRJ','TPG', 'TRU', 'TIV')
         ) X
-        
         ), DATOS_PAGO AS (
         SELECT FTC_FOLIO,
                CASE

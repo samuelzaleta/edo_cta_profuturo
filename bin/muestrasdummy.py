@@ -124,7 +124,7 @@ def get_blob_info(bucket_name, prefix):
         parts = blob.name.split('-')
 
         # Asegúrate de que haya al menos tres partes en el nombre
-        if len(parts) == 4:
+        if parts[3] =='' and len(parts)  == 5:
             # Obtiene la información de id, formato y área
             blob_info = {
                 "FTC_POSICION_PDF": parts[0].split('/')[1],
@@ -132,12 +132,13 @@ def get_blob_info(bucket_name, prefix):
                 "FCN_ID_AREA": int(parts[2].split('.')[0]),
                 "FTC_URL_IMAGEN": f"https://storage.cloud.google.com/{bucket_name}/{blob.name}",
                 "FTC_IMAGEN": f"{blob.name}",
-                "FTC_SIEFORE": parts[3].split('.')[0] if parts[3].split('.')[0] != 'sinsiefore' else None
+                "FTC_RANGO_EDAD": parts[3],
+                "FTC_SIEFORE": parts[4].split('.')[0] if parts[4].split('.')[0] != 'sinsiefore' else None
             }
-
             blob_info_list.append(blob_info)
 
-        if len(parts) > 4:
+            # Asegúrate de que haya al menos tres partes en el nombre
+        if len(parts)==6 and parts[3] !='':
             # Obtiene la información de id, formato y área
             blob_info = {
                 "FTC_POSICION_PDF": parts[0].split('/')[1],
@@ -145,10 +146,38 @@ def get_blob_info(bucket_name, prefix):
                 "FCN_ID_AREA": int(parts[2].split('.')[0]),
                 "FTC_URL_IMAGEN": f"https://storage.cloud.google.com/{bucket_name}/{blob.name}",
                 "FTC_IMAGEN": f"{blob.name}",
-                "FTC_SIEFORE": f"{parts[3]}-{parts[4].split('.')[0]}"
+                "FTC_RANGO_EDAD": f"{parts[3]}-{parts[4]}",
+                "FTC_SIEFORE": parts[5].split('.')[0] if parts[5].split('.')[0] != 'sinsiefore' else None
             }
-
             blob_info_list.append(blob_info)
+
+        # Asegúrate de que haya al menos tres partes en el nombre
+        if len(parts) == 6 and parts[3] =='':
+            # Obtiene la información de id, formato y área
+            blob_info = {
+                "FTC_POSICION_PDF": parts[0].split('/')[1],
+                "FCN_ID_FORMATO_EDOCTA": int(parts[1]),
+                "FCN_ID_AREA": int(parts[2].split('.')[0]),
+                "FTC_URL_IMAGEN": f"https://storage.cloud.google.com/{bucket_name}/{blob.name}",
+                "FTC_IMAGEN": f"{blob.name}",
+                "FTC_SIEFORE": f"{parts[4]}-{parts[5].split('.')[0]}"
+            }
+            blob_info_list.append(blob_info)
+
+        # Asegúrate de que haya al menos tres partes en el nombre
+        if len(parts) == 7:
+            # Obtiene la información de id, formato y área
+            blob_info = {
+                "FTC_POSICION_PDF": parts[0].split('/')[1],
+                "FCN_ID_FORMATO_EDOCTA": int(parts[1]),
+                "FCN_ID_AREA": int(parts[2].split('.')[0]),
+                "FTC_URL_IMAGEN": f"https://storage.cloud.google.com/{bucket_name}/{blob.name}",
+                "FTC_IMAGEN": f"{blob.name}",
+                "FTC_RANGO_EDAD": f"{parts[3]}-{parts[4]}",
+                "FTC_SIEFORE": f"{parts[5]}-{parts[6].split('.')[0]}"
+            }
+            blob_info_list.append(blob_info)
+
 
     return blob_info_list
 
@@ -166,14 +195,17 @@ with define_extraction(phase, area, postgres_pool, bigquery_pool) as (postgres, 
         ###########################  IMAGENES   #################################################
         truncate_table(postgres, 'TTEDOCTA_IMAGEN_DUMMY')
 
-        delete_all_objects(bucket_name, prefix)
-        delete_all_objects(bucket_name, 'profuturo-archivos-dummy')
+        try:
+            delete_all_objects(bucket_name, prefix)
+        except:
+            pass
 
         query = """
         SELECT
         DISTINCT
-        concat("FTC_CODIGO_POSICION_PDF",'-',tcie."FCN_ID_FORMATO_ESTADO_CUENTA",'-', tcie."FCN_ID_AREA",'-',COALESCE(tcie."FTC_DESCRIPCION_SIEFORE",'sinsiefore')) AS ID,"FTO_IMAGEN" AS FTO_IMAGEN
-        FROM "GESTOR"."TTGESPRO_CONFIG_IMAGEN_EDOCTA" tcie
+        concat("FTC_CODIGO_POSICION_PDF",'-',tcie."FCN_ID_FORMATO_ESTADO_CUENTA",'-',tcie."FCN_ID_AREA",'-',coalesce("FTC_RANGO_EDAD", ''), '-', COALESCE(tcie."FTC_DESCRIPCION_SIEFORE",'sinsiefore') ) AS ID,"FTO_IMAGEN" AS FTO_IMAGEN
+        FROM
+        "GESTOR"."TTGESPRO_CONFIG_IMAGEN_EDOCTA" tcie
         """
 
         imagenes_df = _create_spark_dataframe(spark, configure_postgres_spark, query,params={"term": term_id, "start": start_month, "end": end_month, "user": str(user)})
@@ -191,7 +223,8 @@ with define_extraction(phase, area, postgres_pool, bigquery_pool) as (postgres, 
             StructField("FCN_ID_AREA", IntegerType(), True),
             StructField("FTC_URL_IMAGEN", StringType(), True),
             StructField("FTC_IMAGEN", StringType(), True),
-            StructField("FTC_SIEFORE", StringType(), True)
+            StructField("FTC_SIEFORE", StringType(), True),
+            StructField("FTC_RANGO_EDAD", StringType(), True)
         ])
 
         df = spark.createDataFrame(blob_info_list, schema=schema)
