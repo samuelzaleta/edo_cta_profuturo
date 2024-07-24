@@ -95,7 +95,7 @@ def send_email( to_address, subject, body):
         'subject': subject,
         'text': message
     }
-    response = requests.post(url, data=datos,  verify=False)
+    response = requests.post(url, data=datos)
 
     if response.status_code == 200:
         # Si la petición fue exitosa, puedes acceder al contenido de la respuesta de la siguiente manera:

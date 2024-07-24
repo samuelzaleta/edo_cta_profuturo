@@ -36,7 +36,6 @@ def get_token():
 
         return non_repudiation_token
     except Exception as error:
-        print("ERROR:", error)
         return -1
 
 
