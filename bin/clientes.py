@@ -51,24 +51,7 @@ with define_extraction(phase, area, postgres_pool,postgres_oci_pool,) as (postgr
             FTC_NSS,
             FTC_CURP,
             FTC_RFC,
-            CASE
-            WHEN ANIO_NACIMIENTO IN (30,31,32,33,34) THEN '30-34'
-            WHEN ANIO_NACIMIENTO IN (35,36,37,38,39) THEN '30-34'
-            WHEN ANIO_NACIMIENTO IN (40,41,42,43,44) THEN '40-44'
-            WHEN ANIO_NACIMIENTO IN (45,46,47,48,49) THEN '40-44'
-            WHEN ANIO_NACIMIENTO IN (50,51,52,53,54) THEN '50-54'
-            WHEN ANIO_NACIMIENTO IN (50,51,52,53,54) THEN '50-54'
-            WHEN ANIO_NACIMIENTO IN (55,56,57,58,59) THEN '55-59'
-            WHEN ANIO_NACIMIENTO IN (61,62,63,64,60) THEN '60-64'
-            WHEN ANIO_NACIMIENTO IN (65,66,67,68,69) THEN '65-69'
-            WHEN ANIO_NACIMIENTO IN (70,71,72,73,74) THEN '70-74'
-            WHEN ANIO_NACIMIENTO IN (75,76,77,78,79) THEN '75-79'
-            WHEN ANIO_NACIMIENTO IN (80,81,82,83,84) THEN '80-84'
-            WHEN ANIO_NACIMIENTO IN (85,86,87,88,89) THEN '85-89'
-            WHEN ANIO_NACIMIENTO IN (90,91,92,93,94) THEN '90-94'
-            WHEN ANIO_NACIMIENTO IN (95,96,97,98,99) THEN '95-99'
-            WHEN ANIO_NACIMIENTO IN (00) THEN '00-04'
-            END AS FTC_RANGO_EDAD
+            ANIO_NACIMIENTO AS FTC_ANIO_NACIMIENTO
         FROM (
             SELECT
                ROW_NUMBER() over (partition by TO_NUMBER(REGEXP_REPLACE(TO_CHAR(C.NUMERO), '[^0-9]', '')) order by C.NUMERO) AS id,
@@ -110,7 +93,7 @@ with define_extraction(phase, area, postgres_pool,postgres_oci_pool,) as (postgr
                  WHEN CURP.VALOR_IDENTIFICADOR IS NOT NULL THEN
                    SUBSTR(CURP.VALOR_IDENTIFICADOR, 5, 2)
                 ELSE
-                 '00'
+                 '20'
                 END as ANIO_NACIMIENTO
             FROM CONTRATO C
                 INNER JOIN PERSONA_CONT_ROL PCR ON C.IDCONTRATO = PCR.IDCONTRATO
@@ -391,17 +374,135 @@ with define_extraction(phase, area, postgres_pool,postgres_oci_pool,) as (postgr
 
         _write_spark_dataframe(df, configure_postgres_oci_spark, '"HECHOS"."TCHECHOS_CLIENTE"')
 
-        postgres.execute(text("""
+        postgres_oci.execute(text("""
                 UPDATE "HECHOS"."TCHECHOS_CLIENTE"
                 SET "FTC_GENERACION" = 'DECIMO TRANSITORIO'
                 WHERE "FCN_CUENTA" IN (SELECT "FCN_CUENTA" FROM "HECHOS"."TTHECHOS_CARGA_ARCHIVO" WHERE "FCN_ID_INDICADOR" = 28)
                             """), {"term": term_id, "area": area})
 
-        postgres.execute(text("""
+        postgres_oci.execute(text("""
                 UPDATE "HECHOS"."TCHECHOS_CLIENTE"
                 SET "FTB_PENSION" = 'true'
                 WHERE "FCN_CUENTA" IN (SELECT "FCN_CUENTA" FROM "HECHOS"."TTHECHOS_CARGA_ARCHIVO" WHERE "FCN_ID_INDICADOR" = 73)
                 """), {"term": term_id, "area": area})
+
+
+        ## CAMBIOS DE SIEFORE
+        postgres_oci.execute(text("""
+        UPDATE "MAESTROS"."TCDATMAE_CLIENTE"
+        SET "FTC_ANIO_NACIMIENTO" = '00'
+        WHERE "FTN_CUENTA" IN (
+        SELECT
+        MTC."FTN_CUENTA"
+        FROM "MAESTROS"."TCDATMAE_CLIENTE" MTC
+            INNER JOIN
+        "HECHOS"."TCHECHOS_CLIENTE" HTC ON MTC."FTN_CUENTA" = HTC."FCN_CUENTA"
+            AND MTC."FTC_ANIO_NACIMIENTO" = '20'
+            AND (HTC."FTC_PERFIL_INVERSION" = 'Inicial' or  HTC."FTC_PERFIL_INVERSION" IS NULL)
+        )         
+        """), {"term": term_id, "area": area})
+
+        postgres_oci.execute(text("""
+        UPDATE "MAESTROS"."TCDATMAE_CLIENTE"
+        SET "FTC_ANIO_NACIMIENTO" = '59'
+        WHERE "FTN_CUENTA" IN (
+        SELECT
+        MTC."FTN_CUENTA"
+        FROM "MAESTROS"."TCDATMAE_CLIENTE" MTC
+        INNER JOIN
+        "HECHOS"."TCHECHOS_CLIENTE" HTC ON MTC."FTN_CUENTA" = HTC."FCN_CUENTA"
+        AND MTC."FTC_ANIO_NACIMIENTO" = '20'
+        AND (HTC."FTC_PERFIL_INVERSION" = 'De Pensiones'
+        OR SUBSTR(HTC."FTC_PERFIL_INVERSION", 1, 2) = '60'
+        OR SUBSTR(HTC."FTC_PERFIL_INVERSION", 1, 2) = '55'
+            )
+        )
+        """), {"term": term_id, "area": area})
+
+        postgres_oci.execute(text("""
+        UPDATE "MAESTROS"."TCDATMAE_CLIENTE"
+        SET "FTC_ANIO_NACIMIENTO" = '65'
+        WHERE "FTN_CUENTA" IN (
+        SELECT
+        MTC."FTN_CUENTA"
+        FROM "MAESTROS"."TCDATMAE_CLIENTE" MTC
+        INNER JOIN
+            "HECHOS"."TCHECHOS_CLIENTE" HTC ON MTC."FTN_CUENTA" = HTC."FCN_CUENTA"
+            AND MTC."FTC_ANIO_NACIMIENTO" = '20'
+            AND (SUBSTR(HTC."FTC_PERFIL_INVERSION", 1, 2) = '65')
+        )
+        """), {"term": term_id, "area": area})
+
+        postgres_oci.execute(text("""
+        UPDATE "MAESTROS"."TCDATMAE_CLIENTE"
+        SET "FTC_ANIO_NACIMIENTO" = '70'
+        WHERE "FTN_CUENTA" IN (
+        SELECT
+        MTC."FTN_CUENTA"
+        FROM "MAESTROS"."TCDATMAE_CLIENTE" MTC
+        INNER JOIN
+            "HECHOS"."TCHECHOS_CLIENTE" HTC ON MTC."FTN_CUENTA" = HTC."FCN_CUENTA"
+            AND MTC."FTC_ANIO_NACIMIENTO" = '20'
+            AND (SUBSTR(HTC."FTC_PERFIL_INVERSION", 1, 2) = '70')
+        )
+        """), {"term": term_id, "area": area})
+
+        postgres_oci.execute(text("""
+        UPDATE "MAESTROS"."TCDATMAE_CLIENTE"
+        SET "FTC_ANIO_NACIMIENTO" = '75'
+        WHERE "FTN_CUENTA" IN (
+        SELECT
+        MTC."FTN_CUENTA"
+        FROM "MAESTROS"."TCDATMAE_CLIENTE" MTC
+        INNER JOIN
+            "HECHOS"."TCHECHOS_CLIENTE" HTC ON MTC."FTN_CUENTA" = HTC."FCN_CUENTA"
+            AND MTC."FTC_ANIO_NACIMIENTO" = '20'
+            AND (SUBSTR(HTC."FTC_PERFIL_INVERSION", 1, 2) = '75')
+        )
+        """), {"term": term_id, "area": area})
+
+        postgres_oci.execute(text("""
+        UPDATE "MAESTROS"."TCDATMAE_CLIENTE"
+        SET "FTC_ANIO_NACIMIENTO" = '80'
+        WHERE "FTN_CUENTA" IN (
+        SELECT
+        MTC."FTN_CUENTA"
+        FROM "MAESTROS"."TCDATMAE_CLIENTE" MTC
+        INNER JOIN
+            "HECHOS"."TCHECHOS_CLIENTE" HTC ON MTC."FTN_CUENTA" = HTC."FCN_CUENTA"
+            AND MTC."FTC_ANIO_NACIMIENTO" = '20'
+            AND (SUBSTR(HTC."FTC_PERFIL_INVERSION", 1, 2) = '80')
+        )
+        """), {"term": term_id, "area": area})
+
+
+        postgres_oci.execute(text("""
+        UPDATE "MAESTROS"."TCDATMAE_CLIENTE"
+        SET "FTC_ANIO_NACIMIENTO" = '85'
+        WHERE "FTN_CUENTA" IN (
+        SELECT
+        MTC."FTN_CUENTA"
+        FROM "MAESTROS"."TCDATMAE_CLIENTE" MTC
+        INNER JOIN
+            "HECHOS"."TCHECHOS_CLIENTE" HTC ON MTC."FTN_CUENTA" = HTC."FCN_CUENTA"
+            AND MTC."FTC_ANIO_NACIMIENTO" = '20'
+            AND (SUBSTR(HTC."FTC_PERFIL_INVERSION", 1, 2) = '85')
+        )
+        """), {"term": term_id, "area": area})
+
+        postgres_oci.execute(text("""
+        UPDATE "MAESTROS"."TCDATMAE_CLIENTE"
+        SET "FTC_ANIO_NACIMIENTO" = '90'
+        WHERE "FTN_CUENTA" IN (
+        SELECT
+        MTC."FTN_CUENTA"
+        FROM "MAESTROS"."TCDATMAE_CLIENTE" MTC
+        INNER JOIN
+            "HECHOS"."TCHECHOS_CLIENTE" HTC ON MTC."FTN_CUENTA" = HTC."FCN_CUENTA"
+            AND MTC."FTC_ANIO_NACIMIENTO" = '20'
+            AND (SUBSTR(HTC."FTC_PERFIL_INVERSION", 1, 2) = '90')
+        )
+        """), {"term": term_id, "area": area})
 
         query_pension = """
                 SELECT
