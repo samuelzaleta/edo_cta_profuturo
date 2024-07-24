@@ -2,7 +2,7 @@ from profuturo.common import truncate_table, register_time, define_extraction, n
 from profuturo.database import get_postgres_pool, get_postgres_oci_pool, get_mit_pool,configure_postgres_oci_spark ,configure_postgres_spark, configure_mit_spark
 from profuturo.extraction import extract_terms, _get_spark_session, read_table_insert_temp_view, _write_spark_dataframe
 from profuturo.reporters import HtmlReporter
-from pyspark.sql.functions import col, lit
+from pyspark.sql.functions import col, lit, udf
 from warnings import filterwarnings
 import sys
 from datetime import datetime
@@ -623,10 +623,54 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
          AND SL.FTD_FEH_CRE = RL.FTD_FEH_CRE
         """)
 
-        print('Dataframe final')
-        df.show(30)
 
-        _write_spark_dataframe(df, configure_postgres_oci_spark, '"HECHOS"."TTHECHOS_RETIRO"')
+        # Función UDF para validar y corregir el formato de la fecha
+        def validate_and_correct_date(date_str):
+            try:
+                # Validar formato yyyymmdd
+                if re.match(r'^\d{8}$', date_str):
+                    year = int(date_str[:4])
+                    month = int(date_str[4:6])
+                    day = int(date_str[6:])
+                    if 1 <= month <= 12 and 1 <= day <= 31:
+                        return date_str
+                # Validar formato ddmmyyyy
+                elif re.match(r'^\d{8}$', date_str):
+                    day = int(date_str[:2])
+                    month = int(date_str[2:4])
+                    year = int(date_str[4:])
+                    if 1 <= month <= 12 and 1 <= day <= 31:
+                        return f'{year:04d}{month:02d}{day:02d}'
+            except:
+                pass
+            return None
+
+
+        validate_and_correct_date_udf = udf(validate_and_correct_date, StringType())
+
+        # Aplicar la UDF a las columnas de fecha
+        df = df.withColumn("FTN_FEH_INI_PEN_CORRECTED", validate_and_correct_date_udf(col("FTN_FEH_INI_PEN")))
+        df = df.withColumn("FTN_FEH_RES_PEN_CORRECTED", validate_and_correct_date_udf(col("FTN_FEH_RES_PEN")))
+
+        # Filtrar los registros con formato correcto e incorrecto
+        df_correct_format = df.filter(
+            col("FTN_FEH_INI_PEN_CORRECTED").isNotNull() & col("FTN_FEH_RES_PEN_CORRECTED").isNotNull())
+        df_incorrect_format = df.filter(
+            col("FTN_FEH_INI_PEN_CORRECTED").isNull() | col("FTN_FEH_RES_PEN_CORRECTED").isNull())
+
+        # Eliminar las columnas de fecha corregida
+        df_correct_format = df_correct_format.drop("FTN_FEH_INI_PEN_CORRECTED", "FTN_FEH_RES_PEN_CORRECTED")
+        df_incorrect_format = df_incorrect_format.drop("FTN_FEH_INI_PEN_CORRECTED", "FTN_FEH_RES_PEN_CORRECTED")
+
+        # Mostrar los DataFrames
+        print('Dataframe con formato correcto')
+        df_correct_format.show(30)
+
+        print('Dataframe con formato incorrecto')
+        df_incorrect_format.show(30)
+
+        # Escribir el DataFrame con formato correcto
+        _write_spark_dataframe(df_correct_format, configure_postgres_oci_spark, '"HECHOS"."TTHECHOS_RETIRO"')
 
         query = """
                 select
@@ -681,6 +725,23 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
             area,
             term=term_id,
             message=f"Se han generado las cifras de control para retiros exitosamente para el periodo",
+            details=html_table,
+            visualiza=False
+        )
+
+        # Convert PySpark DataFrame to pandas DataFrame
+        pandas_df = df_incorrect_format.toPandas()
+
+        # Convert pandas DataFrame to HTML
+        html_table = pandas_df.to_html()
+
+        notify(
+            postgres,
+            f"FORMATO INCORRECTOS",
+            phase,
+            area,
+            term=term_id,
+            message=f"REGISTROS MALOS ",
             details=html_table,
             visualiza=False
         )
