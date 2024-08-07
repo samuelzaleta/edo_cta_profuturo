@@ -18,6 +18,7 @@ phase = int(sys.argv[1])
 user = int(sys.argv[3])
 area = int(sys.argv[4])
 
+
 with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgres, postgres_oci):
     term = extract_terms(postgres, phase)
     term_id = term["id"]
@@ -27,6 +28,7 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
     print('end_month',end_month)
     start_next_mes = term["start_next_mes"]
     print('start_next_mes',start_next_mes)
+    start_next_mes_valor_accion = term["start_next_mes_valor_accion"]
 
 
 
@@ -55,7 +57,6 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
                   WHERE SHMIN.FTD_FEH_LIQUIDACION > :date
               )
                AND SHMAX.FCN_ID_SIEFORE NOT IN (81,80)
-               --AND SHMAX.FCN_ID_SIEFORE IN (74) --LINEA AGREGADA
             GROUP BY SHMAX.FTN_NUM_CTA_INVDUAL, SHMAX.FCN_ID_SIEFORE, SHMAX.FCN_ID_TIPO_SUBCTA
         ) SHMAXIMO ON SH.FTN_NUM_CTA_INVDUAL = SHMAXIMO.FTN_NUM_CTA_INVDUAL
                   AND SH.FCN_ID_TIPO_SUBCTA = SHMAXIMO.FCN_ID_TIPO_SUBCTA AND SH.FCN_ID_SIEFORE = SHMAXIMO.FCN_ID_SIEFORE
@@ -108,7 +109,7 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
             WHERE SHMAX.FTD_FEH_LIQUIDACION < (
                   SELECT MIN(SHMIN.FTD_FEH_LIQUIDACION)
                   FROM cierren.thafogral_saldo_historico_v2 SHMIN
-                  WHERE SHMIN.FTD_FEH_LIQUIDACION > :date
+                  WHERE SHMIN.FTD_FEH_LIQUIDACION > :end
               )
                AND SHMAX.FCN_ID_SIEFORE IN (81, 80)
                --AND SHMAX.FCN_ID_SIEFORE IN (74000) --LINEA AGREGADA
@@ -141,7 +142,7 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
             query,
             '"HECHOS"."THHECHOS_SALDO_HISTORICO"',
             term=term_id,
-            params={"date": start_next_mes, "type": "F"},
+            params={"end": start_next_mes,"date": start_next_mes_valor_accion, "type": "F"},
         )
         truncate_table(postgres_oci, 'TTCALCUL_BONO', term=term_id)
 
@@ -251,71 +252,47 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
             '"MAESTROS"."TCDATMAE_SIEFORE"'
         )
 
-        # Cifras de control
-        report1 = html_reporter.generate(
-            postgres_oci,
-            """
-            SELECT
-                I."FTC_GENERACION" AS GENERACION,
-                I."FTC_VIGENCIA" AS VIGENCIA,
-                I."FTC_TIPO_CLIENTE" AS TIPO_CLIENTE,
-                I."FTC_ORIGEN" AS ORIGEN,
-                TS."FCC_VALOR" AS TIPO_SUBCUENTA,
-                S."FTC_DESCRIPCION_CORTA" AS SIEFORE,
-                --ROUND(SUM(CASE WHEN SH."FTC_TIPO_SALDO" = 'I' THEN SH."FTF_SALDO_DIA" ELSE 0 END)::numeric,2) AS SALDO_INICIAL_PESOS,
-                TRUNC(SUM(CASE WHEN SH."FTC_TIPO_SALDO" = 'F' THEN SH."FTF_SALDO_DIA" ELSE 0 END):: NUMERIC, 2)AS SALDO_FINAL_PESOS,
-                --ROUND(SUM(CASE WHEN SH."FTC_TIPO_SALDO" = 'I' THEN SH."FTN_DIA_ACCIONES" ELSE 0 END)::numeric,6) AS SALDO_INICIAL_ACCIONES,
-                TRUNC(SUM(CASE WHEN SH."FTC_TIPO_SALDO" = 'F' THEN SH."FTF_DIA_ACCIONES" ELSE 0 END):: NUMERIC, 6) AS SALDO_FINAL_ACCIONES
-            FROM "HECHOS"."THHECHOS_SALDO_HISTORICO" SH
-            INNER JOIN "HECHOS"."TCHECHOS_CLIENTE" I ON SH."FCN_CUENTA" = I."FCN_CUENTA"
-            INNER JOIN "MAESTROS"."TCDATMAE_TIPO_SUBCUENTA" TS ON SH."FCN_ID_TIPO_SUBCTA" = TS."FTN_ID_TIPO_SUBCTA"
-            INNER JOIN "MAESTROS"."TCDATMAE_SIEFORE" S ON SH."FCN_ID_SIEFORE" = S."FTN_ID_SIEFORE"
-            WHERE SH."FCN_ID_PERIODO" = :term and I."FCN_ID_PERIODO" = :term
-            GROUP BY TS."FCC_VALOR", S."FTC_DESCRIPCION_CORTA",I."FTC_GENERACION" , I."FTC_VIGENCIA", I."FTC_TIPO_CLIENTE", I."FTC_ORIGEN"
-            """,
-            ["Generación", "Vigencia", "tipo_cliente", "Origen", "Sub cuenta", "SIEFORE"],
-            ["Saldo final en pesos", "Saldo final en acciones"],
-            params={"term": term_id},
-        )
-
-        report2 = html_reporter.generate(
-            postgres_oci,
-            """
-            SELECT TS."FCC_VALOR" AS TIPO_SUBCUENTA,
-                   S."FTC_DESCRIPCION_CORTA" AS SIEFORE,
-                   --ROUND(SUM(CASE WHEN SH."FTC_TIPO_SALDO" = 'I' THEN SH."FTF_SALDO_DIA" ELSE 0 END)::numeric,2) AS SALDO_INICIAL_PESOS,
-                   TRUNC(SUM(CASE WHEN SH."FTC_TIPO_SALDO" = 'F' THEN SH."FTF_SALDO_DIA" ELSE 0 END)::numeric,2)AS SALDO_FINAL_PESOS,
-                   --ROUND(SUM(CASE WHEN SH."FTC_TIPO_SALDO" = 'I' THEN SH."FTN_DIA_ACCIONES" ELSE 0 END)::numeric,6) AS SALDO_INICIAL_ACCIONES,
-                   TRUNC(SUM(CASE WHEN SH."FTC_TIPO_SALDO" = 'F' THEN SH."FTF_DIA_ACCIONES" ELSE 0 END)::numeric,6) AS SALDO_FINAL_ACCIONES
-            FROM "HECHOS"."THHECHOS_SALDO_HISTORICO" SH
-                INNER JOIN "MAESTROS"."TCDATMAE_TIPO_SUBCUENTA" TS ON SH."FCN_ID_TIPO_SUBCTA" = TS."FTN_ID_TIPO_SUBCTA"
-                INNER JOIN "MAESTROS"."TCDATMAE_SIEFORE" S ON SH."FCN_ID_SIEFORE" = S."FTN_ID_SIEFORE"
+        query_cifras = """
+        SELECT 
+            :term AS PERIODO,
+            TS."FCC_VALOR" AS TIPO_SUBCUENTA,
+            S."FTC_DESCRIPCION_CORTA" AS SIEFORE,
+            TRUNC(SUM(CASE WHEN SH."FTC_TIPO_SALDO" = 'F' THEN SH."FTF_SALDO_DIA" ELSE 0 END)::numeric,2)AS SALDO_FINAL_PESOS,
+            TRUNC(SUM(CASE WHEN SH."FTC_TIPO_SALDO" = 'F' THEN SH."FTF_DIA_ACCIONES" ELSE 0 END)::numeric,6) AS SALDO_FINAL_ACCIONES
+        FROM 
+            "HECHOS"."THHECHOS_SALDO_HISTORICO" SH
+        INNER JOIN 
+            "MAESTROS"."TCDATMAE_TIPO_SUBCUENTA" TS ON SH."FCN_ID_TIPO_SUBCTA" = TS."FTN_ID_TIPO_SUBCTA"
+        INNER JOIN 
+            "MAESTROS"."TCDATMAE_SIEFORE" S ON SH."FCN_ID_SIEFORE" = S."FTN_ID_SIEFORE"
             WHERE "FCN_ID_PERIODO" = :term
-            GROUP BY TS."FCC_VALOR", S."FTC_DESCRIPCION_CORTA"
-            """,
-            ["TIPO_SUBCUENTA", "SIEFORE"],
-            ["Saldo final en pesos", "Saldo final en acciones"],
-            params={"term": term_id},
+        GROUP BY TS."FCC_VALOR", S."FTC_DESCRIPCION_CORTA"
+
+        """
+        read_table_insert_temp_view(
+            configure_postgres_oci_spark,
+            query_cifras,
+            "CIFRAS_SALDOS",
+            params={"term": term_id}
         )
+
+        df = spark.sql(""" select * from CIFRAS_SALDOS""")
+        # Convert PySpark DataFrame to pandas DataFrame
+        pandas_df = df.toPandas()
+
+        # Convert pandas DataFrame to HTML
+        html_table = pandas_df.to_html()
 
         notify(
             postgres,
-            f"Saldos",
+            f"Saldos 1 de 2 ",
             phase,
             area,
             term=term_id,
             message=f"Se han generado las cifras de control para saldos exitosamente para el periodo",
-            details=report1,
+            details=html_table,
         )
-        notify(
-            postgres,
-            f"Saldos",
-            phase,
-            area,
-            term=term_id,
-            message=f"Se han generado las cifras de control para saldos exitosamente para el periodo",
-            details=report2,
-        )
+
 
         #Elimina tablas temporales
         postgres_oci.execute(text("""
