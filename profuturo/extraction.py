@@ -6,7 +6,6 @@ from sqlalchemy import text
 from pandas import DataFrame as PandasDataFrame
 from typing import Dict, Any, List, Callable, Sequence, Union
 from datetime import datetime, date, time
-from numbers import Number
 from .database import SparkConnectionConfigurator
 from .exceptions import ProfuturoException
 from dateutil.relativedelta import relativedelta
@@ -43,6 +42,7 @@ def extract_terms(conn: Connection, phase: int, term_id: int = None) -> Dict[str
             end_saldos_anterior = start_month
             valor_accion_anterior = valor_accion - relativedelta(months=1)
             #MAS UN MES O DOS MESES#
+            start_next_mes_valor_accion = start_month + relativedelta(months=1) + relativedelta(days=1)
             if month == 4:
                 start_next_mes = start_month + relativedelta(months=1) + relativedelta(days=1)
             else:
@@ -56,7 +56,8 @@ def extract_terms(conn: Connection, phase: int, term_id: int = None) -> Dict[str
                 "time_period": time_period,
                 "end_saldos_anterior": end_saldos_anterior,
                 "valor_accion_anterior": valor_accion_anterior,
-                "start_next_mes": start_next_mes
+                "start_next_mes": start_next_mes,
+                "start_next_mes_valor_accion": start_next_mes_valor_accion
             }
 
         raise RuntimeError("Can not retrieve the term")
@@ -100,16 +101,11 @@ def update_indicator_spark(
     except Exception as e:
         raise ProfuturoException("TABLE_SWITCH_ERROR", term) from e
 
-
-def extract_dataset_paginate(
+def create_dataset(
     origin: Connection,
-    destination: Connection,
     query: str,
-    table: str,
     term: int = None,
     params: Dict[str, Any] = None,
-    page_size: int = 80000,
-    page_number: int = 1,
     transform: Callable[[pd.DataFrame], pd.DataFrame] = None,
 ):
     if isinstance(query, Compiled):
@@ -117,35 +113,9 @@ def extract_dataset_paginate(
         query = str(query)
     if params is None:
         params = {}
-
-    offset = (page_number - 1) * page_size
-    print(offset)
-    query = f"""
-        SELECT *
-        FROM (
-            {query}
-        ) AS inner_query
-        LIMIT {page_size}
-        OFFSET {offset}
-    """
-    params["limit"] = page_size  # Optional, for clarity
-
-    print(f"Extracting {table} (page {page_number})...")
-
     try:
         df_pd = pd.read_sql_query(text(query), origin, params=params)
         df_pd = df_pd.rename(columns=str.upper)
-        print("count", df_pd.count())
-        print("shape", df_pd.shape[0])
-
-        if df_pd.empty:
-            return 0
-        # Validar si el DataFrame está vacío
-        if df_pd.shape[0] == 0:
-            return 0
-
-        if len(df_pd) == 0:
-            return 0
 
         if term:
             df_pd = df_pd.assign(FCN_ID_PERIODO=term)
@@ -153,21 +123,11 @@ def extract_dataset_paginate(
         if transform is not None:
             df_pd = transform(df_pd)
 
-        df_pd.to_sql(
-            table,
-            destination,
-            if_exists="append",
-            index=False,
-            method="multi",
-            chunksize=1_000,
-        )
+        return df_pd
     except Exception as e:
         raise ProfuturoException.from_exception(e, term) from e
 
-    print(f"Done extracting {table} (page {page_number})!")
-    print(df_pd.info())
 
-    return 1
 
 def extract_dataset(
     origin: Connection,
@@ -176,7 +136,6 @@ def extract_dataset(
     table: str,
     term: int = None,
     params: Dict[str, Any] = None,
-    limit: int = 1000,
     transform: Callable[[pd.DataFrame], pd.DataFrame] = None,
 ):
     if isinstance(query, Compiled):
@@ -184,14 +143,11 @@ def extract_dataset(
         query = str(query)
     if params is None:
         params = {}
-    if limit is not None:
-        query = f"SELECT * FROM ({query}) WHERE ROWNUM <= :limit"
-        params["limit"] = limit
 
     print(f"Extracting {table}...")
 
     try:
-        df_pd = pd.read_sql_query(text(query), origin, params=params)
+        df_pd = execute_query_with_retry(query, origin, params)
         df_pd = df_pd.rename(columns=str.upper)
 
         if term:
@@ -206,48 +162,13 @@ def extract_dataset(
             if_exists="append",
             index=False,
             method="multi",
-            chunksize=1_000,
+            chunksize=80_000,
         )
     except Exception as e:
         raise ProfuturoException.from_exception(e, term) from e
 
     print(f"Done extracting {table}!")
     print(df_pd.info())
-
-
-def extract_dataset_return(
-    origin: Connection,
-    destination: Connection,
-    query: str,
-    term: int = None,
-    params: Dict[str, Any] = None,
-    limit: int = None,
-    transform: Callable[[PandasDataFrame], PandasDataFrame] = None,
-):
-    if isinstance(query, Compiled):
-        params = query.params
-        query = str(query)
-    if params is None:
-        params = {}
-    if limit is not None:
-        query = f"SELECT * FROM ({query}) WHERE ROWNUM <= :limit"
-        params["limit"] = limit
-
-
-    try:
-        df_pd = pd.read_sql_query(text(query), origin, params=params)
-        df_pd = df_pd.rename(columns=str.upper)
-
-        if term:
-            df_pd = df_pd.assign(FCN_ID_PERIODO=term)
-            #print(df_pd.info())
-            return df_pd
-        return df_pd
-
-    except Exception as e:
-        raise ProfuturoException.from_exception(e, term) from e
-
-
 
 
 def extract_dataset_write_view_spark(
