@@ -10,6 +10,7 @@ from .database import SparkConnectionConfigurator
 from .exceptions import ProfuturoException
 from dateutil.relativedelta import relativedelta
 import calendar
+from numbers import Number
 import sys
 import pandas as pd
 import polars as pl
@@ -42,8 +43,8 @@ def extract_terms(conn: Connection, phase: int, term_id: int = None) -> Dict[str
             end_saldos_anterior = start_month
             valor_accion_anterior = valor_accion - relativedelta(months=1)
             #MAS UN MES O DOS MESES#
-            start_next_mes_valor_accion = start_month + relativedelta(months=1) + relativedelta(days=1)
-            if month == 4:
+            start_next_mes_valor_accion = start_month + relativedelta(months=1)
+            if month == 4 or month == 12:
                 start_next_mes = start_month + relativedelta(months=1) + relativedelta(days=1)
             else:
                 start_next_mes = start_month + relativedelta(months=1)
@@ -147,7 +148,7 @@ def extract_dataset(
     print(f"Extracting {table}...")
 
     try:
-        df_pd = execute_query_with_retry(query, origin, params)
+        df_pd = pd.read_sql_query(text(query), origin, params=params)
         df_pd = df_pd.rename(columns=str.upper)
 
         if term:
@@ -156,19 +157,14 @@ def extract_dataset(
         if transform is not None:
             df_pd = transform(df_pd)
 
-        df_pd.to_sql(
-            table,
-            destination,
-            if_exists="append",
-            index=False,
-            method="multi",
-            chunksize=80_000,
-        )
+        #df_pd.to_sql(table, destination, if_exists="append", index=False, method="multi",chunksize=10_000)
     except Exception as e:
         raise ProfuturoException.from_exception(e, term) from e
 
     print(f"Done extracting {table}!")
+    print(df_pd.head(20))
     print(df_pd.info())
+    return df_pd.empty
 
 
 def extract_dataset_write_view_spark(
