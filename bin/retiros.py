@@ -1,22 +1,24 @@
 from profuturo.common import truncate_table, register_time, define_extraction, notify
-from profuturo.database import get_postgres_pool, get_postgres_oci_pool, get_mit_pool,configure_postgres_oci_spark ,configure_postgres_spark, configure_mit_spark
+from profuturo.database import get_postgres_pool, get_postgres_oci_pool, configure_postgres_oci_spark, \
+    configure_mit_spark
 from profuturo.extraction import extract_terms, _get_spark_session, read_table_insert_temp_view, _write_spark_dataframe
 from profuturo.reporters import HtmlReporter
-from pyspark.sql.functions import col, lit, udf
+from pyspark.sql.functions import col, lit, udf, date_format, to_date
+from pyspark.sql.types import StringType
 from warnings import filterwarnings
 import sys
+import re
 from datetime import datetime
 
 spark = _get_spark_session(
-        excuetor_memory='8g',
-        memory_overhead='1g',
-        memory_offhead='1g',
-        driver_memory='2g',
-        intances=4,
-        parallelims=8000)
+    excuetor_memory='8g',
+    memory_overhead='1g',
+    memory_offhead='1g',
+    driver_memory='2g',
+    intances=4,
+    parallelims=8000)
 
 filterwarnings(action='ignore', category=DeprecationWarning, message='`np.bool` is a deprecated alias')
-
 
 html_reporter = HtmlReporter()
 postgres_pool = get_postgres_pool()
@@ -33,12 +35,12 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
     start_month = term["start_month"]
     end_month = term["end_month"]
     spark = _get_spark_session(
-    excuetor_memory = '10g',
-    memory_overhead ='1g',
-    memory_offhead ='1g',
-    driver_memory ='1g',
-    intances = 4,
-    parallelims = 8000)
+        excuetor_memory='10g',
+        memory_overhead='1g',
+        memory_offhead='1g',
+        driver_memory='1g',
+        intances=4,
+        parallelims=8000)
 
     with register_time(postgres_pool, phase, term_id, user, area):
         truncate_table(postgres_oci, 'TTHECHOS_RETIRO', term=term_id)
@@ -55,16 +57,16 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
             WHERE FTB_IND_FOLIO_AGRUP = '1'
               AND FCN_ID_ESTATUS = 6649
               AND TRUNC(FTD_FEH_CRE) BETWEEN :start AND :end
-              --AND  FTN_NUM_CTA_INVDUAL IN (10012191, 10900387)
+              --AND  FTN_NUM_CTA_INVDUAL IN (70013825, 890000529, 890019811, 3300276673)
             UNION ALL
-        
+
             SELECT DISTINCT FTC_FOLIO, FTC_FOLIO_REL, FTN_NUM_CTA_INVDUAL,
                    FCN_ID_PROCESO, FCN_ID_SUBPROCESO, FTD_FEH_CRE
             FROM BENEFICIOS.TTAFORETI_LIQ_SOLICITUDES ttls
             WHERE FTB_IND_FOLIO_AGRUP = '1'
               AND FCN_ID_ESTATUS = 6649
               AND TRUNC(FTD_FEH_CRE) BETWEEN :start AND :end
-             --AND  FTN_NUM_CTA_INVDUAL IN (10012191, 10900387)
+              --AND  FTN_NUM_CTA_INVDUAL IN (70013825, 890000529, 890019811, 3300276673)
         ) X
         INNER JOIN (
             SELECT distinct tms.TMC_DESC_ITGY,tms.TMC_DESC_NCI, tms.TMN_CVE_NCI, ttc.FCN_ID_SUBPROCESO
@@ -105,9 +107,9 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
             LEFT JOIN TTAFOGRAL_CTA_INVDUAL ctaind ON L.FTN_NUM_CTA_INVDUAL = ctaind.FTN_NUM_CTA_INVDUAL
             LEFT JOIN RESOLUCIONES resol ON ctaind.FTN_NSS =  resol.FTC_NSS
         WHERE L.TMC_DESC_ITGY IN ('T73', 'TNP', 'TPP', 'T97', 'TPR', 'TED', 'RJP', 'TRE', 'TJU', 'TEX', 'TGF','TRJ', 'TPG', 'TRU', 'TIV')
-        
+
         UNION ALL
-        
+
         SELECT DISTINCT L.FTN_NUM_CTA_INVDUAL AS FCN_CUENTA, L.FTC_FOLIO AS FTC_FOLIO,
                L.FTC_FOLIO_REL AS FTC_FOLIO_REL, L.FCN_ID_PROCESO AS FCN_ID_PROCESO,
                L.FCN_ID_SUBPROCESO AS FCN_ID_SUBPROCESO, T.FTC_TIPO_TRAMITE,
@@ -126,9 +128,9 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
             AND T.FTC_CVE_REGIMEN = resol.FTC_CVE_REGIMEN
             AND T.FTC_TIPO_PRESTACION = resol.FTC_TIPO_PRESTACION
         WHERE L.TMC_DESC_ITGY IN ('TIX', 'TEI', 'TPI', 'TNI', 'TJI', 'PPI', 'RCI', 'TAI')
-        
+
         UNION ALL
-        
+
         SELECT DISTINCT L.FTN_NUM_CTA_INVDUAL AS FCN_CUENTA, L.FTC_FOLIO AS FTC_FOLIO,
                L.FTC_FOLIO_REL, L.FCN_ID_PROCESO AS FCN_ID_PROCESO,
                TR.FTN_ID_SUBPRO_TRAMITE AS FCN_ID_SUBPROCESO, TR.FTC_TIPO_TRAMITE,
@@ -147,9 +149,9 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
             AND TR.FTC_REGIMEN = resol.FTC_CVE_REGIMEN
             AND TR.FCC_TPPRESTACION = resol.FTC_TIPO_PRESTACION
         WHERE L.TMC_DESC_ITGY IN ('T73', 'TNP', 'TPP', 'T97', 'TPR', 'TED', 'RJP', 'TRE', 'TJU', 'TEX', 'TGF','TRJ', 'TPG', 'TRU', 'TIV')
-        
+
         UNION ALL
-        
+
         SELECT DISTINCT L.FTN_NUM_CTA_INVDUAL AS FCN_CUENTA, L.FTC_FOLIO AS FTC_FOLIO,
                L.FTC_FOLIO_REL, L.FCN_ID_PROCESO AS FCN_ID_PROCESO,
                TR.FTN_ID_SUBPRO_TRAMITE AS FCN_ID_SUBPROCESO, TR.FTC_TIPO_TRAMITE,
@@ -168,9 +170,9 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
             AND TR.FTC_REGIMEN = resol.FTC_CVE_REGIMEN
             AND TR.FCC_TPPRESTACION = resol.FTC_TIPO_PRESTACION
         WHERE L.TMC_DESC_ITGY IN ('TIX', 'TEI', 'TPI', 'TNI', 'TJI', 'PPI', 'RCI', 'TAI')
-        
+
         UNION ALL
-        
+
         SELECT DISTINCT L.FTN_NUM_CTA_INVDUAL AS FCN_CUENTA, L.FTC_FOLIO AS FTC_FOLIO,
                L.FTC_FOLIO_REL AS FTC_FOLIO_REL, TR.FTN_ID_SUBPRO_TRAMITE AS FCN_ID_PROCESO,
                L.FCN_ID_SUBPROCESO AS FCN_ID_SUBPROCESO, TR.FTC_TIPO_TRAMITE,
@@ -189,9 +191,9 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
             AND TR.FTC_REGIMEN = resol.FTC_CVE_REGIMEN
             AND TR.FCC_TPPRESTACION = resol.FTC_TIPO_PRESTACION
         WHERE L.TMC_DESC_ITGY IN ('TIX', 'TEI', 'TPI', 'TNI', 'TJI', 'PPI', 'RCI', 'TAI')
-        
+
         UNION ALL
-        
+
         SELECT DISTINCT  L.FTN_NUM_CTA_INVDUAL AS FCN_CUENTA, L.FTC_FOLIO AS FTC_FOLIO,
                L.FTC_FOLIO_REL AS FTC_FOLIO_REL, TR.FTN_ID_SUBPRO_TRAMITE AS FCN_ID_PROCESO,
                L.FCN_ID_SUBPROCESO AS FCN_ID_SUBPROCESO, TR.FTC_TIPO_TRAMITE,
@@ -277,56 +279,56 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
             FROM CIERREN.TTAFOGRAL_MOV_RCV
             WHERE FTD_FEH_LIQUIDACION BETWEEN :start AND :end
             and FCN_ID_TIPO_MOV not in (182)
-            --AND  FTN_NUM_CTA_INVDUAL IN (10012191, 10900387)
-        
+            --AND  FTN_NUM_CTA_INVDUAL IN (70013825, 890000529, 890019811, 3300276673)
+
             UNION ALL
-        
+
             SELECT FTC_FOLIO, FTC_FOLIO_REL, FTN_NUM_CTA_INVDUAL, FCN_ID_TIPO_SUBCTA, FTF_MONTO_PESOS
             FROM CIERREN.TTAFOGRAL_MOV_GOB
             WHERE FTD_FEH_LIQUIDACION BETWEEN :start AND :end
             and FCN_ID_TIPO_MOV not in (182)
-            --AND  FTN_NUM_CTA_INVDUAL IN (10012191, 10900387)
-        
+            --AND  FTN_NUM_CTA_INVDUAL IN (70013825, 890000529, 890019811, 3300276673)
+
             UNION ALL
-        
+
             SELECT FTC_FOLIO, FTC_FOLIO_REL, FTN_NUM_CTA_INVDUAL, FCN_ID_TIPO_SUBCTA, FTF_MONTO_PESOS
             FROM CIERREN.TTAFOGRAL_MOV_VIV
             WHERE FTD_FEH_LIQUIDACION BETWEEN :start AND :end
             and FCN_ID_TIPO_MOV not in (182)
-            --AND  FTN_NUM_CTA_INVDUAL IN (10012191, 10900387)
-        
+            --AND  FTN_NUM_CTA_INVDUAL IN (70013825, 890000529, 890019811, 3300276673)
+
             UNION ALL
-        
+
             SELECT FTC_FOLIO, FTC_FOLIO_REL, FTN_NUM_CTA_INVDUAL, FCN_ID_TIPO_SUBCTA, FTF_MONTO_PESOS
             FROM CIERREN.TTAFOGRAL_MOV_COMP
             WHERE FTD_FEH_LIQUIDACION BETWEEN :start AND :end
             and FCN_ID_TIPO_MOV not in (182)
-            --AND  FTN_NUM_CTA_INVDUAL IN (10012191, 10900387)
-        
+            --AND  FTN_NUM_CTA_INVDUAL IN (70013825, 890000529, 890019811, 3300276673)
+
             UNION ALL
-        
+
             SELECT FTC_FOLIO, FTC_FOLIO_REL, FTN_NUM_CTA_INVDUAL, FCN_ID_TIPO_SUBCTA, FTF_MONTO_PESOS
             FROM CIERREN.TTAFOGRAL_MOV_SAR
             WHERE FTD_FEH_LIQUIDACION BETWEEN :start AND :end
             and FCN_ID_TIPO_MOV not in (182)
-            --AND  FTN_NUM_CTA_INVDUAL IN (10012191, 10900387)
-                
+            --AND  FTN_NUM_CTA_INVDUAL IN (70013825, 890000529, 890019811, 3300276673)
+
             UNION ALL
-        
+
             SELECT FTC_FOLIO, FTC_FOLIO_REL, FTN_NUM_CTA_INVDUAL, FCN_ID_TIPO_SUBCTA, FTF_MONTO_PESOS
             FROM CIERREN.TTAFOGRAL_MOV_AVOL
             WHERE FTD_FEH_LIQUIDACION BETWEEN :start AND :end
             and FCN_ID_TIPO_MOV not in (182)
-            --AND  FTN_NUM_CTA_INVDUAL IN (10012191, 10900387)
-                
+            --AND  FTN_NUM_CTA_INVDUAL IN (70013825, 890000529, 890019811, 3300276673)
+
             UNION ALL
-        
+
             SELECT FTC_FOLIO, FTC_FOLIO_REL, FTN_NUM_CTA_INVDUAL, FCN_ID_TIPO_SUBCTA, FTF_MONTO_PESOS
             FROM CIERREN.TTAFOGRAL_MOV_BONO
             WHERE FTD_FEH_LIQUIDACION BETWEEN :start AND :end
             and FCN_ID_TIPO_MOV not in (182)
-            --AND  FTN_NUM_CTA_INVDUAL IN (10012191, 10900387)
-            
+            --AND  FTN_NUM_CTA_INVDUAL IN (70013825, 890000529, 890019811, 3300276673)
+
         ) X
         GROUP BY FTC_FOLIO, FTC_FOLIO_REL, FTN_NUM_CTA_INVDUAL
         """
@@ -344,17 +346,17 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
               AND FCN_ID_ESTATUS = 6649
               -- AND tthls.FCN_ID_PROCESO IN (4045, 4046, 4047, 4048, 4049, 4050, 4051)
               AND TRUNC(FTD_FEH_CRE) BETWEEN :start AND :end
-              --AND  FTN_NUM_CTA_INVDUAL IN (10012191, 10900387)
-                
+              --AND  FTN_NUM_CTA_INVDUAL IN (70013825, 890000529, 890019811, 3300276673)
+
             UNION ALL
-        
+
             SELECT DISTINCT FTC_FOLIO, FTC_FOLIO_REL, FTN_NUM_CTA_INVDUAL,
                    FCN_ID_PROCESO, FCN_ID_SUBPROCESO, FTD_FEH_CRE
             FROM BENEFICIOS.TTAFORETI_LIQ_SOLICITUDES ttls
             WHERE FTB_IND_FOLIO_AGRUP = '1'
               AND FCN_ID_ESTATUS = 6649
               AND TRUNC(FTD_FEH_CRE) BETWEEN  :start AND :end
-              --AND FTN_NUM_CTA_INVDUAL IN (10012191, 10900387)
+              --AND FTN_NUM_CTA_INVDUAL IN (70013825, 890000529, 890019811, 3300276673)
         ) X
         INNER JOIN (
             SELECT DISTINCT tms.TMC_DESC_ITGY,tms.TMC_DESC_NCI, tms.TMN_CVE_NCI, ttc.FCN_ID_SUBPROCESO
@@ -378,7 +380,7 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
         GROUP BY PS.FTC_FOLIO, RET.FTN_NUM_CTA_INVDUAL,RET.FTC_FOLIO_REL
          """
 
-        query_saldos ="""
+        query_saldos = """
         WITH RETIROS AS (
             SELECT DISTINCT X.FTN_NUM_CTA_INVDUAL AS FCN_CUENTA, X.FTC_FOLIO, X.FTC_FOLIO_REL, PT.TMC_DESC_ITGY AS FTC_TMC_DESC_ITGY,
                PT.TMC_DESC_NCI, PT.TMN_CVE_NCI, X.FCN_ID_PROCESO, X.FCN_ID_SUBPROCESO,
@@ -390,7 +392,7 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
             WHERE FTB_IND_FOLIO_AGRUP = '1'
               AND FCN_ID_ESTATUS = 6649
               AND TRUNC(FTD_FEH_CRE) BETWEEN :start AND :end
-              --AND  FTN_NUM_CTA_INVDUAL IN (10012191, 10900387)
+              --AND  FTN_NUM_CTA_INVDUAL IN (70013825, 890000529, 890019811, 3300276673)
             UNION ALL
 
             SELECT DISTINCT FTC_FOLIO, FTC_FOLIO_REL, FTN_NUM_CTA_INVDUAL,
@@ -399,7 +401,7 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
             WHERE FTB_IND_FOLIO_AGRUP = '1'
               AND FCN_ID_ESTATUS = 6649
               AND TRUNC(FTD_FEH_CRE) BETWEEN :start AND :end
-             --AND  FTN_NUM_CTA_INVDUAL IN (10012191, 10900387)
+              --AND  FTN_NUM_CTA_INVDUAL IN (70013825, 890000529, 890019811, 3300276673)
         ) X
         INNER JOIN (
             SELECT distinct tms.TMC_DESC_ITGY,tms.TMC_DESC_NCI, tms.TMN_CVE_NCI, ttc.FCN_ID_SUBPROCESO
@@ -551,7 +553,7 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
             configure_mit_spark,
             query=query_saldos,
             view="SALDOS_INICIALES",
-            params={"end": end_month,'start': start_month, 'term': term_id}
+            params={"end": end_month, 'start': start_month, 'term': term_id}
         )
         print('SALDOS INICIALES')
         spark.sql("SELECT COUNT(*) FROM SALDOS_INICIALES").show(40)
@@ -612,8 +614,8 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
         RL.FCC_MEDIO_PAGO,
         --RL.FTN_SALDO_TRANSFERIDO_VIVIENDA + RL.FTN_SALDO_TRANSFERIDO_AHORRORET AS FTN_MONTO_TRANSFERIDO_AFORE,
         RL.FTN_ISR_LIQ_RET AS FTN_AFO_ISR,
-        RL.FTN_FEH_INI_PEN,
-        RL.FTN_FEH_RES_PEN,
+        CAST(RL.FTN_FEH_INI_PEN AS VARCHAR(12)) AS FTN_FEH_INI_PEN,
+        CAST(RL.FTN_FEH_RES_PEN AS VARCHAR(12)) AS FTN_FEH_RES_PEN,
         RL.FTC_TMC_DESC_ITGY AS FTC_TIPO_TRAMITE,
         RL.FTN_ARCHIVO,
         RL.FCN_ID_PERIODO
@@ -634,6 +636,13 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
                     day = int(date_str[6:])
                     if 1 <= month <= 12 and 1 <= day <= 31:
                         return date_str
+                    # Validar formato ddmmyyyy
+                    elif re.match(r'^\d{8}$', date_str):
+                        day = int(date_str[:2])
+                        month = int(date_str[2:4])
+                        year = int(date_str[4:])
+                        if 1 <= month <= 12 and 1 <= day <= 31:
+                            return f'{year:04d}{month:02d}{day:02d}'
                 # Validar formato ddmmyyyy
                 elif re.match(r'^\d{8}$', date_str):
                     day = int(date_str[:2])
@@ -643,31 +652,83 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
                         return f'{year:04d}{month:02d}{day:02d}'
             except:
                 pass
-            return None
+            return f'{date_str[:2]}{date_str[2:4]}{date_str[4:]}'
 
 
         validate_and_correct_date_udf = udf(validate_and_correct_date, StringType())
 
+
+        def validate_date(date_str):
+            try:
+                # Validar formato yyyymmdd
+                if re.match(r'^\d{8}$', date_str):
+                    month = int(date_str[4:6])
+                    day = int(date_str[6:])
+                    if 1 <= month <= 12 and 1 <= day <= 31:
+                        return True
+                # Validar formato ddmmyyyy
+                elif re.match(r'^\d{8}$', date_str):
+                    day = int(date_str[:2])
+                    month = int(date_str[2:4])
+                    if 1 <= month <= 12 and 1 <= day <= 31:
+                        return False
+            except:
+                pass
+            return False
+
+
+        validate_date_udf = udf(validate_date, StringType())
+
         # Aplicar la UDF a las columnas de fecha
-        df = df.withColumn("FTN_FEH_INI_PEN_CORRECTED", validate_and_correct_date_udf(col("FTN_FEH_INI_PEN")))
-        df = df.withColumn("FTN_FEH_RES_PEN_CORRECTED", validate_and_correct_date_udf(col("FTN_FEH_RES_PEN")))
+        # Primero castea las columnas a string
+        df = df.withColumn("FTN_FEH_INI_PEN", col("FTN_FEH_INI_PEN").cast("string"))
+        df = df.withColumn("FTN_FEH_RES_PEN", col("FTN_FEH_RES_PEN").cast("string"))
 
-        # Filtrar los registros con formato correcto e incorrecto
-        df_correct_format = df.filter(
-            col("FTN_FEH_INI_PEN_CORRECTED").isNotNull() & col("FTN_FEH_RES_PEN_CORRECTED").isNotNull())
-        df_incorrect_format = df.filter(
-            col("FTN_FEH_INI_PEN_CORRECTED").isNull() | col("FTN_FEH_RES_PEN_CORRECTED").isNull())
+        df = df.withColumn("FTN_FEH_INI_PEN", validate_and_correct_date_udf(col("FTN_FEH_INI_PEN")))
+        df = df.withColumn("FTN_FEH_RES_PEN", validate_and_correct_date_udf(col("FTN_FEH_RES_PEN")))
+        print("Se aplicó correción de fecha")
+        df.show(3)
 
-        # Eliminar las columnas de fecha corregida
-        df_correct_format = df_correct_format.drop("FTN_FEH_INI_PEN_CORRECTED", "FTN_FEH_RES_PEN_CORRECTED")
-        df_incorrect_format = df_incorrect_format.drop("FTN_FEH_INI_PEN_CORRECTED", "FTN_FEH_RES_PEN_CORRECTED")
+        df = df.withColumn("FEH_INI_VAL", validate_date_udf(col("FTN_FEH_INI_PEN")))
+        df = df.withColumn("FEH_RES_VAL", validate_date_udf(col("FTN_FEH_RES_PEN")))
+        # Castea las columnas a int
+        df = df.withColumn("FTN_FEH_INI_PEN", col("FTN_FEH_INI_PEN").cast("int"))
+        df = df.withColumn("FTN_FEH_RES_PEN", col("FTN_FEH_RES_PEN").cast("int"))
+
+        print("se aplicó validación de fecha")
+        df.show(3)
+
+        df_correct_format = df.filter((col("FEH_INI_VAL") == True) & (col("FEH_RES_VAL") == True))
+
+        df_correct_format = df_correct_format.drop("FEH_INI_VAL", "FEH_RES_VAL")
 
         # Mostrar los DataFrames
         print('Dataframe con formato correcto')
         df_correct_format.show(30)
 
-        print('Dataframe con formato incorrecto')
-        df_incorrect_format.show(30)
+        df_incorrect_format = df.filter((col("FEH_INI_VAL") == False) & (col("FEH_RES_VAL") == False))
+
+        df_incorrect_format.drop("FEH_INI_VAL", "FEH_RES_VAL")
+
+        if df_incorrect_format.count() > 0:
+            print('Dataframe con formato incorrecto en las fechas de pension')
+            df_incorrect_format.show(30)
+            # Convert PySpark DataFrame to pandas DataFrame
+            pandas_df = df_incorrect_format.toPandas()
+
+            # Convert pandas DataFrame to HTML
+            html_table = pandas_df.to_html()
+
+            notify(
+                postgres,
+                f"FORMATO INCORRECTOS EN LAS FECHAS PENSION",
+                phase,
+                area,
+                term=term_id,
+                message=f"REGISTROS MALOS ",
+                details=html_table,
+                visualiza=False
+            )
 
         # Escribir el DataFrame con formato correcto
         _write_spark_dataframe(df_correct_format, configure_postgres_oci_spark, '"HECHOS"."TTHECHOS_RETIRO"')
@@ -728,21 +789,3 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
             details=html_table,
             visualiza=False
         )
-
-        # Convert PySpark DataFrame to pandas DataFrame
-        pandas_df = df_incorrect_format.toPandas()
-
-        # Convert pandas DataFrame to HTML
-        html_table = pandas_df.to_html()
-
-        notify(
-            postgres,
-            f"FORMATO INCORRECTOS",
-            phase,
-            area,
-            term=term_id,
-            message=f"REGISTROS MALOS ",
-            details=html_table,
-            visualiza=False
-        )
-
