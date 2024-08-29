@@ -48,6 +48,14 @@ def extract_terms(conn: Connection, phase: int, term_id: int = None) -> Dict[str
                 start_next_mes = start_month + relativedelta(months=1) + relativedelta(days=1)
             else:
                 start_next_mes = start_month + relativedelta(months=1)
+
+            # Validar si start_next_mes es sábado o domingo
+            weekday = start_next_mes.weekday()
+            if weekday == calendar.SATURDAY:
+                start_next_mes += relativedelta(days=2)
+            elif weekday == calendar.SUNDAY:
+                start_next_mes += relativedelta(days=1)
+
             print(f"Extracting period: from {start_month} to {end_month}")
             return {
                 "id": term_id,
