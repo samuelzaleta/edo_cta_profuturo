@@ -29,11 +29,14 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
     start_next_mes = term["start_next_mes"]
     print('start_next_mes',start_next_mes)
     start_next_mes_valor_accion = term["start_next_mes_valor_accion"]
+    print('start_next_mes_valor_accion', start_next_mes_valor_accion)
 
 
 
     with register_time(postgres_pool, phase, term_id, user, area):
         # Extracción
+        truncate_table(postgres_oci, "THHECHOS_SALDO_HISTORICO", term=term_id)
+        truncate_table(postgres_oci, "TTCALCUL_BONO", term=term_id)
         query = f"""
         SELECT SH.FTN_NUM_CTA_INVDUAL AS FCN_CUENTA,
                SH.FCN_ID_SIEFORE,
@@ -54,9 +57,9 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
             WHERE SHMAX.FTD_FEH_LIQUIDACION < (
                   SELECT MIN(SHMIN.FTD_FEH_LIQUIDACION)
                   FROM cierren.thafogral_saldo_historico_v2 SHMIN
-                  WHERE SHMIN.FTD_FEH_LIQUIDACION > :date
+                  WHERE SHMIN.FTD_FEH_LIQUIDACION > :start_next_mes
               )
-               AND SHMAX.FCN_ID_SIEFORE NOT IN (81,80)
+               AND SHMAX.FCN_ID_SIEFORE NOT IN (81)
             GROUP BY SHMAX.FTN_NUM_CTA_INVDUAL, SHMAX.FCN_ID_SIEFORE, SHMAX.FCN_ID_TIPO_SUBCTA
         ) SHMAXIMO ON SH.FTN_NUM_CTA_INVDUAL = SHMAXIMO.FTN_NUM_CTA_INVDUAL
                   AND SH.FCN_ID_TIPO_SUBCTA = SHMAXIMO.FCN_ID_TIPO_SUBCTA AND SH.FCN_ID_SIEFORE = SHMAXIMO.FCN_ID_SIEFORE
@@ -69,7 +72,7 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
             SELECT ROW_NUMBER() OVER(PARTITION BY FCN_ID_SIEFORE, FCN_ID_REGIMEN ORDER BY FCD_FEH_ACCION DESC) AS ROW_NUM,
                    FCN_ID_SIEFORE, FCN_ID_REGIMEN, FCN_VALOR_ACCION, FCD_FEH_ACCION
             FROM cierren.TCAFOGRAL_VALOR_ACCION
-            WHERE FCD_FEH_ACCION <= :end
+            WHERE FCD_FEH_ACCION <= :end_month
             )
             WHERE ROW_NUM = 1
         ) VA ON SH.FCN_ID_SIEFORE = VA.FCN_ID_SIEFORE
@@ -77,15 +80,13 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
         GROUP BY SH.FTN_NUM_CTA_INVDUAL, SH.FCN_ID_SIEFORE, SH.FCN_ID_TIPO_SUBCTA, SH.FTD_FEH_LIQUIDACION
         """
 
-        truncate_table(postgres_oci, "THHECHOS_SALDO_HISTORICO", term=term_id)
-
         extract_dataset_spark(
             configure_mit_spark,
             configure_postgres_oci_spark,
             query,
             '"HECHOS"."THHECHOS_SALDO_HISTORICO"',
             term=term_id,
-            params={"date": start_next_mes, "end" :end_month, "type": "F"},
+            params={"start_next_mes": start_next_mes, "end_month" :end_month, "type": "F"},
         )
 
         # Extracción
@@ -109,9 +110,9 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
             WHERE SHMAX.FTD_FEH_LIQUIDACION < (
                   SELECT MIN(SHMIN.FTD_FEH_LIQUIDACION)
                   FROM cierren.thafogral_saldo_historico_v2 SHMIN
-                  WHERE SHMIN.FTD_FEH_LIQUIDACION > :end
+                  WHERE SHMIN.FTD_FEH_LIQUIDACION > :start_next_mes
               )
-               AND SHMAX.FCN_ID_SIEFORE IN (81, 80)
+               AND SHMAX.FCN_ID_SIEFORE IN (81)
                --AND SHMAX.FCN_ID_SIEFORE IN (74000) --LINEA AGREGADA
             GROUP BY SHMAX.FTN_NUM_CTA_INVDUAL, SHMAX.FCN_ID_SIEFORE, SHMAX.FCN_ID_TIPO_SUBCTA
         ) SHMAXIMO ON SH.FTN_NUM_CTA_INVDUAL = SHMAXIMO.FTN_NUM_CTA_INVDUAL
@@ -128,7 +129,7 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
             SELECT ROW_NUMBER() OVER(PARTITION BY FCN_ID_SIEFORE, FCN_ID_REGIMEN ORDER BY FCD_FEH_ACCION DESC) AS ROW_NUM,
                    FCN_ID_SIEFORE, FCN_ID_REGIMEN, FCN_VALOR_ACCION, FCD_FEH_ACCION
             FROM cierren.TCAFOGRAL_VALOR_ACCION
-            WHERE FCD_FEH_ACCION <= :date
+            WHERE FCD_FEH_ACCION <= :valor_accion
             )
             WHERE ROW_NUM = 1
         ) VA ON SH.FCN_ID_SIEFORE = VA.FCN_ID_SIEFORE
@@ -142,9 +143,9 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
             query,
             '"HECHOS"."THHECHOS_SALDO_HISTORICO"',
             term=term_id,
-            params={"end": start_next_mes,"date": start_next_mes_valor_accion, "type": "F"},
+            params={"start_next_mes": start_next_mes,"valor_accion": start_next_mes_valor_accion, "type": "F"},
         )
-        truncate_table(postgres_oci, 'TTCALCUL_BONO', term=term_id)
+
 
         query_dias_rend_bono = """
                 SELECT RB.FTN_NUM_CTA_INVDUAL, RB.FTD_FEH_VALOR AS FTD_FECHA_REDENCION_BONO,
@@ -267,7 +268,6 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
             "MAESTROS"."TCDATMAE_SIEFORE" S ON SH."FCN_ID_SIEFORE" = S."FTN_ID_SIEFORE"
             WHERE "FCN_ID_PERIODO" = :term
         GROUP BY TS."FCC_VALOR", S."FTC_DESCRIPCION_CORTA"
-
         """
         read_table_insert_temp_view(
             configure_postgres_oci_spark,
