@@ -320,7 +320,7 @@ with define_extraction(phase, area, postgres_pool,postgres_oci_pool,) as (postgr
         SELECT
         P.FTN_NUM_CTA_INVDUAL AS FCN_CUENTA,
         CASE WHEN SUBSTR(C.FCC_VALOR,6,7) = 'BI' then 'Inicial'
-             WHEN SUBSTR(C.FCC_VALOR,6,7) = 'BP' then 'De Pensiones'
+             WHEN SUBSTR(C.FCC_VALOR,6,7) = 'BP' then 'De Pension'
              WHEN SUBSTR(C.FCC_VALOR, 6, 7) = '50' THEN 'Inicial'
              WHEN SUBSTR(C.FCC_VALOR, 6, 7) = '55' THEN 'Inicial'
              WHEN SUBSTR(C.FCC_VALOR, 6, 7) != '55' or SUBSTR(C.FCC_VALOR, 6, 7) != '50'  THEN SUBSTR(C.FCC_VALOR, 6, 7) || '-' || TO_CHAR(CAST(SUBSTR(C.FCC_VALOR, 6, 7) AS INT) + 4)
