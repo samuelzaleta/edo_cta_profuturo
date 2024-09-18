@@ -165,7 +165,7 @@ def extract_dataset(
         if transform is not None:
             df_pd = transform(df_pd)
 
-        #df_pd.to_sql(table, destination, if_exists="append", index=False, method="multi",chunksize=10_000)
+        df_pd.to_sql(table, destination, if_exists="append", index=False, method="multi",chunksize=60_000)
     except Exception as e:
         raise ProfuturoException.from_exception(e, term) from e
 
