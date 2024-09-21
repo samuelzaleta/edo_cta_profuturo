@@ -22,6 +22,14 @@ phase = int(sys.argv[1])
 user = int(sys.argv[3])
 area = int(sys.argv[4])
 
+cuentas = (
+)
+
+ftn_cuenta = ""
+
+if len(cuentas) > 0:
+    ftn_cuenta = f"AND FTN_NUM_CTA_INVDUAL IN {cuentas}"
+
 with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgres, postgres_oci):
     term = extract_terms(postgres, phase)
     term_id = term["id"]
@@ -47,6 +55,7 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
         ON C.FCN_ID_CONCEPTO_MOV =M.FFN_ID_CONCEPTO_MOV
         INNER JOIN TRAFOGRAL_MOV_SUBCTA S ON M.FRN_ID_MOV_SUBCTA = S.FRN_ID_MOV_SUBCTA
         WHERE C.FTD_FEH_LIQUIDACION BETWEEN :start AND :end
+        {ftn_cuenta}
         """
         truncate_table(postgres_oci, "TTHECHOS_COMISION", term=term_id)
         extract_dataset_spark(

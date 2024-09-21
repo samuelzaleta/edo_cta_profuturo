@@ -26,6 +26,17 @@ phase = int(sys.argv[1])
 user = int(sys.argv[3])
 area = int(sys.argv[4])
 
+cuentas = (
+)
+fcn_cuenta = ""
+cuenta_itgy = ""
+if len(cuentas) > 0:
+    fcn_cuenta = f"""AND "FCN_CUENTA" IN {cuentas}"""
+    cuenta_itgy = f"""AND "CSIE1_NUMCUE" IN {cuentas}"""
+
+
+
+
 with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgres, postgres_oci):
     term = extract_terms(postgres, phase)
     term_id = term["id"]
@@ -53,13 +64,14 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
         )
 
 
-        all_user = """
+        all_user = f"""
         SELECT 
         DISTINCT C."FCN_CUENTA" AS "FCN_CUENTA", TS."FTN_ID_TIPO_SUBCTA" AS "FCN_ID_TIPO_SUBCTA"
         FROM "HECHOS"."TCHECHOS_CLIENTE" C,
         "MAESTROS"."TCDATMAE_TIPO_SUBCUENTA" TS
         WHERE 1=1 --and C."FCN_ID_PERIODO" = :term
         --AND C."FCN_CUENTA" = 1330029515
+        {fcn_cuenta}
         """
         saldo_inicial_query = f"""
         SELECT 
@@ -78,6 +90,7 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
             1=1
             AND tsh."FCN_ID_PERIODO" = CAST(to_char(:date, 'YYYYMM') AS INT)   
             --AND tsh."FCN_CUENTA" = 1330029515
+            {fcn_cuenta}
         ) x
         GROUP BY
             1=1
@@ -104,6 +117,7 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
             AND tsh."FTC_TIPO_SALDO" = 'F'
             AND tsh."FCN_ID_PERIODO" = :term_id
             --AND tsh."FCN_CUENTA" = 1330029515 
+            {fcn_cuenta}
         ) x
         GROUP BY
             1=1
@@ -111,7 +125,7 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
             , "FCN_ID_TIPO_SUBCTA"
         """
 
-        cargo_query = """
+        cargo_query = f"""
         SELECT DISTINCT "FCN_CUENTA", "FCN_ID_TIPO_SUBCTA", SUM(round("FTF_MONTO_PESOS",2)) AS "FTF_CARGO"
             FROM (
                 SELECT DISTINCT "FCN_CUENTA",
@@ -121,6 +135,7 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
                 WHERE "FCN_ID_TIPO_MOVIMIENTO" = '180'
                   AND "FCN_ID_PERIODO" = :term_id
                   --AND "FCN_CUENTA" = 1330029515
+                  {fcn_cuenta}
                   GROUP BY
                   "FCN_CUENTA",
                   "FCN_ID_TIPO_SUBCTA"
@@ -132,6 +147,7 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
                 WHERE CAST("CSIE1_CODMOV" AS INT) > 500
                   AND "FCN_ID_PERIODO" = :term_id
                   --AND "CSIE1_NUMCUE" = 1330029515
+                  {cuenta_itgy}
                   GROUP BY
                   "CSIE1_NUMCUE",
                   "SUBCUENTA"
@@ -139,7 +155,7 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
             GROUP BY "FCN_CUENTA", "FCN_ID_TIPO_SUBCTA"
         """
 
-        abono_query = """
+        abono_query = f"""
         SELECT DISTINCT "FCN_CUENTA", "FCN_ID_TIPO_SUBCTA", SUM(round("FTF_MONTO_PESOS",2)) AS "FTF_ABONO"
         FROM (
             SELECT DISTINCT "FCN_CUENTA",
@@ -149,6 +165,7 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
             WHERE "FCN_ID_TIPO_MOVIMIENTO" = '181'
               AND "FCN_ID_PERIODO" = :term_id
               --AND "FCN_CUENTA" = 1330029515
+              {fcn_cuenta}
               GROUP BY
               "FCN_CUENTA",
               "FCN_ID_TIPO_SUBCTA"
@@ -160,6 +177,7 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
             WHERE CAST("CSIE1_CODMOV" AS INT) <= 500
               AND "FCN_ID_PERIODO" = :term_id
               --AND "CSIE1_NUMCUE" = 1330029515
+              {cuenta_itgy}
               GROUP BY
               "CSIE1_NUMCUE",
               "SUBCUENTA"
@@ -168,7 +186,7 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
         GROUP BY "FCN_CUENTA", "FCN_ID_TIPO_SUBCTA"
         """
 
-        comision_query = """
+        comision_query = f"""
         SELECT
         DISTINCT 
         C."FCN_CUENTA",
@@ -177,6 +195,7 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
         FROM "HECHOS"."TTHECHOS_COMISION" C
         WHERE "FCN_ID_PERIODO" = :term_id
         --AND "FCN_CUENTA" = 1330029515
+        {fcn_cuenta}
         GROUP BY C."FCN_CUENTA", C."FTN_TIPO_SUBCTA"
         """
 

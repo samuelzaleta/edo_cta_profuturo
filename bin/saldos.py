@@ -4,9 +4,8 @@ from profuturo.extraction import extract_terms, _get_spark_session, read_table_i
 from profuturo.reporters import HtmlReporter
 from pyspark.sql.functions import col, lit
 from sqlalchemy import text
-import sys
 from datetime import datetime
-
+import sys
 
 spark = _get_spark_session()
 
@@ -18,6 +17,12 @@ phase = int(sys.argv[1])
 user = int(sys.argv[3])
 area = int(sys.argv[4])
 
+cuentas = (
+)
+ftn_cuenta = ""
+
+if len(cuentas) > 0:
+    ftn_cuenta = f"AND FTN_NUM_CTA_INVDUAL IN {cuentas}"
 
 with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgres, postgres_oci):
     term = extract_terms(postgres, phase)
@@ -30,7 +35,6 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
     print('start_next_mes',start_next_mes)
     start_next_mes_valor_accion = term["start_next_mes_valor_accion"]
     print('start_next_mes_valor_accion', start_next_mes_valor_accion)
-
 
 
     with register_time(postgres_pool, phase, term_id, user, area):
@@ -60,6 +64,7 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
                   WHERE SHMIN.FTD_FEH_LIQUIDACION > :start_next_mes
               )
                AND SHMAX.FCN_ID_SIEFORE NOT IN (81)
+               {ftn_cuenta}
             GROUP BY SHMAX.FTN_NUM_CTA_INVDUAL, SHMAX.FCN_ID_SIEFORE, SHMAX.FCN_ID_TIPO_SUBCTA
         ) SHMAXIMO ON SH.FTN_NUM_CTA_INVDUAL = SHMAXIMO.FTN_NUM_CTA_INVDUAL
                   AND SH.FCN_ID_TIPO_SUBCTA = SHMAXIMO.FCN_ID_TIPO_SUBCTA AND SH.FCN_ID_SIEFORE = SHMAXIMO.FCN_ID_SIEFORE
@@ -113,6 +118,7 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
                   WHERE SHMIN.FTD_FEH_LIQUIDACION > :start_next_mes
               )
                AND SHMAX.FCN_ID_SIEFORE IN (81)
+               {ftn_cuenta}
                --AND SHMAX.FCN_ID_SIEFORE IN (74000) --LINEA AGREGADA
             GROUP BY SHMAX.FTN_NUM_CTA_INVDUAL, SHMAX.FCN_ID_SIEFORE, SHMAX.FCN_ID_TIPO_SUBCTA
         ) SHMAXIMO ON SH.FTN_NUM_CTA_INVDUAL = SHMAXIMO.FTN_NUM_CTA_INVDUAL
