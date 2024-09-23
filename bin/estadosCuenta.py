@@ -206,9 +206,24 @@ def get_blob_info(bucket_name, prefix):
     for blob in blobs:
         # Divide el nombre del blob en partes usando '-'
         parts = blob.name.split('-')
+        print(parts, len(parts))
 
         # Asegúrate de que haya al menos tres partes en el nombre
-        if len(parts) == 4:
+        if parts[3] =='SinRangoEdad' and parts[4].split('.')[0] =='sinsiefore':
+            # Obtiene la información de id, formato y área
+            blob_info = {
+                "FTC_POSICION_PDF": parts[0].split('/')[1],
+                "FCN_ID_FORMATO_EDOCTA": int(parts[1]),
+                "FCN_ID_AREA": int(parts[2]),
+                "FTC_URL_IMAGEN": f"https://storage.cloud.google.com/{bucket_name}/{blob.name}",
+                "FTC_IMAGEN": f"{blob.name}",
+                "FTC_RANGO_EDAD": parts[3],
+                "FTC_SIEFORE": parts[4]
+            }
+            blob_info_list.append(blob_info)
+
+            # Asegúrate de que haya al menos tres partes en el nombre
+        if len(parts)==6 and parts[3] !='':
             # Obtiene la información de id, formato y área
             blob_info = {
                 "FTC_POSICION_PDF": parts[0].split('/')[1],
@@ -216,12 +231,13 @@ def get_blob_info(bucket_name, prefix):
                 "FCN_ID_AREA": int(parts[2].split('.')[0]),
                 "FTC_URL_IMAGEN": f"https://storage.cloud.google.com/{bucket_name}/{blob.name}",
                 "FTC_IMAGEN": f"{blob.name}",
-                "FTC_SIEFORE": parts[3].split('.')[0] if parts[3].split('.')[0] != 'sinsiefore' else None
+                "FTC_RANGO_EDAD": f"{parts[3]}-{parts[4]}",
+                "FTC_SIEFORE": parts[5].split('.')[0] if parts[5].split('.')[0] != 'sinsiefore' else None
             }
-
             blob_info_list.append(blob_info)
 
-        if len(parts) > 4:
+        # Asegúrate de que haya al menos tres partes en el nombre
+        if len(parts) == 6 and parts[3] =='':
             # Obtiene la información de id, formato y área
             blob_info = {
                 "FTC_POSICION_PDF": parts[0].split('/')[1],
@@ -229,13 +245,26 @@ def get_blob_info(bucket_name, prefix):
                 "FCN_ID_AREA": int(parts[2].split('.')[0]),
                 "FTC_URL_IMAGEN": f"https://storage.cloud.google.com/{bucket_name}/{blob.name}",
                 "FTC_IMAGEN": f"{blob.name}",
-                "FTC_SIEFORE": f"{parts[3]}-{parts[4].split('.')[0]}"
+                "FTC_SIEFORE": f"{parts[4]}-{parts[5].split('.')[0]}"
             }
-
             blob_info_list.append(blob_info)
+
+        # Asegúrate de que haya al menos tres partes en el nombre
+        if len(parts) == 7:
+            # Obtiene la información de id, formato y área
+            blob_info = {
+                "FTC_POSICION_PDF": parts[0].split('/')[1],
+                "FCN_ID_FORMATO_EDOCTA": int(parts[1]),
+                "FCN_ID_AREA": int(parts[2].split('.')[0]),
+                "FTC_URL_IMAGEN": f"https://storage.cloud.google.com/{bucket_name}/{blob.name}",
+                "FTC_IMAGEN": f"{blob.name}",
+                "FTC_RANGO_EDAD": f"{parts[3]}-{parts[4]}",
+                "FTC_SIEFORE": f"{parts[5]}-{parts[6].split('.')[0]}"
+            }
+            blob_info_list.append(blob_info)
+
 
     return blob_info_list
-
 def move_blob(source_bucket, destination_bucket, source_blob_name, destination_blob_name):
     source_blob = source_bucket.blob(source_blob_name)
     destination_blob = destination_bucket.blob(destination_blob_name)
