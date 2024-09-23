@@ -90,9 +90,24 @@ def get_blob_info(bucket_name, prefix):
     for blob in blobs:
         # Divide el nombre del blob en partes usando '-'
         parts = blob.name.split('-')
+        print(parts, len(parts))
 
         # Asegúrate de que haya al menos tres partes en el nombre
-        if len(parts) == 4:
+        if parts[3] =='SinRangoEdad' and parts[4].split('.')[0] =='sinsiefore':
+            # Obtiene la información de id, formato y área
+            blob_info = {
+                "FTC_POSICION_PDF": parts[0].split('/')[1],
+                "FCN_ID_FORMATO_EDOCTA": int(parts[1]),
+                "FCN_ID_AREA": int(parts[2]),
+                "FTC_URL_IMAGEN": f"https://storage.cloud.google.com/{bucket_name}/{blob.name}",
+                "FTC_IMAGEN": f"{blob.name}",
+                "FTC_RANGO_EDAD": parts[3],
+                "FTC_SIEFORE": parts[4]
+            }
+            blob_info_list.append(blob_info)
+
+            # Asegúrate de que haya al menos tres partes en el nombre
+        if len(parts)==6 and parts[3] !='':
             # Obtiene la información de id, formato y área
             blob_info = {
                 "FTC_POSICION_PDF": parts[0].split('/')[1],
@@ -100,12 +115,13 @@ def get_blob_info(bucket_name, prefix):
                 "FCN_ID_AREA": int(parts[2].split('.')[0]),
                 "FTC_URL_IMAGEN": f"https://storage.cloud.google.com/{bucket_name}/{blob.name}",
                 "FTC_IMAGEN": f"{blob.name}",
-                "FTC_SIEFORE": parts[3].split('.')[0] if parts[3].split('.')[0] != 'sinsiefore' else None
+                "FTC_RANGO_EDAD": f"{parts[3]}-{parts[4]}",
+                "FTC_SIEFORE": parts[5].split('.')[0] if parts[5].split('.')[0] != 'sinsiefore' else None
             }
-
             blob_info_list.append(blob_info)
 
-        if len(parts) > 4:
+        # Asegúrate de que haya al menos tres partes en el nombre
+        if len(parts) == 6 and parts[3] =='':
             # Obtiene la información de id, formato y área
             blob_info = {
                 "FTC_POSICION_PDF": parts[0].split('/')[1],
@@ -113,12 +129,27 @@ def get_blob_info(bucket_name, prefix):
                 "FCN_ID_AREA": int(parts[2].split('.')[0]),
                 "FTC_URL_IMAGEN": f"https://storage.cloud.google.com/{bucket_name}/{blob.name}",
                 "FTC_IMAGEN": f"{blob.name}",
-                "FTC_SIEFORE": f"{parts[3]}-{parts[4].split('.')[0]}"
+                "FTC_SIEFORE": f"{parts[4]}-{parts[5].split('.')[0]}"
             }
-
             blob_info_list.append(blob_info)
+
+        # Asegúrate de que haya al menos tres partes en el nombre
+        if len(parts) == 7:
+            # Obtiene la información de id, formato y área
+            blob_info = {
+                "FTC_POSICION_PDF": parts[0].split('/')[1],
+                "FCN_ID_FORMATO_EDOCTA": int(parts[1]),
+                "FCN_ID_AREA": int(parts[2].split('.')[0]),
+                "FTC_URL_IMAGEN": f"https://storage.cloud.google.com/{bucket_name}/{blob.name}",
+                "FTC_IMAGEN": f"{blob.name}",
+                "FTC_RANGO_EDAD": f"{parts[3]}-{parts[4]}",
+                "FTC_SIEFORE": f"{parts[5]}-{parts[6].split('.')[0]}"
+            }
+            blob_info_list.append(blob_info)
+
 
     return blob_info_list
+
 
 def move_blob(source_bucket, destination_bucket, source_blob_name, destination_blob_name):
     source_blob = source_bucket.blob(source_blob_name)
@@ -171,8 +202,6 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
                                   """ SELECT * FROM "HECHOS"."TTHECHOS_CARGA_ARCHIVO" """,
                                   '"HECHOS"."TTHECHOS_CARGA_ARCHIVO"'
                                   )
-
-
         def eliminar_tablas():
             # Elimina tablas temporales
             postgres_oci.execute(
@@ -201,7 +230,7 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
             WHEN C."FTC_COLONIA" LIKE '%NO ASIGNADO%' THEN C."FTC_ASENTAMIENTO"
             ELSE COALESCE(C."FTC_COLONIA",C."FTC_ASENTAMIENTO")
         END AS "FTC_COLONIA",
-        COALESCE(CONCAT(C."FTC_MUNICIPIO",C."FTC_DELEGACION"), C."FTC_DELEGACION") AS "FTC_MUNICIPIO",
+        COALESCE(concat_ws(' ',C."FTC_MUNICIPIO",C."FTC_DELEGACION"), C."FTC_DELEGACION") AS "FTC_MUNICIPIO",
         COALESCE(C."FTC_CODIGO_POSTAL", ' ') AS "FTC_CP",
         COALESCE(C."FTC_ENTIDAD_FEDERATIVA", ' ') AS "FTC_ENTIDAD",
         COALESCE(C."FTC_CURP", ' ') AS "FTC_CURP",
@@ -273,8 +302,6 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
         anverso_df = spark.sql("select * from edoCtaAnverso")
 
 
-
-
         _write_spark_dataframe(general_df, configure_postgres_oci_spark, '"ESTADO_CUENTA"."TTMUESTR_RETIRO_GENERAL"')
         _write_spark_dataframe(anverso_df, configure_postgres_oci_spark, '"ESTADO_CUENTA"."TTMUESTR_RETIRO"')
 
@@ -304,23 +331,21 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
         delete_all_objects(bucket_name, 'profuturo-archivos')
 
         query = """
-        SELECT
-        DISTINCT
-        concat("FTC_CODIGO_POSICION_PDF",'-',tcie."FCN_ID_FORMATO_ESTADO_CUENTA",'-', ra."FCN_ID_AREA",'-',COALESCE(tcie."FTC_DESCRIPCION_SIEFORE",'sinsiefore')) AS ID,"FTO_IMAGEN" AS FTO_IMAGEN
-        FROM "GESTOR"."TTGESPRO_CONFIG_IMAGEN_EDOCTA" tcie
-        INNER JOIN "GESTOR"."TTGESPRO_ROL_USUARIO" ru ON CAST(tcie."FTC_USUARIO" AS INT) = ru."FCN_ID_USUARIO"
-        INNER JOIN "GESTOR"."TCGESPRO_ROL_AREA" ra ON ru."FCN_ID_ROL" =  ra."FCN_ID_ROL"
-        """
+                SELECT
+                DISTINCT
+                concat("FTC_CODIGO_POSICION_PDF",'-',tcie."FCN_ID_FORMATO_ESTADO_CUENTA",'-', ra."FCN_ID_AREA",'-',COALESCE(tcie."FTC_RANGO_EDAD", 'SinRangoEdad'), '-', COALESCE(tcie."FTC_DESCRIPCION_SIEFORE",'sinsiefore') ) AS ID,"FTO_IMAGEN" AS FTO_IMAGEN
+                FROM "GESTOR"."TTGESPRO_CONFIG_IMAGEN_EDOCTA" tcie
+                INNER JOIN "GESTOR"."TTGESPRO_ROL_USUARIO" ru ON CAST(tcie."FTC_USUARIO" AS INT) = ru."FCN_ID_USUARIO"
+                INNER JOIN "GESTOR"."TCGESPRO_ROL_AREA" ra ON ru."FCN_ID_ROL" =  ra."FCN_ID_ROL"
+                """
 
         imagenes_df = _create_spark_dataframe(spark, configure_postgres_spark, query,
                                               params={"term": term_id, "start": start_month, "end": end_month,
                                                       "user": str(user)})
 
-        imagenes_df.show()
-
         imagenes_df.foreach(upload_to_gcs)
 
-        # Obtiene la información del blob
+                # Obtiene la información del blob
         blob_info_list = get_blob_info(bucket_name, prefix)
 
         schema = StructType([
@@ -329,13 +354,13 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
             StructField("FCN_ID_AREA", IntegerType(), True),
             StructField("FTC_URL_IMAGEN", StringType(), True),
             StructField("FTC_IMAGEN", StringType(), True),
-            StructField("FTC_SIEFORE", StringType(), True)
+            StructField("FTC_SIEFORE", StringType(), True),
+            StructField("FTC_RANGO_EDAD", StringType(), True)
         ])
 
         df = spark.createDataFrame(blob_info_list, schema=schema)
 
         _write_spark_dataframe(df, configure_postgres_oci_spark, '"ESTADO_CUENTA"."TTEDOCTA_IMAGEN"')
-
         ####################### FIN MUESTRAS
 
 
