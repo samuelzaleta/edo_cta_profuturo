@@ -145,11 +145,9 @@ def extract_dataset(
     table: str,
     term: int = None,
     params: Dict[str, Any] = None,
+    schema: str = 'HECHOS',
     transform: Callable[[pd.DataFrame], pd.DataFrame] = None,
 ):
-    if isinstance(query, Compiled):
-        params = query.params
-        query = str(query)
     if params is None:
         params = {}
 
@@ -165,7 +163,7 @@ def extract_dataset(
         if transform is not None:
             df_pd = transform(df_pd)
 
-        df_pd.to_sql(table, destination, if_exists="append", index=False, method="multi",chunksize=60_000)
+        df_pd.to_sql(table, con=destination, schema=schema, if_exists="append", index=False, method="multi",chunksize=60_000)
     except Exception as e:
         raise ProfuturoException.from_exception(e, term) from e
 
