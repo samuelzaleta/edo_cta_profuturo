@@ -122,18 +122,19 @@ def get_blob_info(bucket_name, prefix):
     for blob in blobs:
         # Divide el nombre del blob en partes usando '-'
         parts = blob.name.split('-')
+        print(parts, len(parts))
 
         # Asegúrate de que haya al menos tres partes en el nombre
-        if parts[3] =='' and len(parts)  == 5:
+        if parts[3] =='SinRangoEdad' and parts[4].split('.')[0] =='sinsiefore':
             # Obtiene la información de id, formato y área
             blob_info = {
                 "FTC_POSICION_PDF": parts[0].split('/')[1],
                 "FCN_ID_FORMATO_EDOCTA": int(parts[1]),
-                "FCN_ID_AREA": int(parts[2].split('.')[0]),
+                "FCN_ID_AREA": int(parts[2]),
                 "FTC_URL_IMAGEN": f"https://storage.cloud.google.com/{bucket_name}/{blob.name}",
                 "FTC_IMAGEN": f"{blob.name}",
                 "FTC_RANGO_EDAD": parts[3],
-                "FTC_SIEFORE": parts[4].split('.')[0] if parts[4].split('.')[0] != 'sinsiefore' else None
+                "FTC_SIEFORE": parts[4]
             }
             blob_info_list.append(blob_info)
 
@@ -181,6 +182,7 @@ def get_blob_info(bucket_name, prefix):
 
     return blob_info_list
 
+
 with define_extraction(phase, area, postgres_pool, bigquery_pool) as (postgres, bigquery):
     term = extract_terms(postgres, phase)
     term_id = term["id"]
@@ -203,9 +205,8 @@ with define_extraction(phase, area, postgres_pool, bigquery_pool) as (postgres, 
         query = """
         SELECT
         DISTINCT
-        concat("FTC_CODIGO_POSICION_PDF",'-',tcie."FCN_ID_FORMATO_ESTADO_CUENTA",'-',tcie."FCN_ID_AREA",'-',coalesce("FTC_RANGO_EDAD", ''), '-', COALESCE(tcie."FTC_DESCRIPCION_SIEFORE",'sinsiefore') ) AS ID,"FTO_IMAGEN" AS FTO_IMAGEN
-        FROM
-        "GESTOR"."TTGESPRO_CONFIG_IMAGEN_EDOCTA" tcie
+        concat("FTC_CODIGO_POSICION_PDF",'-',tcie."FCN_ID_FORMATO_ESTADO_CUENTA",'-', tcie."FCN_ID_AREA",'-',COALESCE(tcie."FTC_RANGO_EDAD", 'SinRangoEdad'), '-', COALESCE(tcie."FTC_DESCRIPCION_SIEFORE",'sinsiefore') ) AS ID,"FTO_IMAGEN" AS FTO_IMAGEN
+        FROM "GESTOR"."TTGESPRO_CONFIG_IMAGEN_EDOCTA" tcie
         """
 
         imagenes_df = _create_spark_dataframe(spark, configure_postgres_spark, query,params={"term": term_id, "start": start_month, "end": end_month, "user": str(user)})
