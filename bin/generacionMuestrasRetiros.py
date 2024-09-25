@@ -92,6 +92,19 @@ def get_blob_info(bucket_name, prefix):
         parts = blob.name.split('-')
         print(parts, len(parts))
 
+        if parts[3] =='' and parts[4].split('.')[0] =='sinsiefore':
+            # Obtiene la información de id, formato y área
+            blob_info = {
+                "FTC_POSICION_PDF": parts[0].split('/')[1],
+                "FCN_ID_FORMATO_EDOCTA": int(parts[1]),
+                "FCN_ID_AREA": int(parts[2]),
+                "FTC_URL_IMAGEN": f"https://storage.cloud.google.com/{bucket_name}/{blob.name}",
+                "FTC_IMAGEN": f"{blob.name}",
+                "FTC_RANGO_EDAD":'',
+                "FTC_SIEFORE": parts[4]
+            }
+            blob_info_list.append(blob_info)
+
         # Asegúrate de que haya al menos tres partes en el nombre
         if parts[3] =='SinRangoEdad' and parts[4].split('.')[0] =='sinsiefore':
             # Obtiene la información de id, formato y área
@@ -149,6 +162,7 @@ def get_blob_info(bucket_name, prefix):
 
 
     return blob_info_list
+
 
 
 def move_blob(source_bucket, destination_bucket, source_blob_name, destination_blob_name):
@@ -333,10 +347,8 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
         query = """
                 SELECT
                 DISTINCT
-                concat("FTC_CODIGO_POSICION_PDF",'-',tcie."FCN_ID_FORMATO_ESTADO_CUENTA",'-', ra."FCN_ID_AREA",'-',COALESCE(tcie."FTC_RANGO_EDAD", 'SinRangoEdad'), '-', COALESCE(tcie."FTC_DESCRIPCION_SIEFORE",'sinsiefore') ) AS ID,"FTO_IMAGEN" AS FTO_IMAGEN
+                concat("FTC_CODIGO_POSICION_PDF",'-',tcie."FCN_ID_FORMATO_ESTADO_CUENTA",'-', tcie."FCN_ID_AREA",'-',COALESCE(tcie."FTC_RANGO_EDAD", 'SinRangoEdad'), '-', COALESCE(tcie."FTC_DESCRIPCION_SIEFORE",'sinsiefore') ) AS ID,"FTO_IMAGEN" AS FTO_IMAGEN
                 FROM "GESTOR"."TTGESPRO_CONFIG_IMAGEN_EDOCTA" tcie
-                INNER JOIN "GESTOR"."TTGESPRO_ROL_USUARIO" ru ON CAST(tcie."FTC_USUARIO" AS INT) = ru."FCN_ID_USUARIO"
-                INNER JOIN "GESTOR"."TCGESPRO_ROL_AREA" ra ON ru."FCN_ID_ROL" =  ra."FCN_ID_ROL"
                 """
 
         imagenes_df = _create_spark_dataframe(spark, configure_postgres_spark, query,
