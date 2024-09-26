@@ -1,28 +1,12 @@
-from profuturo.common import notify, register_time, define_extraction, truncate_table
+from profuturo.common import register_time, define_extraction, truncate_table, notify
 from profuturo.database import get_postgres_pool, get_integrity_pool, get_postgres_oci_pool, configure_postgres_spark, configure_postgres_oci_spark
 from profuturo.extraction import extract_terms, extract_dataset, extract_dataset_spark
 from profuturo.reporters import HtmlReporter
-from dotenv import load_dotenv
-from datetime import datetime
 from pandas import DataFrame
 from sqlalchemy import text
 import numpy as np
 import sys
-
-def transform_rcv(df: DataFrame) -> DataFrame:
-    # Transformaciones adicionales de MOV_RCV
-    df["CSIE1_CODMOV"] = np.where(
-        (df["CSIE1_CODMOV"] >= 114) & (df["CSIE1_NSSEMP"] == "INT. RET08"),
-        117,
-        df["CSIE1_CODMOV"],
-    )
-    df["CSIE1_CODMOV"] = np.where(
-        (df["CSIE1_CODMOV"] >= 114) & (df["CSIE1_NSSEMP"] == "INT. CYVTRA"),
-        117,
-        df["CSIE1_CODMOV"],
-    )
-
-    return transform(df)
+import time
 
 
 def transform(df: DataFrame) -> DataFrame:
@@ -62,254 +46,164 @@ def transform(df: DataFrame) -> DataFrame:
 html_reporter = HtmlReporter()
 postgres_pool = get_postgres_pool()
 postgres_oci_pool = get_postgres_oci_pool()
-integrity_pool = get_integrity_pool("cierren")
+
 
 phase = int(sys.argv[1])
 user = int(sys.argv[3])
 area = int(sys.argv[4])
 
-with define_extraction(phase, area, postgres_pool, integrity_pool,postgres_oci_pool) as (postgres, integrity, postgres_oci):
+with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgres, postgres_oci):
     term = extract_terms(postgres, phase)
     term_id = term["id"]
     start_month = term["start_month"]
     end_month = term["end_month"]
+    start = start_month.strftime("%Y%m%d")
+    end = end_month.strftime("%Y%m%d")
+    # SWITCH
+    switches = postgres.execute(text("""
+    SELECT DISTINCT "FTN_ID_MOVIMIENTO_PROFUTURO", "FTN_MONPES", "FCN_ID_TIPO_SUBCUENTA"
+    FROM "GESTOR"."TCGESPRO_MOVIMIENTO_PROFUTURO"
+    WHERE "FTB_SWITCH" = TRUE
+        AND "FTC_ORIGEN" = 'INTEGRITY'
+    """)).fetchall()
+
+    movimientos_query_2 = (
+    129, 116, 146, 412, 432, 434, 436, 442, 472, 474, 514, 520, 616, 646, 724, 727, 905, 915, 917, 923, 925, 926,
+    927, 932,936, 942, 943, 945, 946, 947, 952, 955, 956, 957, 960, 962, 963, 964, 965, 966, 972, 973, 974, 109,
+    136, 216, 260, 405,406, 409, 410, 413, 414, 416, 420, 421, 423, 424, 426, 430, 433, 440, 441, 443, 444, 446,
+    450, 452, 453, 454, 456, 470, 476, 636, 710, 716, 760, 809, 914, 922, 924, 930, 933, 934, 944, 954, 921)
+
+    movimientos_query_1 = (106, 110, 120, 127, 130, 140, 141, 210, 220, 720, 805, 806, 822, 824, 841)
+
+    tablas_campos = {
+        "MOV_AVOL": """CSIE1_NUMCUE, CSIE1_CODMOV, CSIE1_FECCON, CVE_SIEFORE, CVE_SERVICIO,CSIE1_MONPES_1,
+                        CSIE1_MONPES_3, CSIE1_MONPES_5, CSIE1_NSSEMP, CSIE1_FECHA_2, CSIE1_FECTRA,
+                        CSIE1_SECLOT, CSIE1_CORREL, CSIE1_PERPAG, CSIE1_FOLSUA, CSIE1_FECPAG, CSIE1_FECPRO
+                        """,
+        "MOV_BONO_UDI": """CSIE1_NUMCUE, CSIE1_CODMOV, CSIE1_FECCON, CVE_SIEFORE, CVE_SERVICIO, CSIE1_MONPES_1,
+                            CSIE1_MONPES_3, CSIE1_NSSEMP, CSIE1_FECHA_2, CSIE1_FECTRA, CSIE1_SECLOT,CSIE1_CORREL,
+                            CSIE1_PERPAG, CSIE1_FOLSUA, CSIE1_FECPAG, CSIE1_FECPRO
+                            """,
+        "MOV_GOBIERNO": """CSIE1_NUMCUE, CSIE1_CODMOV, CSIE1_FECCON, CVE_SIEFORE, CVE_SERVICIO, CSIE1_MONPES_1,
+                            CSIE1_MONPES_3, CSIE1_MONPES_5, CSIE1_MONPES_8, CSIE1_MONPES_9, CSIE1_NSSEMP,
+                            CSIE1_FECHA_2, CSIE1_FECTRA, CSIE1_SECLOT, CSIE1_CORREL, CSIE1_PERPAG,
+                            CSIE1_FOLSUA, CSIE1_FECPAG, CSIE1_FECPRO
+                            """,
+        "MOV_RCV": """CSIE1_NUMCUE, CSIE1_CODMOV, CSIE1_FECCON, CVE_SIEFORE, CVE_SERVICIO, CSIE1_MONPES_1,
+                    CSIE1_MONPES_2, CSIE1_MONPES_3, CSIE1_MONPES_4, CSIE1_MONPES_7, CSIE1_MONPES_8,
+                    CSIE1_NSSEMP, CSIE1_FECHA_2, CSIE1_FECTRA, CSIE1_SECLOT, CSIE1_CORREL, CSIE1_PERPAG,
+                    CSIE1_FOLSUA, CSIE1_FECPAG, CSIE1_FECPRO""",
+        "MOV_VIV97": """CSIE1_NUMCUE, CSIE1_CODMOV, CSIE1_FECCON, CVE_SIEFORE, CVE_SERVICIO,CSIE1_MONPES_1,
+                     CSIE1_NSSEMP, CSIE1_FECHA_2, CSIE1_FECTRA, CSIE1_SECLOT, CSIE1_CORREL,
+                     CSIE1_PERPAG,CSIE1_FOLSUA, CSIE1_FECPAG, CSIE1_FECPRO""",
+
+        "MOV_COMRET": """ CSIE1_NUMCUE, CSIE1_CODMOV, CSIE1_FECCON, CVE_SIEFORE, CVE_SERVICIO, CSIE1_MONPES_1,
+                     CSIE1_MONPES_3, CSIE1_NSSEMP, CSIE1_FECHA_2, CSIE1_FECTRA, CSIE1_CORREL,CSIE1_PERPAG,
+                     CSIE1_FOLSUA, CSIE1_FECPAG, CSIE1_FECPRO
+                     """,
+        "MOV_SAR92": """
+                     CSIE1_NUMCUE, CSIE1_CODMOV, CSIE1_FECCON, CVE_SIEFORE, CVE_SERVICIO,
+                     CSIE1_MONPES_1, CSIE1_MONPES_2, CSIE1_NSSEMP, CSIE1_FECHA_2, CSIE1_FECTRA, CSIE1_SECLOT,
+                     CSIE1_CORREL, CSIE1_PERPAG, CSIE1_FOLSUA, CSIE1_FECPAG, CSIE1_FECPRO
+                     """,
+        "MOV_VIV92": """CSIE1_NUMCUE, CSIE1_CODMOV, CSIE1_FECCON, CVE_SIEFORE, CVE_SERVICIO,
+                     CSIE1_MONPES_3, CSIE1_NSSEMP, CSIE1_FECHA_2, CSIE1_FECTRA, CSIE1_SECLOT, 
+                     CSIE1_CORREL, CSIE1_PERPAG, CSIE1_FOLSUA, CSIE1_FECPAG, CSIE1_FECPRO
+                 """
+    }
+
+with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgres, postgres_oci):
+    term = extract_terms(postgres, phase)
+    start_month = term["start_month"]
+    end_month = term["end_month"]
+    start = start_month.strftime("%Y%m%d")
+    end = end_month.strftime("%Y%m%d")
 
     with register_time(postgres_pool, phase, term_id, user, area):
-        # SWITCH
-        switches = postgres.execute(text("""
-        SELECT DISTINCT "FTN_ID_MOVIMIENTO_PROFUTURO", "FTN_MONPES", "FCN_ID_TIPO_SUBCUENTA"
-        FROM "GESTOR"."TCGESPRO_MOVIMIENTO_PROFUTURO"
-        WHERE "FTB_SWITCH" = TRUE
-          AND "FTC_ORIGEN" = 'INTEGRITY'
-        """)).fetchall()
 
         truncate_table(postgres_oci, 'TTHECHOS_MOVIMIENTOS_INTEGRITY', term=term_id)
-        extract_dataset(integrity, postgres_oci, f"""
-        SELECT CSIE1_NUMCUE, 
-               CSIE1_CODMOV,
-               CSIE1_FECCON,
-               CVE_SIEFORE,
-               CVE_SERVICIO, CSIE1_MONPES_1, CSIE1_MONPES_3, 
-               CSIE1_MONPES_5, CSIE1_MONPES_8, CSIE1_MONPES_9, 
-               CSIE1_NSSEMP, CSIE1_FECHA_2,
-               CSIE1_FECTRA, CSIE1_SECLOT, CSIE1_CORREL,
-               CSIE1_PERPAG, CSIE1_FOLSUA, CSIE1_FECPAG, CSIE1_FECPRO
-        FROM MOV_GOBIERNO
-        WHERE CSIE1_FECCON >= :start
-          AND CSIE1_FECCON <= :end
-          AND CSIE1_CODMOV  IN (
-              106, 109, 129, 129, 210, 210, 260, 260, 405, 406, 410, 410, 412, 413, 414, 416, 420, 420, 421, 423, 424, 
-              426, 430, 430, 430, 433, 436, 440, 440, 441,442, 443, 444, 446, 450, 450, 450, 450, 450, 450,452, 453, 
-              453, 454, 454, 456, 470, 472, 474, 476, 610, 630, 710, 710, 760, 760, 805, 806, 841
-          )
-        """, "TTHECHOS_MOVIMIENTOS_INTEGRITY", term=term_id, params={
-            "start": start_month.strftime("%Y%m%d"),
-            "end": end_month.strftime("%Y%m%d"),
-        }, transform=transform)
-        extract_dataset(integrity, postgres_oci, f"""
-        SELECT CSIE1_NUMCUE, CSIE1_CODMOV, CSIE1_FECCON, CVE_SIEFORE,
-               CVE_SERVICIO, CSIE1_MONPES_1,
-               CSIE1_MONPES_2, CSIE1_MONPES_3, CSIE1_MONPES_4,
-               CSIE1_MONPES_7, CSIE1_MONPES_8,
-               CSIE1_NSSEMP, CSIE1_FECHA_2,
-               CSIE1_FECTRA, CSIE1_SECLOT, CSIE1_CORREL,
-               CSIE1_PERPAG, CSIE1_FOLSUA, CSIE1_FECPAG, CSIE1_FECPRO
-        FROM MOV_RCV
-        WHERE CSIE1_FECCON >= :start
-          AND CSIE1_FECCON <= :end
-          AND CSIE1_CODMOV IN (
-              106, 109, 129, 129, 210, 210, 260, 260, 405, 406, 410, 410, 412, 413, 414, 416, 420, 420, 421, 423, 424, 
-              426, 430, 430, 430, 433, 436, 440, 440, 441,442, 443, 444, 446, 450, 450, 450, 450, 450, 450,452, 453, 
-              453, 454, 454, 456, 470, 472, 474, 476, 610, 630, 710, 710, 760, 760, 805, 806, 841
-          )
-        """, "TTHECHOS_MOVIMIENTOS_INTEGRITY", term=term_id, params={
-            "start": start_month.strftime("%Y%m%d"),
-            "end": end_month.strftime("%Y%m%d"),
-        }, transform=transform_rcv)
-        extract_dataset(integrity, postgres_oci, f"""
-        SELECT CSIE1_NUMCUE, CSIE1_CODMOV, CSIE1_FECCON, 
-               CVE_SIEFORE, CVE_SERVICIO, CSIE1_MONPES_1,
-               CSIE1_NSSEMP, CSIE1_FECHA_2,
-               CSIE1_FECTRA, CSIE1_SECLOT, CSIE1_CORREL,
-               CSIE1_PERPAG, CSIE1_FOLSUA, CSIE1_FECPAG, CSIE1_FECPRO
-        FROM MOV_VIV97
-        WHERE CSIE1_FECCON >= :start
-          AND CSIE1_FECCON <= :end
-          AND CSIE1_CODMOV IN (
-              106, 109, 129, 129, 210, 210, 260, 260, 405, 406, 410, 410, 412, 413, 414, 416, 420, 420, 421, 423, 424, 
-              426, 430, 430, 430, 433, 436, 440, 440, 441,442, 443, 444, 446, 450, 450, 450, 450, 450, 450,452, 453, 
-              453, 454, 454, 456, 470, 472, 474, 476, 610, 630, 710, 710, 760, 760, 805, 806, 841
-          )
-        """, "TTHECHOS_MOVIMIENTOS_INTEGRITY", term=term_id, params={
-            "start": start_month.strftime("%Y%m%d"),
-            "end": end_month.strftime("%Y%m%d"),
-        }, transform=transform)
-        extract_dataset(integrity, postgres_oci, f"""
-        SELECT CSIE1_NUMCUE, CSIE1_CODMOV, CSIE1_FECCON, CVE_SIEFORE,
-               CVE_SERVICIO, CSIE1_MONPES_1, CSIE1_MONPES_3, CSIE1_NSSEMP, 
-               CSIE1_FECHA_2, CSIE1_FECTRA, CSIE1_CORREL,
-               CSIE1_PERPAG, CSIE1_FOLSUA, CSIE1_FECPAG, CSIE1_FECPRO
-        FROM MOV_COMRET
-        WHERE CSIE1_FECCON >= :start
-          AND CSIE1_FECCON <= :end
-          AND CSIE1_CODMOV IN (
-              106, 109, 129, 129, 210, 210, 260, 260, 405, 406, 410, 410, 412, 413, 414, 416, 420, 420, 421, 423, 424, 
-              426, 430, 430, 430, 433, 436, 440, 440, 441,442, 443, 444, 446, 450, 450, 450, 450, 450, 450,452, 453, 
-              453, 454, 454, 456, 470, 472, 474, 476, 610, 630, 710, 710, 760, 760, 805, 806, 841
-          )
-        """, "TTHECHOS_MOVIMIENTOS_INTEGRITY", term=term_id, params={
-            "start": start_month.strftime("%Y%m%d"),
-            "end": end_month.strftime("%Y%m%d"),
-        }, transform=transform)
-        extract_dataset(integrity, postgres_oci, f"""
-        SELECT CSIE1_NUMCUE, CSIE1_CODMOV, CSIE1_FECCON, CVE_SIEFORE,
-               CVE_SERVICIO, CSIE1_MONPES_1, CSIE1_MONPES_2, CSIE1_NSSEMP, 
-               CSIE1_FECHA_2, CSIE1_FECTRA, CSIE1_SECLOT, CSIE1_CORREL,
-               CSIE1_PERPAG, CSIE1_FOLSUA, CSIE1_FECPAG, CSIE1_FECPRO
-        FROM MOV_SAR92
-        WHERE CSIE1_FECCON >= :start
-          AND CSIE1_FECCON <= :end
-          AND CSIE1_CODMOV IN (
-              106, 109, 129, 129, 210, 210, 260, 260, 405, 406, 410, 410, 412, 413, 414, 416, 420, 420, 421, 423, 424, 
-              426, 430, 430, 430, 433, 436, 440, 440, 441,442, 443, 444, 446, 450, 450, 450, 450, 450, 450,452, 453, 
-              453, 454, 454, 456, 470, 472, 474, 476, 610, 630, 710, 710, 760, 760, 805, 806, 841
-          )
-        """, "TTHECHOS_MOVIMIENTOS_INTEGRITY", term=term_id, params={
-            "start": start_month.strftime("%Y%m%d"),
-            "end": end_month.strftime("%Y%m%d"),
-        }, transform=transform)
-        extract_dataset(integrity, postgres_oci, f"""
-        SELECT CSIE1_NUMCUE, CSIE1_CODMOV, CSIE1_FECCON, CVE_SIEFORE,
-               CVE_SERVICIO, CSIE1_MONPES_3, CSIE1_NSSEMP, CSIE1_FECHA_2,
-               CSIE1_FECTRA, CSIE1_SECLOT, CSIE1_CORREL, CSIE1_PERPAG,
-               CSIE1_FOLSUA, CSIE1_FECPAG, CSIE1_FECPRO
-        FROM MOV_VIV92
-        WHERE CSIE1_FECCON >= :start
-          AND CSIE1_FECCON <= :end
-          AND CSIE1_CODMOV IN (
-              106, 109, 129, 129, 210, 210, 260, 260, 405, 406, 410, 410, 412, 413, 414, 416, 420, 420, 421, 423, 424, 
-              426, 430, 430, 430, 433, 436, 440, 440, 441,442, 443, 444, 446, 450, 450, 450, 450, 450, 450,452, 453, 
-              453, 454, 454, 456, 470, 472, 474, 476, 610, 630, 710, 710, 760, 760, 805, 806, 841
-        )
-        """, "TTHECHOS_MOVIMIENTOS_INTEGRITY", term=term_id, params={
-            "start": start_month.strftime("%Y%m%d"),
-            "end": end_month.strftime("%Y%m%d"),
-        }, transform=transform)
-        extract_dataset(integrity, postgres_oci, f"""
-        SELECT CSIE1_NUMCUE, CSIE1_CODMOV, CSIE1_FECCON, CVE_SIEFORE,
-               CVE_SERVICIO, CSIE1_MONPES_1, CSIE1_MONPES_3, CSIE1_NSSEMP, 
-               CSIE1_FECHA_2, CSIE1_FECTRA, CSIE1_SECLOT, CSIE1_CORREL, 
-               CSIE1_PERPAG, CSIE1_FOLSUA, CSIE1_FECPAG, CSIE1_FECPRO
-        FROM MOV_BONO_UDI
-        WHERE CSIE1_FECCON >= :start
-          AND CSIE1_FECCON <= :end
-          AND CSIE1_CODMOV IN (
-              106, 109, 129, 129, 210, 210, 260, 260, 405, 406, 410, 410, 412, 413, 414, 416, 420, 420, 421, 423, 424, 
-              426, 430, 430, 430, 433, 436, 440, 440, 441,442, 443, 444, 446, 450, 450, 450, 450, 450, 450,452, 453, 
-              453, 454, 454, 456, 470, 472, 474, 476, 610, 630, 710, 710, 760, 760, 805, 806, 841
-          )
-        """, "TTHECHOS_MOVIMIENTOS_INTEGRITY", term=term_id, params={
-            "start": start_month.strftime("%Y%m%d"),
-            "end": end_month.strftime("%Y%m%d"),
-        }, transform=transform)
 
-        postgres_oci.execute(
-            text(""" DROP TABLE IF EXISTS "MAESTROS"."TCGESPRO_MOVIMIENTO_PROFUTURO" """))
+        for tabla, columnas in tablas_campos.items():
+            print(tabla)
+            print(columnas)
+            block = 0
+            result = False
+            print("Primer Query")
 
-        postgres_oci.execute(
-            text(""" DROP TABLE IF EXISTS "MAESTROS"."TCGESPRO_PERIODO" """))
+            while result == False:
+                # Close and reopen the connection
+                integrity_pool = get_integrity_pool("cierren")
+                query_extract = f"""
+                SELECT {columnas} FROM {tabla}
+                WHERE CSIE1_FECCON >= {start}
+                    AND CSIE1_FECCON <= {end}
+                    AND (
+                        (CSIE1_CODMOV = 213 AND CSIE1_NSSEMP = 'CAM-REG-BON') 
+                        OR 
+                        ( CSIE1_CODMOV IN (106, 110, 120, 127, 130, 140, 141, 210, 220, 720, 805, 806, 822, 824, 841)
+                        AND (
+                            CSIE1_NSSEMP = 'CAM-REG-BON'
+                            OR CSIE1_NSSEMP = 'REINVERPNC'
+                            OR CSIE1_NSSEMP = 'REINVER TRD'
+                            OR CSIE1_NSSEMP = 'RECUPERIMSS'
+                            OR LENGTH(TRIM(CSIE1_NSSEMP)) IN (10, 11)
+                            OR CSIE1_NSSEMP = 'UNIFICADO'
+                            )
+                        )
+                    )
+                OFFSET {block * 10_000} ROWS FETCH NEXT 10000 ROWS ONLY
+                """
+                print("BLOCK",block)
+                print("Query")
+                print(query_extract)
 
-        postgres_oci.execute(
-            text(""" DROP TABLE IF EXISTS "MAESTROS"."TCDATMAE_TIPO_SUBCUENTA" """))
+                result = extract_dataset(
+                    integrity_pool, postgres_oci, query_extract, 'TTHECHOS_MOVIMIENTOS_INTEGRITY',
+                    term=term_id, params={
+                        "start": start,
+                        "end": end,
+                    }, transform=transform
+                )
+                print("result:",result)
 
-        postgres_oci.execute(text("""
-                                DROP TABLE IF EXISTS "MAESTROS"."TCDATMAE_SIEFORE"
-                                """))
+                # Close the connection
+                integrity_pool.dispose()
 
-        # Extracción de tablas temporales
-        query_temp = """
-                       SELECT
-                       "FTN_ID_SIEFORE", "FTC_DESCRIPCION", "FTC_DESCRIPCION_CORTA", "FTC_SIEFORE"
-                       FROM "MAESTROS"."TCDATMAE_SIEFORE"
-                       """
-        extract_dataset_spark(
-            configure_postgres_spark,
-            configure_postgres_oci_spark,
-            query_temp,
-            '"MAESTROS"."TCDATMAE_SIEFORE"'
-        )
+                # Wait 3 seconds
+                time.sleep(3)
 
+                block += 1
 
-        extract_dataset_spark(configure_postgres_spark, configure_postgres_oci_spark,
-                              """ SELECT * FROM "GESTOR"."TCGESPRO_MOVIMIENTO_PROFUTURO" """,
-                              '"MAESTROS"."TCGESPRO_MOVIMIENTO_PROFUTURO"'
-                              )
+            print("Segundo Query")
+            block = 0
+            while result == False:
+                integrity_pool = get_integrity_pool("cierren")
+                query_extract = f"""
+                SELECT {columnas}
+                FROM {tabla}
+                WHERE CSIE1_CODMOV IN (    129, 116, 146, 412, 432, 434, 436, 442, 472, 474, 514, 520, 616, 646, 724, 727, 905, 915, 917, 923, 925, 926,
+                927, 932,936, 942, 943, 945, 946, 947, 952, 955, 956, 957, 960, 962, 963, 964, 965, 966, 972, 973, 974, 109,
+                136, 216, 260, 405,406, 409, 410, 413, 414, 416, 420, 421, 423, 424, 426, 430, 433, 440, 441, 443, 444, 446,
+                450, 452, 453, 454, 456, 470, 476, 636, 710, 716, 760, 809, 914, 922, 924, 930, 933, 934, 944, 954, 921))
+                    AND CSIE1_FECCON >= {start}
+                    AND CSIE1_FECCON <= {end}
+                OFFSET {block * 10_000} ROWS FETCH NEXT 10000 ROWS ONLY
+                """
+                print("BLOCK",block)
+                print("Query")
+                print(query_extract)
+                result = extract_dataset(
+                    integrity_pool, postgres_oci, query_extract, 'TTHECHOS_MOVIMIENTOS_INTEGRITY',
+                    term=term_id, params={
+                        "start": start,
+                        "end": end
+                    }, transform=transform
+                )
+                print("result:", result)
+                # Close the connection
+                integrity_pool.dispose()
 
-        extract_dataset_spark(configure_postgres_spark, configure_postgres_oci_spark,
-                              """ SELECT * FROM "GESTOR"."TCGESPRO_PERIODO" """,
-                              '"MAESTROS"."TCGESPRO_PERIODO"'
-                              )
+                # Wait 3 seconds
+                time.sleep(3)
 
-        extract_dataset_spark(configure_postgres_spark, configure_postgres_oci_spark,
-                              """ SELECT * FROM "MAESTROS"."TCDATMAE_TIPO_SUBCUENTA" """,
-                              '"MAESTROS"."TCDATMAE_TIPO_SUBCUENTA"'
-                              )
-
-
-        # Cifras de control
-        report = html_reporter.generate(
-            postgres_oci,
-            """
-            --movimientos postgres
-            SELECT
-            g."FTC_PERIODO" AS PERIODO,
-            s."FTC_DESCRIPCION" AS SIEFORE_INTEGRITY,
-            ROUND(cast(SUM (m."MONTO") as numeric(16,2)),2) as MONTO_PESOS
-            FROM "HECHOS"."TTHECHOS_MOVIMIENTOS_INTEGRITY" m
-            LEFT JOIN "MAESTROS"."TCDATMAE_SIEFORE" s ON  s."FTN_ID_SIEFORE" =
-            CASE m."CVE_SIEFORE"
-            WHEN 7 THEN 74
-            WHEN 98 THEN 80
-            WHEN 99 THEN 81
-            WHEN 2 THEN 82
-            WHEN 4 THEN 83
-            WHEN 8 THEN 6318
-            WHEN 3 THEN 6319
-            WHEN 1 THEN 6320
-            WHEN 11 THEN 6322
-            WHEN 5 THEN 6323
-            WHEN 12 THEN 6324
-            WHEN 6 THEN 6325
-            WHEN 13 THEN 6326
-            END
-            INNER JOIN "MAESTROS"."TCGESPRO_PERIODO" g ON g."FTN_ID_PERIODO" = m."FCN_ID_PERIODO"
-            WHERE "FCN_ID_PERIODO" = :term
-            GROUP BY
-            g."FTC_PERIODO", s."FTC_DESCRIPCION"
-            """,
-            ["PERIODO", "SIEFORE"],
-            ["MONTO_PESOS"],
-            params={"term": term_id},
-        )
-        notify(
-            postgres,
-            f"Movimientos Integrity",
-            phase,
-            area,
-            term=term_id,
-            message="Se han generado las cifras de control para movimientos integrity exitosamente",
-            details=report,
-        )
-
-        postgres_oci.execute(
-            text(""" DROP TABLE IF EXISTS "MAESTROS"."TCGESPRO_MOVIMIENTO_PROFUTURO" """))
-
-        postgres_oci.execute(
-            text(""" DROP TABLE IF EXISTS "MAESTROS"."TCGESPRO_PERIODO" """))
-
-        postgres_oci.execute(
-            text(""" DROP TABLE IF EXISTS "MAESTROS"."TCDATMAE_TIPO_SUBCUENTA" """))
-
-        postgres_oci.execute(text("""
-                                       DROP TABLE IF EXISTS "MAESTROS"."TCDATMAE_SIEFORE"
-                                       """))
+                block += 1
