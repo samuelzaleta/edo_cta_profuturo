@@ -95,61 +95,6 @@ def get_headers():
 
 
 ################### OBTENCIÓN DE MUESTRAS #######################################
-def find_samples(samples_cursor: CursorResult):
-    samples = set()
-    i = 0
-    for batch in samples_cursor.partitions(50):
-        for record in batch:
-            account = record[0]
-            consars = record[1]
-            i += 1
-
-            for consar in consars:
-                if consar not in configurations:
-                    continue
-
-                configurations[consar] = configurations[consar] - 1
-
-                if configurations[consar] == 0:
-                    del configurations[consar]
-
-                samples.add(account)
-
-                if len(configurations) == 0:
-                    print("Cantidad de registros: " + str(i))
-                    return samples
-
-    result = tuple(list(configurations.keys()))
-    print(result)
-    try:
-        descripcion_consar = postgres.execute(text("""
-            SELECT "FTC_DESCRIPCION" FROM "MAESTROS"."TCDATMAE_MOVIMIENTO_CONSAR"
-            WHERE "FTN_ID_MOVIMIENTO_CONSAR" IN :consar
-            """), {'consar': result}).fetchall()
-
-        print(descripcion_consar)
-        # Creating a DataFrame
-        df = pd.DataFrame(descripcion_consar, columns=['Concepto Consar'])  # Replace 'Column_Name' with an appropriate column name
-        html_table = df.to_html()
-
-        notify(
-            postgres,
-            'No se encontraron suficientes registros para los Conceptos CONSAR',
-            phase,
-            area,
-            term_id,
-            message=f"No se encontraron suficientes muestras para los Conceptos CONSAR:",
-            details=html_table,
-            aprobar=False,
-            descarga=False,
-            reproceso=False,
-        )
-
-        return samples
-    except:
-        return 'sin muestras'
-
-
 def upload_to_gcs(row):
     id_value = row["id"]
     bytea_data = row["fto_imagen"]

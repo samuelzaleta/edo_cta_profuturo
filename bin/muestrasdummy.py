@@ -1,6 +1,6 @@
 from sqlalchemy.engine import CursorResult
 from profuturo.common import define_extraction, register_time, notify, truncate_table
-from profuturo.database import get_postgres_pool, configure_postgres_spark, configure_bigquery_spark, get_bigquery_pool,configure_mitedocta_spark
+from profuturo.database import get_postgres_pool, configure_postgres_spark, get_postgres_oci_pool
 from profuturo.extraction import _write_spark_dataframe, extract_terms, _get_spark_session, _create_spark_dataframe
 from pyspark.sql.functions import concat, col, row_number, lit, lpad
 from pyspark.sql.types import StringType, StructType, StructField, IntegerType
@@ -20,13 +20,12 @@ import os
 
 load_env()
 postgres_pool = get_postgres_pool()
-bigquery_pool = get_bigquery_pool()
 storage_client = storage.Client()
+postgres_oci_pool = get_postgres_oci_pool()
 phase = int(sys.argv[1])
 user = int(sys.argv[3])
 area = int(sys.argv[4])
 term =int(sys.argv[2])
-print(phase,term, user,area )
 bucket_name = os.getenv("BUCKET_ID")
 print(bucket_name)
 prefix =f"imagenesDummy"
@@ -196,7 +195,7 @@ def get_blob_info(bucket_name, prefix):
     return blob_info_list
 
 
-with define_extraction(phase, area, postgres_pool, bigquery_pool) as (postgres, bigquery):
+with define_extraction(phase, area, postgres_pool, ) as (postgres, _):
     term = extract_terms(postgres, phase)
     term_id = term["id"]
     start_month = term["start_month"]
