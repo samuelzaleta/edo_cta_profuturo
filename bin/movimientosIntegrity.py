@@ -52,6 +52,16 @@ phase = int(sys.argv[1])
 user = int(sys.argv[3])
 area = int(sys.argv[4])
 
+
+cuentas = (
+
+)
+
+ftn_cuenta = ""
+
+if len(cuentas) > 0:
+    ftn_cuenta = f"AND CSIE1_NUMCUE IN {cuentas}"
+
 with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgres, postgres_oci):
     term = extract_terms(postgres, phase)
     term_id = term["id"]
@@ -151,6 +161,7 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
                             )
                         )
                     )
+                    {ftn_cuenta}
                 OFFSET {block * 10_000} ROWS FETCH NEXT 10000 ROWS ONLY
                 """
                 print("BLOCK",block)
@@ -187,6 +198,7 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
                 450, 452, 453, 454, 456, 470, 476, 636, 710, 716, 760, 809, 914, 922, 924, 930, 933, 934, 944, 954, 921))
                     AND CSIE1_FECCON >= {start}
                     AND CSIE1_FECCON <= {end}
+                    {ftn_cuenta}
                 OFFSET {block * 10_000} ROWS FETCH NEXT 10000 ROWS ONLY
                 """
                 print("BLOCK",block)
