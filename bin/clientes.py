@@ -29,10 +29,20 @@ with define_extraction(phase, area, postgres_pool,postgres_oci_pool,) as (postgr
     time_period = term["time_period"]
     start_month = term["start_month"]
     end_month = term["end_month"]
-
-
-
     with register_time(postgres_pool, phase, term_id, user, area):
+        def insertar_tablas():
+            # Extracción de tablas temporales
+
+            extract_dataset_spark(configure_postgres_spark, configure_postgres_oci_spark,
+                                  """ SELECT * FROM "GESTOR"."TTHECHOS_CARGA_ARCHIVO" """,
+                                  '"MAESTROS"."TTHECHOS_CARGA_ARCHIVO"')
+        def eliminar_tablas():
+            # Elimina tablas temporales
+            postgres_oci.execute(
+                text(""" DROP TABLE IF EXISTS "MAESTROS"."TTHECHOS_CARGA_ARCHIVO" """))
+
+        eliminar_tablas()
+        insertar_tablas()
         # Extracción
         query = f"""
         SELECT
@@ -74,8 +84,15 @@ with define_extraction(phase, area, postgres_pool,postgres_oci_pool,) as (postgr
                 END NUMEROINTERIOR,
                ASE.NOMBRE AS FTC_COLONIA,
                CD.NOMBRE AS FTC_DELEGACION,
-               coalesce(M.NOMBRE, DI.MUNICIPIO, DI.CIUDAD) AS FTC_MUNICIPIO,
-               coalesce(CP.CODIGOPOSTAL,DI.CODIGOPOSTAL) AS FTC_CODIGO_POSTAL,
+                CASE
+                    WHEN COALESCE(M.NOMBRE, '') NOT IN ('', 'NO ASIGNADO', '0') THEN M.NOMBRE
+                    WHEN COALESCE(DI.MUNICIPIO, '') NOT IN ('', 'NO ASIGNADO', '0') THEN DI.MUNICIPIO
+                    ELSE DI.CIUDAD
+                END AS FTC_MUNICIPIO,
+                CASE
+                    WHEN COALESCE(CP.CODIGOPOSTAL, '') IN ('', 'NO ASIGNADO', '0') THEN DI.CODIGOPOSTAL
+                    ELSE CP.CODIGOPOSTAL
+                END AS FTC_CODIGO_POSTAL,
                E.NOMBRE AS FTC_ENTIDAD_FEDERATIVA,
                NSS.VALOR_IDENTIFICADOR AS FTC_NSS,
                CURP.VALOR_IDENTIFICADOR AS FTC_CURP,
@@ -377,13 +394,13 @@ with define_extraction(phase, area, postgres_pool,postgres_oci_pool,) as (postgr
         postgres_oci.execute(text("""
                 UPDATE "HECHOS"."TCHECHOS_CLIENTE"
                 SET "FTC_GENERACION" = 'DECIMO TRANSITORIO'
-                WHERE "FCN_CUENTA" IN (SELECT "FCN_CUENTA" FROM "HECHOS"."TTHECHOS_CARGA_ARCHIVO" WHERE "FCN_ID_INDICADOR" = 28)
+                WHERE "FCN_CUENTA" IN (SELECT "FCN_CUENTA" FROM "MAESTROS"."TTHECHOS_CARGA_ARCHIVO" WHERE "FCN_ID_INDICADOR" = 28)
                             """), {"term": term_id, "area": area})
 
         postgres_oci.execute(text("""
                 UPDATE "HECHOS"."TCHECHOS_CLIENTE"
                 SET "FTB_PENSION" = 'true'
-                WHERE "FCN_CUENTA" IN (SELECT "FCN_CUENTA" FROM "HECHOS"."TTHECHOS_CARGA_ARCHIVO" WHERE "FCN_ID_INDICADOR" = 73)
+                WHERE "FCN_CUENTA" IN (SELECT "FCN_CUENTA" FROM "MAESTROS"."TTHECHOS_CARGA_ARCHIVO" WHERE "FCN_ID_INDICADOR" = 73)
                 """), {"term": term_id, "area": area})
 
 
@@ -536,6 +553,7 @@ with define_extraction(phase, area, postgres_pool,postgres_oci_pool,) as (postgr
             '"MAESTROS"."TCDATMAE_PENSION"',
             params={"end": end_month, "type": "F"},
         )
+        eliminar_tablas()
 
         # Cifras de control
         report = html_reporter.generate(
