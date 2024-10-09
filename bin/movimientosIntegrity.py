@@ -137,10 +137,10 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
             print(tabla)
             print(columnas)
             block = 0
-            result = False
+
             print("Primer Query")
 
-            while result == False:
+            for i in range(0, 5):
                 # Close and reopen the connection
                 integrity_pool = get_integrity_pool("cierren")
                 query_extract = f"""
@@ -187,7 +187,7 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
 
             print("Segundo Query")
             block = 0
-            while result == False:
+            for i in range(0, 5):
                 integrity_pool = get_integrity_pool("cierren")
                 query_extract = f"""
                 SELECT {columnas}
