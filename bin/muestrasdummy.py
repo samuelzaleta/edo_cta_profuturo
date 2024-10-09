@@ -2,14 +2,10 @@ from sqlalchemy.engine import CursorResult
 from profuturo.common import define_extraction, register_time, notify, truncate_table
 from profuturo.database import get_postgres_pool, configure_postgres_spark, get_postgres_oci_pool
 from profuturo.extraction import _write_spark_dataframe, extract_terms, _get_spark_session, _create_spark_dataframe
-from pyspark.sql.functions import concat, col, row_number, lit, lpad
+from profuturo.imagen import upload_to_gcs, delete_all_objects, get_blob_info
 from pyspark.sql.types import StringType, StructType, StructField, IntegerType
-from pyspark.sql.window import Window
-from sqlalchemy import text
 from datetime import datetime, timedelta
 from google.cloud import storage, bigquery
-from io import BytesIO
-from PIL import Image
 from profuturo.env import load_env
 import requests
 import time
@@ -53,8 +49,7 @@ def get_token():
         non_repudiation_token = jwt.encode(payload, secret, algorithm='HS256')
 
         return non_repudiation_token
-    except Exception as error:
-        print("ERROR:", error)
+    except Exception:
         return -1
 
 
@@ -64,135 +59,6 @@ def get_headers():
         return {"Authorization": f"Bearer {non_repudiation_token}"}
     else:
         return {}
-
-def upload_to_gcs(row):
-    id_value = row["id"]
-    bytea_data = row["fto_imagen"]
-
-    # Convertir bytes a imagen
-    image = Image.open(BytesIO(bytea_data))
-
-    # Guardar imagen localmente (opcional)
-    # image.save(f"local/{id_value}.png")
-
-    # Subir imagen a GCS
-    blob_name = f"{prefix}/{id_value}.png"
-
-    storage_client = storage.Client()
-    bucket = storage_client.bucket(bucket_name)
-    blob = bucket.blob(blob_name)
-
-    # Convertir imagen a bytes antes de subirla
-    byte_stream = BytesIO()
-    image.save(byte_stream, format="PNG")
-    byte_stream.seek(0)
-
-    blob.upload_from_file(byte_stream, content_type="image/png")
-
-def delete_all_objects(bucket_name, prefix):
-    # Crea una instancia del cliente de Cloud Storage
-    storage_client = storage.Client()
-
-    # Obtiene el bucket
-    bucket = storage_client.bucket(bucket_name)
-
-    # Lista todos los objetos en el bucket con el prefijo especificado
-    blobs = bucket.list_blobs(prefix=prefix)
-
-    # Elimina cada objeto
-    for blob in blobs:
-        #print(f"Eliminando objeto: {blob.name}")
-        blob.delete()
-
-def get_blob_info(bucket_name, prefix):
-    # Crea una instancia del cliente de Cloud Storage
-    storage_client = storage.Client()
-
-    # Obtiene el bucket
-    bucket = storage_client.bucket(bucket_name)
-
-    # Lista todos los objetos en el bucket con el prefijo especificado
-    blobs = bucket.list_blobs(prefix=prefix)
-
-    # Lista para almacenar información de blobs
-    blob_info_list = []
-
-    # Recorre todos los blobs y obtiene información
-    for blob in blobs:
-        # Divide el nombre del blob en partes usando '-'
-        parts = blob.name.split('-')
-        print(parts, len(parts))
-
-        if parts[3] =='' and parts[4].split('.')[0] =='sinsiefore':
-            # Obtiene la información de id, formato y área
-            blob_info = {
-                "FTC_POSICION_PDF": parts[0].split('/')[1],
-                "FCN_ID_FORMATO_EDOCTA": int(parts[1]),
-                "FCN_ID_AREA": int(parts[2]),
-                "FTC_URL_IMAGEN": f"https://storage.cloud.google.com/{bucket_name}/{blob.name}",
-                "FTC_IMAGEN": f"{blob.name}",
-                "FTC_RANGO_EDAD":'',
-                "FTC_SIEFORE": parts[4]
-            }
-            blob_info_list.append(blob_info)
-
-        # Asegúrate de que haya al menos tres partes en el nombre
-        if parts[3] =='SinRangoEdad' and parts[4].split('.')[0] =='sinsiefore':
-            # Obtiene la información de id, formato y área
-            blob_info = {
-                "FTC_POSICION_PDF": parts[0].split('/')[1],
-                "FCN_ID_FORMATO_EDOCTA": int(parts[1]),
-                "FCN_ID_AREA": int(parts[2]),
-                "FTC_URL_IMAGEN": f"https://storage.cloud.google.com/{bucket_name}/{blob.name}",
-                "FTC_IMAGEN": f"{blob.name}",
-                "FTC_RANGO_EDAD": parts[3],
-                "FTC_SIEFORE": parts[4]
-            }
-            blob_info_list.append(blob_info)
-
-            # Asegúrate de que haya al menos tres partes en el nombre
-        if len(parts)==6 and parts[3] !='':
-            # Obtiene la información de id, formato y área
-            blob_info = {
-                "FTC_POSICION_PDF": parts[0].split('/')[1],
-                "FCN_ID_FORMATO_EDOCTA": int(parts[1]),
-                "FCN_ID_AREA": int(parts[2].split('.')[0]),
-                "FTC_URL_IMAGEN": f"https://storage.cloud.google.com/{bucket_name}/{blob.name}",
-                "FTC_IMAGEN": f"{blob.name}",
-                "FTC_RANGO_EDAD": f"{parts[3]}-{parts[4]}",
-                "FTC_SIEFORE": parts[5].split('.')[0] if parts[5].split('.')[0] != 'sinsiefore' else None
-            }
-            blob_info_list.append(blob_info)
-
-        # Asegúrate de que haya al menos tres partes en el nombre
-        if len(parts) == 6 and parts[3] =='':
-            # Obtiene la información de id, formato y área
-            blob_info = {
-                "FTC_POSICION_PDF": parts[0].split('/')[1],
-                "FCN_ID_FORMATO_EDOCTA": int(parts[1]),
-                "FCN_ID_AREA": int(parts[2].split('.')[0]),
-                "FTC_URL_IMAGEN": f"https://storage.cloud.google.com/{bucket_name}/{blob.name}",
-                "FTC_IMAGEN": f"{blob.name}",
-                "FTC_SIEFORE": f"{parts[4]}-{parts[5].split('.')[0]}"
-            }
-            blob_info_list.append(blob_info)
-
-        # Asegúrate de que haya al menos tres partes en el nombre
-        if len(parts) == 7:
-            # Obtiene la información de id, formato y área
-            blob_info = {
-                "FTC_POSICION_PDF": parts[0].split('/')[1],
-                "FCN_ID_FORMATO_EDOCTA": int(parts[1]),
-                "FCN_ID_AREA": int(parts[2].split('.')[0]),
-                "FTC_URL_IMAGEN": f"https://storage.cloud.google.com/{bucket_name}/{blob.name}",
-                "FTC_IMAGEN": f"{blob.name}",
-                "FTC_RANGO_EDAD": f"{parts[3]}-{parts[4]}",
-                "FTC_SIEFORE": f"{parts[5]}-{parts[6].split('.')[0]}"
-            }
-            blob_info_list.append(blob_info)
-
-
-    return blob_info_list
 
 
 with define_extraction(phase, area, postgres_pool, ) as (postgres, _):
