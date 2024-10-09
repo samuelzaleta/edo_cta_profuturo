@@ -52,8 +52,7 @@ def get_token():
         non_repudiation_token = jwt.encode(payload, secret, algorithm='HS256')
 
         return non_repudiation_token
-    except Exception as error:
-        print("ERROR:", error)
+    except Exception:
         return -1
 
 
