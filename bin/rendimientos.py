@@ -26,15 +26,12 @@ phase = int(sys.argv[1])
 user = int(sys.argv[3])
 area = int(sys.argv[4])
 
-cuentas = (
-)
+cuentas = ()
 fcn_cuenta = ""
 cuenta_itgy = ""
 if len(cuentas) > 0:
     fcn_cuenta = f"""AND "FCN_CUENTA" IN {cuentas}"""
     cuenta_itgy = f"""AND "CSIE1_NUMCUE" IN {cuentas}"""
-
-
 
 
 with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgres, postgres_oci):
@@ -69,7 +66,7 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
         DISTINCT C."FCN_CUENTA" AS "FCN_CUENTA", TS."FTN_ID_TIPO_SUBCTA" AS "FCN_ID_TIPO_SUBCTA"
         FROM "HECHOS"."TCHECHOS_CLIENTE" C,
         "MAESTROS"."TCDATMAE_TIPO_SUBCUENTA" TS
-        WHERE 1=1 --and C."FCN_ID_PERIODO" = :term
+        WHERE 1=1 and C."FCN_ID_PERIODO" = :term
         --AND C."FCN_CUENTA" = 1330029515
         {fcn_cuenta}
         """
@@ -181,7 +178,6 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
               GROUP BY
               "CSIE1_NUMCUE",
               "SUBCUENTA"
-        
         ) AS mov
         GROUP BY "FCN_CUENTA", "FCN_ID_TIPO_SUBCTA"
         """
@@ -284,7 +280,7 @@ with define_extraction(phase, area, postgres_pool, postgres_oci_pool) as (postgr
             cast(ta.FTF_COMISION as numeric(16,2)) as FTF_COMISION,
             (ta.FTF_SALDO_FINAL - (ta.FTF_ABONO + ta.FTF_SALDO_INICIAL - ta.FTF_COMISION - ta.FTF_CARGO)) AS FTF_RENDIMIENTO_CALCULADO
         FROM tablon AS ta
-        WHERE 1=1 and (ta.FTF_SALDO_FINAL - (ta.FTF_ABONO + ta.FTF_SALDO_INICIAL - ta.FTF_COMISION - ta.FTF_CARGO)) <> 0
+        WHERE 1=1 --and (ta.FTF_SALDO_FINAL - (ta.FTF_ABONO + ta.FTF_SALDO_INICIAL - ta.FTF_COMISION - ta.FTF_CARGO)) <> 0
         """)
         df.show(30)
 
