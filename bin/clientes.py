@@ -30,19 +30,7 @@ with define_extraction(phase, area, postgres_pool,postgres_oci_pool,) as (postgr
     start_month = term["start_month"]
     end_month = term["end_month"]
     with register_time(postgres_pool, phase, term_id, user, area):
-        def insertar_tablas():
-            # Extracción de tablas temporales
 
-            extract_dataset_spark(configure_postgres_spark, configure_postgres_oci_spark,
-                                  """ SELECT * FROM "GESTOR"."TTHECHOS_CARGA_ARCHIVO" """,
-                                  '"MAESTROS"."TTHECHOS_CARGA_ARCHIVO"')
-        def eliminar_tablas():
-            # Elimina tablas temporales
-            postgres_oci.execute(
-                text(""" DROP TABLE IF EXISTS "MAESTROS"."TTHECHOS_CARGA_ARCHIVO" """))
-
-        eliminar_tablas()
-        insertar_tablas()
         # Extracción
         query = f"""
         SELECT
@@ -360,20 +348,30 @@ with define_extraction(phase, area, postgres_pool,postgres_oci_pool,) as (postgr
             AND FTC_VIGENCIA= 1 
         """, view="indicador_generacion")
 
+        read_table_insert_temp_view(configure_postgres_spark, query=f"""
+        SELECT * FROM "HECHOS"."TTHECHOS_CARGA_ARCHIVO"
+        """, view="carga")
+
         df = spark.sql(f"""
-        SELECT 
-               DISTINCT 
-               c.FTN_CUENTA as FCN_CUENTA,
-               {term_id} AS FCN_ID_PERIODO,
-               coalesce(cast(p.FCC_VALOR AS BOOLEAN), false) AS FTB_PENSION, 
-               t.FCC_VALOR AS  FTC_TIPO_CLIENTE,
-               o.FCC_VALOR AS FTC_ORIGEN,
-               v.FCC_VALOR AS FTC_VIGENCIA,
-               g.FCC_VALOR AS FTC_GENERACION,
-               coalesce(cast(p.FCC_VALOR AS BOOLEAN), false)  AS FTB_BONO,
-               tp.FCC_VALOR AS FTC_TIPO_PENSION,
-               i.FCC_VALOR AS FTC_PERFIL_INVERSION
-               --JSON_OBJECT('Vigencia', v.FCC_VALOR, 'Generacion', g.FCC_VALOR) AS FTO_INDICADORES
+        SELECT DISTINCT 
+        c.FTN_CUENTA as FCN_CUENTA,
+        {term_id} AS FCN_ID_PERIODO,
+        CASE 
+           WHEN c.FTN_CUENTA IN (SELECT FCN_CUENTA FROM carga WHERE FCN_ID_INDICADOR = 73)
+           THEN TRUE
+           ELSE coalesce(cast(p.FCC_VALOR AS BOOLEAN), false)
+        END AS FTB_PENSION, 
+        t.FCC_VALOR AS  FTC_TIPO_CLIENTE,
+        o.FCC_VALOR AS FTC_ORIGEN,
+        v.FCC_VALOR AS FTC_VIGENCIA,
+        CASE 
+           WHEN c.FTN_CUENTA IN (SELECT FCN_CUENTA FROM carga WHERE FCN_ID_INDICADOR = 28)
+           THEN 'DECIMO TRANSITORIO'
+           ELSE g.FCC_VALOR
+        END AS FTC_GENERACION,
+        coalesce(cast(b.FCC_VALOR AS BOOLEAN), false) AS FTB_BONO,
+        tp.FCC_VALOR AS FTC_TIPO_PENSION,
+        i.FCC_VALOR AS FTC_PERFIL_INVERSION
         FROM cliente c
             LEFT JOIN indicador_generacion g ON c.FTN_CUENTA = g.FCN_CUENTA
             LEFT JOIN indicador_origen o ON c.FTN_CUENTA = o.FCN_CUENTA
@@ -390,19 +388,6 @@ with define_extraction(phase, area, postgres_pool,postgres_oci_pool,) as (postgr
         df = df.repartition(60)
 
         _write_spark_dataframe(df, configure_postgres_oci_spark, '"HECHOS"."TCHECHOS_CLIENTE"')
-
-        postgres_oci.execute(text("""
-                UPDATE "HECHOS"."TCHECHOS_CLIENTE"
-                SET "FTC_GENERACION" = 'DECIMO TRANSITORIO'
-                WHERE "FCN_CUENTA" IN (SELECT "FCN_CUENTA" FROM "MAESTROS"."TTHECHOS_CARGA_ARCHIVO" WHERE "FCN_ID_INDICADOR" = 28)
-                            """), {"term": term_id, "area": area})
-
-        postgres_oci.execute(text("""
-                UPDATE "HECHOS"."TCHECHOS_CLIENTE"
-                SET "FTB_PENSION" = 'true'
-                WHERE "FCN_CUENTA" IN (SELECT "FCN_CUENTA" FROM "MAESTROS"."TTHECHOS_CARGA_ARCHIVO" WHERE "FCN_ID_INDICADOR" = 73)
-                """), {"term": term_id, "area": area})
-
 
         ## CAMBIOS DE SIEFORE
         postgres_oci.execute(text("""
@@ -553,7 +538,6 @@ with define_extraction(phase, area, postgres_pool,postgres_oci_pool,) as (postgr
             '"MAESTROS"."TCDATMAE_PENSION"',
             params={"end": end_month, "type": "F"},
         )
-        eliminar_tablas()
 
         # Cifras de control
         report = html_reporter.generate(
